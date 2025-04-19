@@ -3,5 +3,6 @@
 
 (setq anki-flashcard-queue
   '(
-    "20240929173550-komutativna_algebra.org"
+    "20240929173550-riemannove_ploskve.org"
+    "20240929173547-dinamicni_sistemi.org"
   ))

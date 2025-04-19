@@ -416,7 +416,7 @@ between Emacs sessions.")
        ("Noto Sans Old Turkic" . 140)         ; Old Turkic
        ("Noto Sans Imperial Aramaic" . 140)   ; Imperial Aramaic
        ("Symbola" . 140)))                    ; General symbol fallback
-
+   
    ;; Set up emoji and special character fonts
    (set-fontset-font t 'symbol "Apple Color Emoji" nil 'prepend)
    (set-fontset-font t '(#x1F300 . #x1FAD6) "Apple Color Emoji") ;; Emoji range
