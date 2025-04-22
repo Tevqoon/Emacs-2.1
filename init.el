@@ -93,6 +93,26 @@
 
 (use-package emacs-everywhere)
 
+;;; -> Initialization -> Browser Integration
+
+(use-package browser-setup
+  :no-require t
+  :ensure nil
+  :if (eq system-type 'darwin)
+  :init
+  (defun browse-url-safari (url &optional _new-window)
+    "Open URL in Safari."
+    (interactive (browse-url-interactive-arg "URL: "))
+    (shell-command-to-string (format "open -a Safari %s" (shell-quote-argument url))))
+  :custom
+  (browse-url-browser-function 'browse-url-safari)
+  (browse-url-secondary-browser-function 'browse-url-firefox)
+  
+  (browse-url-handlers
+   '(("\\`https?://\\(?:www\\.\\)?youtube\\.com" . browse-url-firefox)
+     ("\\`https?://\\(?:www\\.\\)?youtu\\.be" . browse-url-firefox)))
+  )
+
 ;;; -> Initialization -> Misc
 
 ;;; -> Initialization -> Misc -> Persistent Variables Utility
@@ -1217,16 +1237,12 @@ If the buffer already has an ID property, just save the buffer."
   :bind
   (("C-c l" . org-store-link)
    ("C-c C-l" . ar/org-insert-link-dwim)
-   ("C-c n o" . open-link-in-safari)
    :map org-mode-map
    ("M-o" . ace-link-org)
    ("C-c C-l" . ar/org-insert-link-dwim)
    ("C-'" . nil)
    ("C-," . nil)
-   ;; Alternative with arrow-like keys
-   ("C-c n ." . my/org-narrow-to-heading-content) ;; current position
-   ("C-c n >" . my/org-next-heading-narrow)       ;; move forward
-   ("C-c n <" . my/org-previous-heading-narrow)   ;; move backward
+   
    )
   
   :config
@@ -1315,82 +1331,65 @@ This function is expected to be hooked in org-mode."
             (t (call-interactively 'org-insert-link)))))
 
   ;; Browser integration
-  (defun browse-url-safari (url &optional _new-window)
-    "Open URL in Safari."
-    (interactive (browse-url-interactive-arg "URL: "))
-    (shell-command-to-string (format "open -a Safari %s" (shell-quote-argument url))))
   
-  ;; (defun open-link-in-safari ()
-  ;;   "Open the URL at point in Safari quietly."
-  ;;   (interactive)
-  ;;   (let ((url (thing-at-point 'url)))
-  ;;     (if url
-  ;;         (browse-url-safari url)
-  ;; 	(message "No URL at point"))))
 
-  (defun open-link-in-safari (&optional arg)
-  "Open links in Safari.
+  (defun open-urls-at-point-or-region (&optional arg)
+    "Open links in region or at point using configured browsers.
 If region is active, extract and open all URLs found in the region.
 Otherwise, open the URL at point.
-With prefix ARG, prompt for browser choice."
-  (interactive "P")
-  (let ((browse-func #'browse-url-safari))
-    ;; With prefix arg, prompt for browser
-    (when arg
-      (let* ((browsers '(("Safari" . browse-url-safari) 
-                         ("Firefox" . browse-url-firefox)))
-             (choice (completing-read "Choose browser: " (mapcar #'car browsers))))
-        (setq browse-func (cdr (assoc choice browsers)))))
-    
-    ;; If region is active, process URLs in region
-    (if (use-region-p)
-        (let ((text (buffer-substring-no-properties (region-beginning) (region-end)))
-              (count 0))
-          (with-temp-buffer
-            (insert text)
-            (goto-char (point-min))
-            
-            ;; 1. Try org-mode links [[url][description]]
-            (while (re-search-forward "\\[\\[\\([^]]+\\)\\]\\[" nil t)
-              (let ((url (match-string 1)))
-                (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
-                  (funcall browse-func url)
-                  (setq count (1+ count)))))
-            
-            ;; 2. Try Markdown links [description](url)
-            (goto-char (point-min))
-            (while (re-search-forward "\\[.*?\\](\\([^)]*\\))" nil t)
-              (let ((url (match-string 1)))
-                (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
-                  (funcall browse-func url)
-                  (setq count (1+ count)))))
-            
-            ;; 3. Try HTML href attributes
-            (goto-char (point-min))
-            (while (re-search-forward "href=[\"']\\([^\"']+\\)[\"']" nil t)
-              (let ((url (match-string 1)))
-                (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
-                  (funcall browse-func url)
-                  (setq count (1+ count)))))
-            
-            ;; 4. Try plain text URLs if nothing else found
-            (when (= count 0)
+With prefix ARG, use secondary browser."
+    (interactive "P")
+    (let ((browse-url-browser-function (if arg
+					   browse-url-secondary-browser-function
+					 browse-url-browser-function)))
+      (if (use-region-p)
+          (let ((text (buffer-substring-no-properties (region-beginning) (region-end)))
+		(count 0))
+            (with-temp-buffer
+              (insert text)
               (goto-char (point-min))
-              (while (re-search-forward "\\(https?://\\|www\\.\\)[^\s\n\"]+" nil t)
-                (let ((url (match-string 0)))
-                  (when (string-match "^www\\." url)
-                    (setq url (concat "https://" url)))
-                  (when (string-match "\\([.,:;\"']+\\)$" url)
-                    (setq url (substring url 0 (match-beginning 1))))
-                  (funcall browse-func url)
-                  (setq count (1+ count))))))
-          (message "Opened %d URLs in browser" count))
-      
-      ;; Otherwise just use the existing function for single URL
-      (let ((url (thing-at-point 'url)))
-        (if url
-            (funcall browse-func url)
-          (message "No URL at point"))))))
+              
+              ;; 1. Try org-mode links [[url][description]]
+              (while (re-search-forward "\\[\\[\\([^]]+\\)\\]\\[" nil t)
+		(let ((url (match-string 1)))
+                  (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
+                    (browse-url url)
+                    (setq count (1+ count)))))
+              
+              ;; 2. Try Markdown links [description](url)
+              (goto-char (point-min))
+              (while (re-search-forward "\\[.*?\\](\\([^)]*\\))" nil t)
+		(let ((url (match-string 1)))
+                  (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
+                    (browse-url url)
+                    (setq count (1+ count)))))
+              
+              ;; 3. Try HTML href attributes
+              (goto-char (point-min))
+              (while (re-search-forward "href=[\"']\\([^\"']+\\)[\"']" nil t)
+		(let ((url (match-string 1)))
+                  (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
+                    (browse-url url)
+                    (setq count (1+ count)))))
+              
+              ;; 4. Try plain text URLs if nothing else found
+              (when (= count 0)
+		(goto-char (point-min))
+		(while (re-search-forward "\\(https?://\\|www\\.\\)[^\s\n\"]+" nil t)
+                  (let ((url (match-string 0)))
+                    (when (string-match "^www\\." url)
+                      (setq url (concat "https://" url)))
+                    (when (string-match "\\([.,:;\"']+\\)$" url)
+                      (setq url (substring url 0 (match-beginning 1))))
+                    (browse-url url)
+                    (setq count (1+ count))))))
+            (message "Opened %d URLs in browser" count))
+	
+	;; Otherwise just use the built-in browse-url for single URL
+	(let ((url (thing-at-point 'url)))
+          (if url
+              (browse-url url)
+            (message "No URL at point"))))))
 
   ;;; -> Org mode -> Navigation
   (defun my/org-narrow-to-heading-content ()
@@ -1426,7 +1425,8 @@ Automatically expands the heading if it's folded."
   )
 ;;; End of org-mode package block
 
-(use-package org-mac-link)
+(use-package org-mac-link
+  :ensure org)
 
 (use-package xenops
   :after org
@@ -1532,12 +1532,17 @@ Automatically expands the heading if it's folded."
          ("C-c n n a" . org-roam-alias-add)
          ("C-c n c" . org-capture-task)
          ("C-c n n u" . org-roam-ui-open)
-	 ("C-c n o" . open-link-in-safari)
+	 ("C-c n o" . open-urls-at-point-or-region)
 	 ("C-c n r" . js/roamify-url-at-point)
 	 ("C-c n t" . org-roam-tag-add)
 
          :map org-mode-map
          ("C-M-i" . completion-at-point)
+
+	 ;; Narrowing and movement
+	 ("C-c n ." . my/org-narrow-to-heading-content) ;; current position
+	 ("C-c n >" . my/org-next-heading-narrow)       ;; move forward
+	 ("C-c n <" . my/org-previous-heading-narrow)   ;; move backward
          )
   :hook (org-roam-mode . visual-line-mode)
   
@@ -1669,14 +1674,20 @@ Automatically expands the heading if it's folded."
 			    (org-roam-node-title node))))
       (org-link-make-string (concat "id:" id) description)))
 
+  ;;; -> org-roam -> Autocapture -> Browser integration
+  (require 'org-mac-link)
   (defun js/retrieve-url (&optional browser)
-    "Retrieve the URL of the given browser page as a string. Defaults to Safari"
-    (if browser
-	(pcase browser
-	  ('Safari (do-applescript "tell application \"Safari\" to return URL of document 1"))
-	  (_ (message "Browser not supported!")))
-      (do-applescript "tell application \"Safari\" to return URL of document 1"))
-    )
+    "Retrieve the URL of the given browser page as a string.
+Using the org-mac-link, this comes pre-formatted with the url title."
+    (let* ((browser (or browser 'safari)) ;; Default to Safari
+           (url (pcase browser
+                  ('safari (org-mac-link-safari-get-frontmost-url))
+                  ('firefox (org-mac-link-firefox-get-frontmost-url))
+                  ('chrome (org-mac-link-chrome-get-frontmost-url))
+                  ('brave (org-mac-link-brave-get-frontmost-url))
+                  (_ (user-error "Browser %s not supported" browser)))))
+      url))
+  
 
   (defun js/log-page (&optional browser)
     "Captures the currently open browser page in today's org-roam daily journal file."
@@ -1754,7 +1765,7 @@ BROWSER specifies which browser to get the URL from (defaults to Orion)."
 		:props (list :finalize #'roamify-finalizer))
 	       )))))
 
-  ;; Archiving
+  ;;; -> org-roam -> Archiving
   (defun archived-backlink-p (backlink)
     "Checks whether the backlink lives under the Archived today heading."
     (let* ((properties (org-roam-backlink-properties backlink))
@@ -2623,7 +2634,7 @@ All other subheadings will be ignored."
          ("D" . elfeed-filter-downloaded)
 	 ("s" . my/elfeed-show-non-trash)
 	 ("P" . js/log-elfeed-process)
-	 ("B" . elfeed-search-browse-url-firefox)
+	 ("B" . elfeed-browse-with-secondary-browser)
 	 ("W" . my/elfeed-entries-to-wallabag)
 	 
          :map elfeed-show-mode-map
@@ -2634,12 +2645,9 @@ All other subheadings will be ignored."
 	 ("t" . elfeed-show-trash)
          ("i" . open-youtube-in-iina)
 	 ("M-o" . ace-link-safari)
-	 ("B" . elfeed-show-browse-url-firefox)
+	 ("B" . elfeed-browse-with-secondary-browser)
 	 ("W" . my/elfeed-entries-to-wallabag)
          )
-  :custom
-  (browse-url-firefox-program "open")
-  (browse-url-firefox-arguments '("-a" "Firefox"))
   :hook
   (elfeed-show-mode . mixed-pitch-mode)
   (elfeed-show-mode . visual-line-mode)
@@ -2778,19 +2786,14 @@ Executing a filter in bytecode form is generally faster than
 		,@(when before
                     `((> age ,before))))))))
 
-  ;; Function to open current entry in Firefox (search mode)
-  (defun elfeed-search-browse-url-firefox ()
-    "Visit the current entry in Firefox."
+  (defun elfeed-browse-with-secondary-browser ()
+    "Visit the current entry in the secondary browser."
     (interactive)
-    (let ((browse-url-browser-function 'browse-url-firefox))
-      (elfeed-search-browse-url)))
+    (let ((browse-url-browser-function browse-url-secondary-browser-function))
+      (if (derived-mode-p 'elfeed-show-mode)
+          (browse-url (elfeed-entry-link elfeed-show-entry))
+	(elfeed-search-browse-url))))
 
-  ;; Function for show mode
-  (defun elfeed-show-browse-url-firefox ()
-    "Visit the current entry in Firefox."
-    (interactive)
-    (let ((browse-url-browser-function 'browse-url-firefox))
-      (elfeed-show-browse-url)))
 
 ;;; -> Elfeed -> Wallabag integration
   (defun my/elfeed-entries-to-wallabag (&optional entries)
