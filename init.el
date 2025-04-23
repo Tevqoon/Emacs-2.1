@@ -1624,27 +1624,30 @@ Automatically expands the heading if it's folded."
 			 ;:props (list :override-default-time (current-time))
 			 )
       ))
-  
+
+  ;;; -> org-roam -> Autocapture -> Browser integration
+  (require 'org-mac-link)
+
   (defvar org-roam-capture--browser nil
     "Variable to pass current browser to capture templates.")
   
   ;;; TODO: Simplify the autocapture templates
   (defvar org-roam-dailies-autocapture-templates
-    '(("w" "Safari url capture" entry "* %(js/format-link (js/retrieve-url org-roam-capture--browser))"
+    '(("w" "url capture" entry "* %(eval org-roam-capture-content)"
        :target (file+head+olp "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content" ("Web"))
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Web"))
        :immediate-finish t)
-      ("r" "Safari url reading capture" entry "* PROCESS %(js/format-link (js/retrieve-url org-roam-capture--browser))"
+      ("r" "url reading capture" entry "* PROCESS %(eval org-roam-capture-content)"
        :target (file+head+olp "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing"))
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing"))
        :immediate-finish t)
       ("e" "elfeed link capture" entry "* %(eval org-roam-capture-content)"
        :target (file+head+olp "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content" ("Elfeed"))
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Elfeed"))
        :immediate-finish t)
       ("p" "process capture" entry "* PROCESS %(eval org-roam-capture-content)"
        :target (file+head+olp "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing"))
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing"))
        :immediate-finish t)
       ("c" "chatlog capture" entry "* %(eval org-roam-capture-content)"
        :target (file+head+olp "%<%Y-%m-%d>.org"
@@ -1673,61 +1676,112 @@ Automatically expands the heading if it's folded."
 	   (description (or description
 			    (org-roam-node-title node))))
       (org-link-make-string (concat "id:" id) description)))
+  
+  (defvar js/browsers '((Safari . org-mac-link-safari-get-frontmost-url)
+			(Firefox . org-mac-link-firefox-get-frontmost-url))
+    "Association list of available browsers with their corresponding URL retrieval functions.")
 
-  ;;; -> org-roam -> Autocapture -> Browser integration
-  (require 'org-mac-link)
   (defun js/retrieve-url (&optional browser)
     "Retrieve the URL of the given browser page as a string.
 Using the org-mac-link, this comes pre-formatted with the url title."
-    (let* ((browser (or browser 'safari)) ;; Default to Safari
-           (url (pcase browser
-                  ('safari (org-mac-link-safari-get-frontmost-url))
-                  ('firefox (org-mac-link-firefox-get-frontmost-url))
-                  ('chrome (org-mac-link-chrome-get-frontmost-url))
-                  ('brave (org-mac-link-brave-get-frontmost-url))
-                  (_ (user-error "Browser %s not supported" browser)))))
-      url))
-  
+    (let* ((browser (or browser 'Safari)) ;; Default to Safari
+           (url-function (cdr (assoc browser js/browsers))))
+      (if url-function
+          (funcall url-function)
+	(user-error "Browser %s not supported" browser))))
 
-  (defun js/log-page (&optional browser)
-    "Captures the currently open browser page in today's org-roam daily journal file."
+  (defun js/extract-org-link (org-link-string)
+    "Extract the URL and description from an Org formatted link string."
+    (with-temp-buffer
+      (insert org-link-string)
+      (org-mode)
+      (goto-char (point-min))
+      (let ((link-context (org-element-link-parser)))
+	(when link-context
+          (let ((raw-link (org-element-property :raw-link link-context))
+		(description (buffer-substring-no-properties
+                              (org-element-property :contents-begin link-context)
+                              (org-element-property :contents-end link-context))))
+            (list raw-link description))))))
+
+  (defvar js/url-targets
+    '((Log . js/url-target-log)
+      (Process . js/url-target-process)
+      (Wallabag . js/url-target-wallabag))
+    "Alist of available URL handling targets and their handler functions.")
+
+  ;; Handler functions for each target
+  (defun js/url-target-log (url-source)
+    "Log URL-SOURCE to the daily journal."
+    (let ((org-roam-capture-content url-source))
+      (org-roam-dailies-autocapture-today "w"))
+    "logged")
+
+  (defun js/url-target-process (url-source)
+    "Log URL-SOURCE to the processing section."
+    (let ((org-roam-capture-content url-source))
+      (org-roam-dailies-autocapture-today "r"))
+    "processed")
+
+  (defun js/url-target-wallabag (url-source)
+    "Add URL-SOURCE to wallabag."
+    (let* ((url-parts (js/extract-org-link url-source))
+           (url (when url-parts (car url-parts))))
+      (when url
+	(message "Adding to wallabag: %s" url)
+	(wallabag-add-entry url)
+	;; Sync wallabag changes to server
+	(run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)
+	"added to wallabag")))
+
+  (cl-defun js/log-page (&key url browser clipboard (targets '(Log)) interactive)
+    "Process a URL according to specified targets.
+Keyword arguments:
+:url         - direct URL string
+:browser     - browser symbol (e.g., 'Safari)
+:clipboard   - non-nil to check clipboard
+:interactive - non-nil to prompt for browser
+:targets     - list of targets (Log, Process, Wallabag)
+               default is '(Log)
+
+Examples:
+  (js/log-page :browser 'Safari)
+  (js/log-page :browser 'Safari :targets '(Process Wallabag))
+  (js/log-page :clipboard t :targets '(Process))
+  (js/log-page :url \"https://example.com\" :targets '(Log Wallabag))
+
+For emacsclient:
+  emacsclient --eval \"(js/log-page :browser 'Safari)\"
+  emacsclient --eval \"(js/log-page :browser 'Safari :targets '(Process))\"
+  emacsclient --eval \"(js/log-page :targets '(Log Wallabag))\"
+"
     (interactive)
-    (let ((org-roam-capture--browser browser))
-      (org-roam-dailies-autocapture-today "w")
-      (alert "Logged page!"
-             :title "Org Logger" :category 'debug)))
+    
+    ;; Get URL from specified source
+    (let* ((url-source (or url
+                           (when browser (js/retrieve-url browser))
+                           (when (or clipboard (not (or url browser interactive)))
+                             (let ((clip (current-kill 0 t)))
+                               (when (and clip (string-match-p "^https?://" clip))
+				 clip)))
+                           (when (or interactive (not (or url browser)))
+                             (js/retrieve-url (intern (completing-read "Select browser: " js/browsers nil t 'Safari))))))
+           (results '()))
+      
+      (when url-source
+	;; Apply each requested target
+	(dolist (target targets)
+          (when-let* ((handler-fn (cdr (assq target js/url-targets)))
+                      (result (funcall handler-fn url-source)))
+            (push result results)))
+	
+	;; Alert based on actions taken
+	(alert (format "URL %s!" (string-join results " and "))
+               :title "URL Handler" :category 'debug)
+	
+	;; Return the URL source for potential chaining
+	url-source)))
 
-  (defun js/log-page-to-process (&optional browser)
-  "Captures the currently open safari page into the daily processing list."
-  (interactive)
-  (let ((org-roam-capture--browser browser))
-    (org-roam-dailies-autocapture-today "r")
-    (alert "Logged page for processing!"
-           :title "Org Logger" :category 'debug)))
-
-  (defun js/add-page-to-wallabag (&optional browser)
-  "Adds the currently open browser page to wallabag and logs it.
-BROWSER specifies which browser to get the URL from (defaults to Orion)."
-  (interactive)
-  (let ((org-roam-capture--browser browser)
-        (url (js/retrieve-url browser)))
-    (if url
-        (progn
-          ;; Add to wallabag
-          (message "Adding to wallabag: %s" url)
-          (wallabag-add-entry url)
-          
-          ;; Log to daily file
-          (org-roam-dailies-autocapture-today "w")
-          
-          ;; Sync wallabag changes to server
-          (run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)
-          
-          ;; Provide feedback
-          (alert "Added page to wallabag and logged!"
-                 :title "Wallabag + Logger" :category 'debug))
-      (message "Could not retrieve URL from browser"))))
-  
   (defun js/roamify-url-at-point ()
     "Convert a URL at point into an org-roam node and replace the link."
     (interactive)
