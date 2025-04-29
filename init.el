@@ -110,7 +110,8 @@
   
   (browse-url-handlers
    '(("\\`https?://\\(?:www\\.\\)?youtube\\.com" . browse-url-firefox)
-     ("\\`https?://\\(?:www\\.\\)?youtu\\.be" . browse-url-firefox)))
+     ("\\`https?://\\(?:www\\.\\)?youtu\\.be" . browse-url-firefox))
+   )
   )
 
 ;;; -> Initialization -> Misc
@@ -660,17 +661,21 @@ between Emacs sessions.")
 (use-package deadgrep
   :defines
   deadgrep-mode-map
-  org-roam-dailies-directory
+  org-roam-dailie
+s-directory
   deadgrep-project-root-function
   org-roam-directory
   :functions
   deadgrep-search-directory
   :after org-roam
+  :hook (deadgrep-finished-hook . my/deadgrep-activate-org-links)
   :bind (("<f5>" . deadgrep)
 	 ("C-c n e d" . deadgrep-search-org-roam-dailies)
 	 ("C-c n e n" . deadgrep-search-org-roam)
 	 :map deadgrep-mode-map
-	 ("q" . quit-window--and-kill))
+	 ("q" . quit-window--and-kill)
+	 ("M-o" . ace-link-org)
+	 ())
   :config
   (defun deadgrep-search-directory (dir)
     "Search a specific directory using deadgrep."
@@ -688,6 +693,50 @@ between Emacs sessions.")
     (interactive)
     (deadgrep-search-directory
      (expand-file-name org-roam-dailies-directory org-roam-directory)))
+
+  (defun my/deadgrep-activate-org-links ()
+    "Activate Org links in deadgrep results buffer."
+    (interactive)
+    (when (eq major-mode 'deadgrep-mode)
+      (let ((inhibit-read-only t))
+	;; Make sure org is loaded
+	(require 'org)
+	
+	;; Find and process links
+	(save-excursion
+          (goto-char (point-min))
+          (while (re-search-forward org-link-bracket-re nil t)
+            (let* ((start (match-beginning 0))
+                   (end (match-end 0))
+                   (link-text (buffer-substring-no-properties start end))
+                   (path (match-string-no-properties 1))
+                   (desc (or (match-string-no-properties 2) path))
+                   (overlay (make-overlay start end)))
+              
+              ;; Apply the link face
+              (overlay-put overlay 'face 'org-link)
+              (overlay-put overlay 'mouse-face 'highlight)
+              
+              ;; Make it clickable using org's machinery
+              (overlay-put overlay 'help-echo 
+                           (concat "Link: " path "\nMouse-1: Open link"))
+              (overlay-put overlay 'keymap 
+                           (let ((map (make-sparse-keymap)))
+                             (define-key map [mouse-1] 
+					 (lambda () 
+					   (interactive)
+					   (save-excursion
+					     (org-link-open-from-string link-text))))
+                             (define-key map (kbd "RET")
+					 (lambda ()
+					   (interactive)
+					   (save-excursion
+					     (org-link-open-from-string link-text))))
+                             map))
+              
+              ;; Only display the description if different from path
+              (when (and desc (not (string= desc path)))
+		(overlay-put overlay 'display desc))))))))
   )
 
 (use-package wgrep
@@ -705,6 +754,7 @@ between Emacs sessions.")
   :bind (("s-u" . counsel-ace-link)
          :map prog-mode-map
          ("M-o" . ace-link-addr)
+	 
          )
   :init
   (ace-link-setup-default)
@@ -1661,7 +1711,7 @@ Automatically expands the heading if it's folded."
     "A function to automatically capture content into a daily template."
     (let ((org-roam-directory (expand-file-name org-roam-dailies-directory org-roam-directory))
           (org-roam-dailies-directory "./")
-	  (org-roam-capture-content contents)
+	  (org-roam-capture-content (or contents org-roam-capture-content))
 	  )
       (org-roam-capture- :keys keys
 			 :node (org-roam-node-create)
@@ -2657,6 +2707,8 @@ All other subheadings will be ignored."
 
 (use-package osm
   :bind-keymap ("C-c n m" . osm-prefix-map) ;; Alternatives: `osm-home' or `osm'
+  :bind (:map osm-prefix-map
+	      ("o" . my/open-heading-coords-in-osm))
   :custom
   ;; Take a look at the customization group `osm' for more options.
   (osm-server 'default) ;; Configure the tile server
@@ -2669,6 +2721,32 @@ All other subheadings will be ignored."
   ;;   :group "Custom"
   ;;   :description "Tiles based on aerial images"
   ;;   :url "https://myserver/tiles/%z/%x/%y.png?apikey=%k")
+
+  (defun my/open-heading-coords-in-osm ()
+    "Extract coordinates from heading properties and open in OSM."
+    (interactive)
+    (save-excursion
+      (while (and (not (org-at-heading-p)) (not (bobp)))
+	(outline-previous-heading))
+      (when (org-at-heading-p)
+	(let ((lat nil)
+              (lon nil))
+          ;; Search for latitude and longitude in properties
+          (let ((props (org-entry-properties nil 'standard)))
+            (setq lat (cdr (assoc "LATITUDE" props)))
+            (setq lon (cdr (assoc "LONGITUDE" props))))
+          
+          (if (and lat lon)
+              (progn
+		;; Convert to numbers if they contain commas (European format)
+		(when (string-match "," lat)
+                  (setq lat (replace-regexp-in-string "," "." lat)))
+		(when (string-match "," lon)
+                  (setq lon (replace-regexp-in-string "," "." lon)))
+		
+		(message "Opening coordinates: %s, %s" lat lon)
+		(osm-goto (string-to-number lat) (string-to-number lon) 15))
+            (message "No coordinates found in heading properties"))))))
   )
 
 ;;; --> Elfeed
