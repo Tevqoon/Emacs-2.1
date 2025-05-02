@@ -2787,7 +2787,7 @@ All other subheadings will be ignored."
   ;; (elfeed-search-mode . my/elfeed-setup-local-activation-hooks)
   :config
   ;; Variables
-  (setq-default elfeed-search-filter "-trash @6-months-ago +unread")
+  (setq-default elfeed-search-filter "-trash @7-days-ago +unread")
 
   ;; Functions
   (defun elfeed-scroll-up-command (&optional arg)
@@ -2820,13 +2820,13 @@ All other subheadings will be ignored."
   (defun my/elfeed-show-non-trash ()
     "Set Elfeed search filter to exclude only 'trash' tagged entries and start live filtering."
     (interactive)
-    (setq elfeed-search-filter "-trash @6-months-ago ")
+    (setq elfeed-search-filter "-trash @7-days-ago ")
     (elfeed-search-update :force)
     (elfeed-search-live-filter))
 
   (defun my/elfeed-show-non-trash--no-search ()
     (interactive)
-    (setq elfeed-search-filter "-trash @6-months-ago ")
+    (setq elfeed-search-filter "-trash @7-days-ago ")
     (elfeed-search-update :force))
 
   (defun elfeed-filter-trash ()
@@ -3075,8 +3075,32 @@ This is attached directly to database modification functions."
     (when my/elfeed-debug
       (message "Elfeed: Setup complete!")))
 
+  (defun my/elfeed-disable-sync ()
+    "Disable database synchronization by removing hooks and advice."
+    (when my/elfeed-debug
+      (message "Elfeed: Disabling sync system..."))
+    
+    ;; Remove advice from core functions
+    (advice-remove 'elfeed-tag #'my/elfeed-mark-db-modified)
+    (advice-remove 'elfeed-untag #'my/elfeed-mark-db-modified)
+    (advice-remove 'elfeed-db-add #'my/elfeed-mark-db-modified)
+    
+    ;; Remove load on entering/focusing Elfeed
+    (advice-remove 'elfeed #'my/elfeed-load-db)
+    
+    ;; Remove the local hooks from elfeed modes
+    (remove-hook 'elfeed-search-mode-hook #'my/elfeed-setup-local-activation-hooks)
+    (remove-hook 'elfeed-show-mode-hook #'my/elfeed-setup-local-activation-hooks)
+    
+    ;; Remove save on exit
+    (advice-remove 'elfeed-search-quit-window #'my/elfeed-save-if-modified)
+    (remove-hook 'kill-emacs-hook #'my/elfeed-save-if-modified)
+    
+    (when my/elfeed-debug
+      (message "Elfeed: Sync system disabled!")))
+
   ;; Initialize the system
-  (my/elfeed-setup-sync)
+  ;; (my/elfeed-setup-sync)
 
   ;; Command to manually trigger a save
   (defun my/elfeed-manual-save ()

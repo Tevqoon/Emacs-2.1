@@ -54,6 +54,7 @@
 	kmacro-end-or-call-macro
 	lean4-tab-indent
 	markdown-outdent-or-delete
+	math-delimiters-insert
 	open-link-in-safari
 	org-agenda-archive-default
 	org-agenda-priority-down
