@@ -396,8 +396,12 @@ between Emacs sessions.")
    )
 
   ('gnu/linux
+   (menu-bar-mode -1)
+   (scroll-bar-mode -1)
+   
    (defvar org-roam-directory "~/org")
    (defvar org-directory "~/org")
+   
    
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
