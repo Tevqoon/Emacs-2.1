@@ -396,6 +396,12 @@ between Emacs sessions.")
    )
 
   ('gnu/linux
+   (defvar org-roam-directory "~/org")
+   (defvar org-directory "~/org")
+   
+   (set-register ?r '(file . "~/.emacs.d/init.el"))
+   (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
+   (set-register ?p `(file . ,(concat org-directory "/journals/Journelly.org")))
    )
   
   (_ (display-warning 'os "Unhandled operating system %s" system-type :warning))
