@@ -358,6 +358,7 @@ between Emacs sessions.")
    ;; Registers ;;
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
+   (set-register ?p `(file . ,(concat org-directory "/journals/Journelly.org")))
    )
   ;;; Android configuration
   ('android
@@ -668,7 +669,7 @@ s-directory
   :functions
   deadgrep-search-directory
   :after org-roam
-  :hook (deadgrep-finished-hook . my/deadgrep-activate-org-links)
+  :hook (deadgrep-finished . my/deadgrep-activate-org-links)
   :bind (("<f5>" . deadgrep)
 	 ("C-c n e d" . deadgrep-search-org-roam-dailies)
 	 ("C-c n e n" . deadgrep-search-org-roam)
@@ -787,6 +788,26 @@ s-directory
       (when pt
 	(goto-char pt)
 	(org-open-at-point))))
+
+  (defun my/ace-link-agenda-current-line ()
+    "Open the link in the current Org agenda line directly, if one exists."
+    (interactive)
+    (let ((line-text (buffer-substring-no-properties
+                      (line-beginning-position)
+                      (line-end-position)))
+          (link-regex org-link-any-re)
+          link-start)
+      ;; Check if there's a link in the current line
+      (save-excursion
+	(goto-char (line-beginning-position))
+	(setq link-start (and (re-search-forward link-regex (line-end-position) t)
+                              (match-beginning 0))))
+      
+      (if link-start
+          (progn
+            (goto-char link-start)
+            (org-open-at-point))
+	(message "No link found in the current agenda line"))))
   )
 
 (use-package crux
@@ -818,7 +839,9 @@ s-directory
 (use-package casual-dired
   :defines dired-mode-map
   :ensure nil
-  :bind (:map dired-mode-map ("C-o" . casual-dired-tmenu)))
+  :bind (:map dired-mode-map ("C-o" . casual-dired-tmenu))
+  :custom
+  (dired-listing-switches "-lagGFDh"))
 
 (use-package dired-preview
   :bind (:map dired-mode-map ("P" . dired-preview-mode)))
@@ -829,7 +852,7 @@ s-directory
   :hook
   (markdown-mode . imenu-add-menubar-index)
   (makefile-mode . imenu-add-menubar-index)
-  (prog-mode . imenu-add-menubar-index)
+  ;; (prog-mode . imenu-add-menubar-index)
   (org-mode . imenu-add-menubar-index)
   )
 
@@ -2550,7 +2573,7 @@ All other subheadings will be ignored."
   
   :bind (("C-c a" . open-org-agenda)
 	 :map org-agenda-mode-map
-	 ("o" . ace-link-org-agenda)
+	 ("o" . my/ace-link-agenda-current-line)
 	 ("M-o" . my/ace-link-org-agenda-urls)
 	 ;; This one doesn't change the view
 	 ("g" . org-agenda-redo)
@@ -2637,7 +2660,8 @@ All other subheadings will be ignored."
 			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
 			 (org-agenda-overriding-header "* High-priority unfinished tasks:")))
 		  (todo "COURSE" ((org-agenda-overriding-header "* Active courses: ")))
-		  (todo "EXAM" ((org-agenda-overriding-header "* Looming exams: ")))
+		  (todo "EXAM" ((org-agenda-overriding-header "* Looming exams: ")
+				(org-agenda-sorting-strategy '(deadline-up))))
 		  (todo "ACTIVE" ((org-agenda-overriding-header "* Active projects: ")))
 		  (todo "PROJECT" ((org-agenda-overriding-header "* Projects: ")))
 		  (todo "NEXT" ((org-agenda-skip-function '(or (air-org-skip-subtree-if-priority ?A)
@@ -2684,6 +2708,7 @@ All other subheadings will be ignored."
      (python . t)
      (C . t)
      (haskell . t)
+     (octave . t)
      ))
 
 
@@ -2761,13 +2786,16 @@ All other subheadings will be ignored."
          ("SPC" . elfeed-search-show-entry)
 	 ("t" . elfeed-search-trash)
          ("T" . elfeed-filter-trash)
+	 ("A" . elfeed-filter-asmr)
          ("i" . open-youtube-in-iina)
          ("I" . download-selected-youtube-videos)
          ("D" . elfeed-filter-downloaded)
-	 ("s" . my/elfeed-show-non-trash)
+	 ("s" . my/elfeed-show-default)
 	 ("P" . js/log-elfeed-process)
 	 ("B" . elfeed-browse-with-secondary-browser)
 	 ("W" . my/elfeed-entries-to-wallabag)
+	 ("<wheel-up>" . previous-line)
+	 ("<wheel-down>" . next-line)
 	 
          :map elfeed-show-mode-map
          ("SPC" . elfeed-scroll-up-command)
@@ -2784,10 +2812,11 @@ All other subheadings will be ignored."
   (elfeed-show-mode . mixed-pitch-mode)
   (elfeed-show-mode . visual-line-mode)
   (elfeed-show-mode . efs/org-mode-visual-fill)
+  (elfeed-search-mode . my/setup-elfeed-scroll)
   ;; (elfeed-search-mode . my/elfeed-setup-local-activation-hooks)
   :config
   ;; Variables
-  (setq-default elfeed-search-filter "-trash @7-days-ago +unread")
+  (setq-default elfeed-search-filter "-trash -asmr @7-days-ago +unread")
 
   ;; Functions
   (defun elfeed-scroll-up-command (&optional arg)
@@ -2806,6 +2835,41 @@ All other subheadings will be ignored."
           (scroll-down-command arg)
         (error (elfeed-show-prev)))))
 
+  ;; Elfeed mouse support
+  (defun my/setup-elfeed-scroll ()
+    "Set up scroll bindings for elfeed-show-mode with adjusted sensitivity."
+    (let ((map (make-sparse-keymap)))
+      ;; Create custom scroll functions with reduced sensitivity
+      (defun my/elfeed-previous-line (event)
+	(interactive "e")
+	;; Extract the delta from the event
+	(when-let* ((delta (and (nth 4 event)
+				(round (cdr (nth 4 event)))))
+                    ;; Reduce sensitivity by dividing the delta
+                    (adjusted-delta (/ delta 5)))  ;; Adjust this divisor as needed
+          (unless (zerop adjusted-delta)
+            (previous-line (max 1 (abs adjusted-delta))))))
+      
+      (defun my/elfeed-next-line (event)
+	(interactive "e")
+	;; Extract the delta from the event
+	(when-let* ((delta (and (nth 4 event)
+				(round (cdr (nth 4 event)))))
+                    ;; Reduce sensitivity by dividing the delta
+                    (adjusted-delta (/ delta 4)))  ;; Adjust this divisor as needed
+          (unless (zerop adjusted-delta)
+            (next-line (max 1 (abs adjusted-delta))))))
+      
+      ;; Define our local wheel bindings with adjusted sensitivity
+      (define-key map (kbd "<wheel-up>") #'my/elfeed-previous-line)
+      (define-key map (kbd "<wheel-down>") #'my/elfeed-next-line)
+      (define-key map (kbd "<mouse-2>") #'elfeed-search-browse-url)
+      
+      ;; Override the mode-specific map
+      (setq-local minor-mode-overriding-map-alist
+                  (cons (cons pixel-scroll-precision-mode map)
+			minor-mode-overriding-map-alist))))
+
   ;; Give a visual indicator of the filter being cleared.
   ;; Helps with an inbox zero approach to elfeed.
   (advice-add 'elfeed-search-clear-filter
@@ -2817,8 +2881,8 @@ All other subheadings will be ignored."
     (when message (message message)))
 
   ;; Trash
-  (defun my/elfeed-show-non-trash ()
-    "Set Elfeed search filter to exclude only 'trash' tagged entries and start live filtering."
+  (defun my/elfeed-show-default () ; s
+    "Set Elfeed search filter to exclude 'trash' tagged entries and start live filtering."
     (interactive)
     (setq elfeed-search-filter "-trash @7-days-ago ")
     (elfeed-search-update :force)
@@ -2843,6 +2907,12 @@ All other subheadings will be ignored."
     (interactive)
     (elfeed-show-tag 'trash)
     (elfeed-show-next))
+
+  ;; ASMR
+  (defun elfeed-filter-asmr ()
+    "Open up the asmr tagged feed."
+    (interactive)
+    (elfeed-filter-maker "-trash +asmr @1-months-ago" "Showing ASMR."))
 
   ;;; Modified so we can search both by feed name and author.
   (defun elfeed-search-compile-filter (filter)
@@ -2948,7 +3018,7 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
           (if url
               (progn
 		(message "Adding to wallabag: %s" title)
-		(wallabag-add-entry url)
+		(wallabag-add-entry url "Unread")
 		(cl-incf added-count))
             (message "No URL found for entry: %s" title))))
       
@@ -2958,6 +3028,7 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
 	(run-with-timer 2 nil #'wallabag-request-and-synchronize-entries))
       
       (message "Added %d entries to wallabag" added-count)))
+  
 ;;; -> Elfeed -> Multi-Device Syncing
 
 ;;; Core Variables
@@ -3383,6 +3454,21 @@ If a key is provided, use it instead of the default capture template."
   ) ;;
 ;;; End of elfeed-tube package block
 
+;;; -> Elfeed -> Elfeed-score
+
+(use-package elfeed-score
+  :ensure t
+  :config
+  (progn
+    (setq elfeed-search-print-entry-function #'elfeed-score-print-entry)
+
+    (elfeed-score-enable)
+    (define-key elfeed-search-mode-map "=" elfeed-score-map))
+
+  )
+
+;;; -> Elfeed -> End
+
 ;;; --> Wallabag
 
 (use-package request
@@ -3775,6 +3861,11 @@ If a key is provided, use it instead of the default capture template."
 (use-package haskell-mode
   :defer t)
 
+;;; -> Programming -> Nix
+
+(use-package nix-mode
+  :mode "\\.nix\\'")
+
 ;;; -> Programming -> OCaml
 ;;; Adapted from
 ;;; https://batsov.com/articles/2022/08/23/setting-up-emacs-for-ocaml-development/
@@ -3811,6 +3902,18 @@ If a key is provided, use it instead of the default capture template."
 ;;   :vc (:url "https://github.com/leanprover-community/lean4-mode")
 ;;   ;; to defer loading the package until required
 ;;   :commands (lean4-mode))
+
+;;; -> Programming -> Octave
+
+(use-package octave
+  :mode (("\\.m\\'" . octave-mode))
+  :config
+  ;; (setq octave-block-offset 4)
+  ;; (add-hook 'octave-mode-hook
+  ;;           (lambda ()
+  ;;             (setq comment-start "% ")
+  ;;             (setq comment-add 0)))
+  )
 
 ;;; --> Misc functions
 
@@ -3854,6 +3957,36 @@ Calling with double prefix ARG (C-u C-u) runs Emacs with -Q."
   (interactive)
   (quit-window t))
 
+(defun random-line ()
+  "Jump to random line in the buffer."
+  (interactive)
+  (goto-line (1+ (random (count-lines (point-min) (point-max))))))
+
+(defvar-local hoagie-narrow-toggle-markers nil
+  "A cons cell (beginning . end) that is updated when using `hoagie-narrow-toggle'.")
+
+(defun hoagie-narrow-toggle ()
+  "Toggle widening/narrowing of the current buffer.
+If the buffer is narrowed, store the boundaries in
+`hoagie-narrow-toggle-markers' and widen.
+If the buffer is widened, then narrow to region if
+`hoagie-narrow-toggle-markers' is non nil (and then discard those
+markers, resetting the state)."
+  (interactive)
+  (if (buffer-narrowed-p)
+      (progn
+        (setf hoagie-narrow-toggle-markers (cons (point-min)
+                                                 (point-max)))
+        (widen))
+    ;; check for toggle markers
+    (if (not hoagie-narrow-toggle-markers)
+        (message "No narrow toggle markers.")
+      ;; do the thing
+      (narrow-to-region (car hoagie-narrow-toggle-markers)
+                        (cdr hoagie-narrow-toggle-markers))
+      (setf hoagie-narrow-toggle-markers nil))))
+
+(global-set-key (kbd "C-x n t") #'hoagie-narrow-toggle)
 
 ;;;
 ;;; End of configuration file.
