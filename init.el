@@ -394,6 +394,9 @@ between Emacs sessions.")
     'android-keyboard              ; property
     :help "Display Android keyboard")
    )
+
+  ('gnu/linux
+   )
   
   (_ (display-warning 'os "Unhandled operating system %s" system-type :warning))
   )
@@ -1035,7 +1038,7 @@ s-directory
   :load-path "~/.emacs.d/lisp/function-groups/")
 
 (use-package vterm
-  :if (not (eq system-type 'android)))
+  :if (eq system-type 'darwin))
 
 ;;; --> AI configuration
 ;;; -> AI configuration -> GPTel
@@ -1237,7 +1240,7 @@ If the buffer already has an ID property, just save the buffer."
 ;;; -> AI configuration -> aidermacs
 
 (use-package aidermacs
-  :if (not (eq system-type 'android))
+  :if (eq system-type 'darwin)
   :after gptel vterm
   :bind ("C-c g a" . aidermacs-transient-menu)
   :custom
@@ -1499,6 +1502,7 @@ Automatically expands the heading if it's folded."
 ;;; End of org-mode package block
 
 (use-package org-mac-link
+  :if (eq system-type 'darwin)
   :ensure org)
 
 (use-package xenops
@@ -1699,7 +1703,6 @@ Automatically expands the heading if it's folded."
       ))
 
   ;;; -> org-roam -> Autocapture -> Browser integration
-  (require 'org-mac-link)
 
   (defvar org-roam-capture--browser nil
     "Variable to pass current browser to capture templates.")
@@ -1749,15 +1752,20 @@ Automatically expands the heading if it's folded."
 	   (description (or description
 			    (org-roam-node-title node))))
       (org-link-make-string (concat "id:" id) description)))
+
   
-  (defvar js/browsers '((Safari . org-mac-link-safari-get-frontmost-url)
-			(Firefox . org-mac-link-firefox-get-frontmost-url))
+  (defvar js/browsers
+    (pcase system-type
+      ('darwin
+       '((Safari . org-mac-link-safari-get-frontmost-url)
+	 (Firefox . org-mac-link-firefox-get-frontmost-url)))
+      (_ '(NoBrowser . (lambda () "No browser function configured!"))))
     "Association list of available browsers with their corresponding URL retrieval functions.")
 
   (defun js/retrieve-url (&optional browser)
     "Retrieve the URL of the given browser page as a string.
 Using the org-mac-link, this comes pre-formatted with the url title."
-    (let* ((browser (or browser 'Safari)) ;; Default to Safari
+    (let* ((browser (or browser (caar js/browsers))) ;; Default to first browser in list
            (url-function (cdr (assoc browser js/browsers))))
       (if url-function
           (funcall url-function)
