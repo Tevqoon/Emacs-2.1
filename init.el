@@ -398,6 +398,8 @@ between Emacs sessions.")
   ('gnu/linux
    (menu-bar-mode -1)
    (scroll-bar-mode -1)
+
+   (define-key key-translation-map (kbd "ESC") (kbd "C-g")) ; works in gui only
    
    (defvar org-roam-directory "~/org")
    (defvar org-directory "~/org")
@@ -406,6 +408,8 @@ between Emacs sessions.")
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
    (set-register ?p `(file . ,(concat org-directory "/journals/Journelly.org")))
+   (set-register ?l '(file . "~/.stumpwm.d/init.lisp")) ;; StumpWM config
+   (set-register ?n '(file . "/etc/nixos/configuration.nix")) ;; StumpWM config
    )
   
   (_ (display-warning 'os "Unhandled operating system %s" system-type :warning))
