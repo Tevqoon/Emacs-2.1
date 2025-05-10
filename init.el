@@ -570,7 +570,7 @@ between Emacs sessions.")
    (defvar fallback-font-families
      '(("Symbola" . 140)                    ; Symbol coverage
        ("Noto Color Emoji" . 140)))         ; Emoji support
-   
+
    ;; Set up symbol ranges to use Symbola
    (set-fontset-font t 'symbol "Symbola" nil 'prepend)
    (set-fontset-font t '(#x2600 . #x27BF) "Symbola")  ;; Misc Symbols range
@@ -611,9 +611,9 @@ between Emacs sessions.")
     (set-face-attribute 'default nil :family fixed-pitch-font)
     (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
     :hook text-mode
-    :custom
-    (mixed-pitch-set-height 180))
-   )
+    ))
+  (set-face-attribute 'default nil :height 160)
+
   )
 
 ;;; --> Searching and navigation
