@@ -605,14 +605,15 @@ between Emacs sessions.")
    '(org-verbatim ((t (:inherit (shadow fixed-pitch)))))
    `(variable-pitch ((t (:family ,variable-pitch-font)))))
 
-  ;; Android-specific mixed-pitch setup
+  ;; Linux-specific mixed-pitch setup
   (use-package mixed-pitch
     :init
     (set-face-attribute 'default nil :family fixed-pitch-font)
     (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
-    :hook text-mode)
+    :hook text-mode
+    :custom
+    (mixed-pitch-set-height 180))
    )
-  
   )
 
 ;;; --> Searching and navigation
