@@ -196,7 +196,10 @@ between Emacs sessions.")
   :init (doom-modeline-mode 1)
   :custom
   (doom-modeline-height 24)
-  (doom-modeline-icon t))
+  (doom-modeline-icon t)
+  :config
+  (if (eq system-type 'gnu/linux)
+      (setq doom-modeline-height 12)))
 
 (use-package which-key
   :init (which-key-mode)
@@ -400,6 +403,11 @@ between Emacs sessions.")
    (scroll-bar-mode -1)
 
    (define-key key-translation-map (kbd "ESC") (kbd "C-g")) ; works in gui only
+   (global-set-key (kbd "s-k") #'kill-current-buffer)
+   (global-set-key (kbd "A-k") #'kill-current-buffer)
+   (global-set-key (kbd "s-s") #'save-buffer)
+   (global-set-key (kbd "s-z") #'undo)
+   (global-set-key (kbd "s-v") #'yank)
    
    (defvar org-roam-directory "~/org")
    (defvar org-directory "~/org")
@@ -611,8 +619,8 @@ between Emacs sessions.")
     (set-face-attribute 'default nil :family fixed-pitch-font)
     (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
     :hook text-mode
-    ))
-  (set-face-attribute 'default nil :height 160)
+    )
+  (set-face-attribute 'default nil :height 160))
 
   )
 
