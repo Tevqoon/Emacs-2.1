@@ -572,7 +572,7 @@ between Emacs sessions.")
     :hook text-mode))
 
   ;; ===================================
-  ;; Linux Configuration
+  ;; Linux Font Configuration
   ;; ===================================
   ('gnu/linux
    (defvar fallback-font-families
@@ -620,7 +620,7 @@ between Emacs sessions.")
     (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
     :hook text-mode
     )
-  (set-face-attribute 'default nil :height 160))
+  (set-face-attribute 'default nil :height 165))
 
   )
 
@@ -1886,7 +1886,7 @@ Using the org-mac-link, this comes pre-formatted with the url title."
            (url (when url-parts (car url-parts))))
       (when url
 	(message "Adding to wallabag: %s" url)
-	(wallabag-add-entry url)
+	(wallabag-add-entry url nil)
 	;; Sync wallabag changes to server
 	(run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)
 	"added to wallabag")))
@@ -3102,7 +3102,7 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
           (if url
               (progn
 		(message "Adding to wallabag: %s" title)
-		(wallabag-add-entry url "Unread")
+		(wallabag-add-entry url nil)
 		(cl-incf added-count))
             (message "No URL found for entry: %s" title))))
       
