@@ -1878,7 +1878,7 @@ Using the org-mac-link, this comes pre-formatted with the url title."
            (url (when url-parts (car url-parts))))
       (when url
 	(message "Adding to wallabag: %s" url)
-	(wallabag-add-entry url)
+	(wallabag-add-entry url "Unread")
 	;; Sync wallabag changes to server
 	(run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)
 	"added to wallabag")))
@@ -3302,7 +3302,7 @@ This is attached directly to database modification functions."
   )
 
 (use-package cuckoo-search
-  :vc (:url "https://github.com/rtrppl/cuckoo-search" :rev :newest)
+  ;; :vc (:url "https://github.com/rtrppl/cuckoo-search" :rev :newest)
   :after (elfeed)
   :bind
   (:map elfeed-search-mode-map
@@ -3931,7 +3931,9 @@ If a key is provided, use it instead of the default capture template."
 
 (use-package sly
   :custom
-  (inferior-lisp-program "sbcl"))
+  (inferior-lisp-program "sbcl")
+  :config
+  (require 'sly-tramp))
 
 ;;; -> Programming -> Lisp -> Racket
 
