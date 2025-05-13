@@ -3918,9 +3918,7 @@ If a key is provided, use it instead of the default capture template."
 
 (use-package sly
   :custom
-  (inferior-lisp-program "sbcl")
-  :config
-  (require 'sly-tramp))
+  (inferior-lisp-program "sbcl"))
 
 ;;; -> Programming -> Lisp -> Racket
 
