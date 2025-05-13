@@ -3700,6 +3700,14 @@ If a key is provided, use it instead of the default capture template."
   :bind ("C-x g" . magit-status)
   :custom (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
 
+(use-package hl-todo
+  :config
+  (global-hl-todo-mode 1))
+
+(use-package magit-todos
+  :after magit
+  :config (magit-todos-mode 1))
+
 (use-package git-timemachine
   :defer t)
 
