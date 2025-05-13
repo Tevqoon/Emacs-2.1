@@ -3708,6 +3708,8 @@ If a key is provided, use it instead of the default capture template."
   :after magit
   :config (magit-todos-mode 1))
 
+(use-package crdt)
+
 (use-package git-timemachine
   :defer t)
 
