@@ -71,6 +71,7 @@
 	org-force-self-insert
 	org-id-get-create
 	org-kill-line
+	org-metadown
 	org-metaleft
 	org-metaright
 	org-metaup
