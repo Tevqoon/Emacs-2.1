@@ -364,6 +364,7 @@ between Emacs sessions.")
   ('gnu/linux
    (menu-bar-mode -1)
    (scroll-bar-mode -1)
+   (setq ring-bell-function 'ignore)
 
    (define-key key-translation-map (kbd "ESC") (kbd "C-g")) ; works in gui only
    (global-set-key (kbd "s-k") #'kill-current-buffer)
