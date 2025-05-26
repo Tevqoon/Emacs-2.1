@@ -1393,7 +1393,7 @@ This function is expected to be hooked in org-mode."
               (org-element-property :description context)))))
   
   (defun js/get-link-title (url)
-    "Get the title for a given URL based on its type."
+    "Get the title for a given `url' based on its type."
     (cond
      ;; ((string-prefix-p "http" url t)
      ;;  (with-current-buffer (url-retrieve-synchronously url)
@@ -1431,7 +1431,7 @@ This function is expected to be hooked in org-mode."
      (t nil)))  ; Return nil for unrecognized URL types
 
   (defun js/format-link (url)
-    "Return the current `link' formatted as an org link with its title."
+    "Return the current `url' formatted as an org link with its title."
     (let ((title (js/get-link-title url)))
       (if title
           (org-link-make-string url title)
@@ -1858,7 +1858,7 @@ Using the org-mac-link, this comes pre-formatted with the url title."
            (url (when url-parts (car url-parts))))
       (when url
 	(message "Adding to wallabag: %s" url)
-	(wallabag-add-entry url nil)
+	(wallabag-add-entry url "")
 	;; Sync wallabag changes to server
 	(run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)
 	"added to wallabag")))
@@ -3074,7 +3074,7 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
           (if url
               (progn
 		(message "Adding to wallabag: %s" title)
-		(wallabag-add-entry url nil)
+		(wallabag-add-entry url "")
 		(cl-incf added-count))
             (message "No URL found for entry: %s" title))))
       
@@ -3693,6 +3693,67 @@ If a key is provided, use it instead of the default capture template."
                                                        (propertize title 'face 'my/wallabag-archived-face))))
                                     (_ (wallabag-get-item-value item entry))))
 		 " ")))
+
+  (defun wallabag-add-entry (&optional url tags)
+  "Add a new entry by URL and TAGS."
+  (interactive)
+  (let* ((url (pcase major-mode
+                ('elfeed-show-mode
+                 (if (and (boundp 'elfeed-show-entry)
+                          (fboundp 'elfeed-entry-link))
+                     (elfeed-entry-link elfeed-show-entry) ""))
+                ('eaf-mode
+                 (if (boundp 'eaf--buffer-url) (abbreviate-file-name eaf--buffer-url) ""))
+                ('eww-mode
+                 (if (boundp 'eww-data) (plist-get eww-data :url) ""))
+                (_ (if url url (read-from-minibuffer "What URL do you want to add? ")))))
+         ;; FIXME if no tags pull before, it will return empty string
+         (tags (or tags (wallabag-get-tag-name)))
+         (host (wallabag-host))
+         (token (or wallabag-token (wallabag-request-token))))
+    (request (format "%s/api/entries.json" host)
+      :parser 'json-read
+      :type "POST"
+      :data `(("url" . ,url)
+              ("archive" . 0)
+              ("starred" . 0)
+              ("tags" . ,tags)
+              ("access_token" . ,token))
+      :headers `(("User-Agent" . "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36"))
+      :error
+      (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
+                     (message "Wallaget request error: %S" error-thrown)))
+      :status-code `((401 . ,(wallabag-request-token-retry #'wallabag-add-entry url)))
+      :success (cl-function
+                (lambda (&key data &allow-other-keys)
+                    ;; convert tags array to tag comma seperated string
+                    (setq data
+                          (progn
+                            (setf
+                             (alist-get 'tag data)
+                             (if (stringp (alist-get 'tag data))
+                                 (alist-get 'tag data)
+                               (wallabag-convert-tags-to-tag data)))
+                            data))
+                    (let ((inhibit-read-only t)
+                          (id (alist-get 'id data)))
+                      ;; check id exists or not
+                      (if (eq 1 (caar (wallabag-db-sql
+                                       `[:select :exists
+                                         [:select id :from items :where (= id ,id)]])))
+                          (progn
+                            (message "Entry Already Exists")
+                            (goto-char (wallabag-find-candidate-location id))
+                            (wallabag-flash-show (line-beginning-position) (line-end-position) 'highlight 0.5))
+                        (wallabag-db-insert (list data))
+                        (if (buffer-live-p (get-buffer wallabag-search-buffer-name))
+                            (with-current-buffer (get-buffer wallabag-search-buffer-name)
+                              (save-excursion
+                                (goto-char (point-min))
+                                (funcall wallabag-search-print-entry-function data))) )
+                        (message "Add Entry: %s" id)
+                        (if wallabag-show-entry-after-creation
+                            (wallabag-show-entry (car (wallabag-db-select :id id))) ))))))))
   )
 ;;; --> Programming
 
