@@ -3407,6 +3407,7 @@ If a key is provided, use it instead of the default capture template."
 	:map elfeed-search-mode-map
 	("F" . elfeed-tube-fetch)
 	([remap save-buffer] . elfeed-tube-save))
+  :custom (elfeed-tube-auto-save-p t)
   :config
   (elfeed-tube-setup)
   (defvar yt-dlp-priority-tags '(asmr chess osrs gaming essays)
@@ -3767,8 +3768,9 @@ If a key is provided, use it instead of the default capture template."
   (global-hl-todo-mode 1))
 
 (use-package magit-todos
-  :after magit
-  :config (magit-todos-mode 1))
+  :after (magit)
+  :config
+  (magit-todos-mode 1))
 
 (use-package crdt)
 
@@ -3787,10 +3789,6 @@ If a key is provided, use it instead of the default capture template."
               ("M-p" . flymake-goto-prev-error)
 	      ("M-l" . flymake-show-buffer-diagnostics))
   )
-
-;; (use-package hl-todo
-;;   :ensure t
-;;   :hook prog-mode)
 
 ;;; -> Programming -> Tree-sitter
 
@@ -4120,6 +4118,44 @@ markers, resetting the state)."
       (setf hoagie-narrow-toggle-markers nil))))
 
 (global-set-key (kbd "C-x n t") #'hoagie-narrow-toggle)
+
+(defun time-until-date ()
+  "Calculate and display the time remaining until a target date and time.
+Uses org-mode's calendar picker for date selection and prompts for time.
+Shows the remaining time in HH:MM format suitable for setting on a physical timer.
+
+If more than 100 hours remain, shows days + hours instead."
+  (interactive)
+  
+  (let* ((date (org-read-date nil nil nil "Select target date: "))
+         (time (read-string "Enter time (HH:MM, default 23:59): " nil nil "23:59"))
+         (target-datetime (concat date " " time ":00"))
+         (current-time (current-time))
+         (target-time (date-to-time target-datetime))
+         (time-diff (time-subtract target-time current-time))
+         (diff-seconds (float-time time-diff)))
+    
+    (if (< diff-seconds 0)
+        (message "Target time is in the past!")
+      (let* ((total-minutes (floor (/ diff-seconds 60)))
+             (hours (floor (/ total-minutes 60)))
+             (minutes (mod total-minutes 60)))
+        
+        (cond
+         ;; If less than or equal to 100 hours, show HH:MM format for timer
+         ((<= hours 100)
+          (let ((result (format "%02d:%02d" hours minutes)))
+            (message "Time until %s %s: %s (set timer to %s)" 
+                     date time result result)
+            result))
+         
+         ;; If more than 100 hours, show days and remaining hours
+         ((> hours 100)
+          (let* ((days (floor (/ hours 24)))
+                 (remaining-hours (mod hours 24)))
+            (message "Time until %s %s: %d days, %d hours, %d minutes (beyond 100h timer limit)" 
+                     date time days remaining-hours minutes)
+            (format "%dd %02dh %02dm" days remaining-hours minutes))))))))
 
 ;;;
 ;;; End of configuration file.
