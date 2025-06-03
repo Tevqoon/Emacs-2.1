@@ -82,6 +82,23 @@
   (set-terminal-coding-system 'utf-8)
   (set-keyboard-coding-system 'utf-8)
 
+  (define-advice keyboard-quit
+      (:around (quit) quit-current-context)
+    "Quit the current context.
+
+When there is an active minibuffer and we are not inside it close
+it.  When we are inside the minibuffer use the regular
+`minibuffer-keyboard-quit' which quits any active region before
+exiting.  When there is no minibuffer `keyboard-quit' unless we
+are defining or executing a macro."
+    (if (active-minibuffer-window)
+	(if (minibufferp)
+            (minibuffer-keyboard-quit)
+          (abort-recursive-edit))
+      (unless (or defining-kbd-macro
+                  executing-kbd-macro)
+	(funcall-interactively quit))))
+
   (server-start)
 
   )
@@ -180,13 +197,19 @@ between Emacs sessions.")
   
   (defun my/apply-theme (appearance)
     "Load theme based on appearance and redshift? status."
+    (interactive)
     (mapc #'disable-theme custom-enabled-themes)
     (pcase `(,appearance ,my/redshift?)
       ('(light nil) (load-theme my/light-theme t))
       ('(dark nil)  (load-theme my/dark-theme t))
       ('(light t)   (load-theme my/light-theme-redshift t))
       ('(dark t)    (load-theme my/dark-theme-redshift t))))
-  (my/apply-theme 'light))
+  (my/apply-theme 'light)
+
+  (defun toggle-redshift ()
+    (interactive)
+    (setq my/redshift? (not my/redshift?))
+    (message "Retoggled redshift")))
 
 (use-package nerd-icons
   :defer t)
@@ -1585,7 +1608,7 @@ Automatically expands the heading if it's folded."
   :custom
   (org-latex-create-formula-image-program 'imagemagick)
   (org-latex-packages-alist '(("" "/Users/jure/.emacs.d/defaults/js" t)))
-  (org-export-in-background t)
+  (org-export-in-background nil)
   
   :config
   (add-to-list
@@ -2691,7 +2714,6 @@ All other subheadings will be ignored."
 	  next-headline
 	nil)))
 
-  ;; Function to check if any ancestor has a HOLD state
   (defun air-org-skip-subtree-if-ancestor-is-hold ()
     "Skip subtree if any ancestor has HOLD todo state."
     (let ((subtree-end (save-excursion (org-end-of-subtree t))))
@@ -2766,6 +2788,7 @@ All other subheadings will be ignored."
      (C . t)
      (haskell . t)
      (octave . t)
+     (awk . t)
      ))
 
 
