@@ -4148,11 +4148,24 @@ markers, resetting the state)."
 Uses org-mode's calendar picker for date selection and prompts for time.
 Shows the remaining time in HH:MM format suitable for setting on a physical timer.
 
+Accepts time in HH:MM format or military time (HHMM, e.g., 1800 for 18:00).
 If more than 100 hours remain, shows days + hours instead."
   (interactive)
   
   (let* ((date (org-read-date nil nil nil "Select target date: "))
-         (time (read-string "Enter time (HH:MM, default 23:59): " nil nil "23:59"))
+         (time-input (read-string "Enter time (HH:MM or HHMM military, default 23:59): " nil nil "23:59"))
+         ;; Convert military time format if needed
+         (time (cond
+                ;; If it contains a colon, use as-is (HH:MM format)
+                ((string-match-p ":" time-input) time-input)
+                ;; If it's exactly 4 digits, treat as military time (HHMM)
+                ((string-match-p "^[0-9]\\{4\\}$" time-input)
+                 (concat (substring time-input 0 2) ":" (substring time-input 2 4)))
+                ;; If it's 3 digits, assume HMM format (e.g., 630 = 06:30)
+                ((string-match-p "^[0-9]\\{3\\}$" time-input)
+                 (concat "0" (substring time-input 0 1) ":" (substring time-input 1 3)))
+                ;; Otherwise, use as-is
+                (t time-input)))
          (target-datetime (concat date " " time ":00"))
          (current-time (current-time))
          (target-time (date-to-time target-datetime))
