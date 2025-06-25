@@ -814,6 +814,43 @@ s-directory
 	 ("s-l" . avy-goto-line))
   )
 
+(use-package jump-char
+  :after avy
+  :bind ("s-;" . jump-char-forward)
+  :config
+  ;; --- jump-char → avy integration ------------------------------------------
+  (require 'avy nil t)                 ; hard‐require avy, but quietly
+
+  ;; 1.  Make “.” repeat forward, “,” repeat backward
+  (setq jump-char-forward-key "."      ; was ";"
+	jump-char-backward-key ",")    ; unchanged, but set explicitly
+
+  ;; 2.  Replace ace-jump fallback with avy (keep the original name so the
+  ;;     rest of jump-char doesn't care).
+  (defun jump-char-switch-to-ace ()
+    "Use `avy-goto-char' in place of `ace-jump-char-mode'.  
+If `jump-char-initial-char' is non-nil, reuse it so the hand-off feels
+exactly like the old ace-jump integration."
+    (interactive)
+    ;; first leave isearch, exactly like the original implementation
+    (let ((search-nonincremental-instead nil))
+      (isearch-exit))
+    ;; with or without an already-typed char
+    (if (null jump-char-initial-char)
+	(call-interactively #'avy-goto-char)
+      (avy-goto-char jump-char-initial-char)))
+
+  ;; 3.  Bind the new helper inside jump-char’s transient keymap
+  ;;     (`jump-char-isearch-map' copies `jump-char-base-map', so patching
+  ;;     the base map is enough).
+  (define-key jump-char-base-map (kbd "C-c C-c") #'jump-char-switch-to-ace)
+  (define-key jump-char-base-map (kbd "M-/")     #'jump-char-switch-to-ace)
+  ;; --------------------------------------------------------------------------
+
+  )
+
+;; (use-package ace-jump-mode)
+
 (use-package ace-link
   :functions ace-link-setup-default
   :hook
