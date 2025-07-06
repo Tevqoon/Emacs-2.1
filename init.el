@@ -3822,7 +3822,12 @@ If a key is provided, use it instead of the default capture template."
 (use-package magit
   :defer t
   :bind ("C-x g" . magit-status)
-  :custom (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
+  :custom
+  (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1)
+  :config
+  (when (eq system-type 'darwin)
+    (setq magit-git-executable "/opt/homebrew/bin/git"))
+  )
 
 (use-package hl-todo
   :config
