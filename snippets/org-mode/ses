@@ -1,0 +1,5 @@
+# -*- mode: snippet -*-
+# name: short exact sequence
+# key: ses
+# --
+0 \rightarrow ${1:M} \xrightarrow{${2:f}} ${3:N} \xrightarrow{${4:g}} ${5:P} \rightarrow 0$0

@@ -1,0 +1,10 @@
+# -*- mode: snippet -*-
+# name: Lean definition (Latex)
+# key: defl
+# --
+
+\begin{definition}[$1]
+\label{def:$2}
+\lean{$3}
+$0
+\end{definition}

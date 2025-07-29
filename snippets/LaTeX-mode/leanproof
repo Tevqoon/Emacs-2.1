@@ -1,0 +1,9 @@
+# -*- mode: snippet -*-
+# name: Lean proof (Latex)
+# key: proofl
+# --
+
+\begin{proof}
+\notready
+$0
+\end{proof}

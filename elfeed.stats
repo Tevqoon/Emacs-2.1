@@ -1,0 +1,26 @@
+;;; Elfeed score rule stats file DO NOT EDIT       -*- lisp -*-
+(:version 1 :stats
+	  #s(hash-table test equal data
+			(#s(elfeed-score-adjust-tags-rule
+			    (nil . -1000) (t trash) nil)
+			   #s(elfeed-score-rule-stats 923
+						      1753774076.509981)
+			   #s(elfeed-score-title-rule "OPEN THREAD"
+						      -1000 s nil nil
+						      nil)
+			   #s(elfeed-score-rule-stats 158
+						      1753694574.333189)
+			   #s(elfeed-score-title-rule
+			      "🔴\\|🚨🚨\\|ACTUALLY LIVE ASMR\\|livestream"
+			      -1000 r nil nil "Livestreams")
+			   #s(elfeed-score-rule-stats 800
+						      1753774076.092181)
+			   #s(elfeed-score-tag-rule (t papers) -500
+						    "Papers should be read by default.")
+			   #s(elfeed-score-rule-stats 5339
+						      1753774067.329356)
+			   #s(elfeed-score-title-rule
+			      "#shorts\\|#fyp\\|#asmr" -1000 r nil nil
+			      "Shorts")
+			   #s(elfeed-score-rule-stats 87
+						      1753774076.509968))))

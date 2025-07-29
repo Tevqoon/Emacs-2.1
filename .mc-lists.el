@@ -3,6 +3,7 @@
 
 (setq mc/cmds-to-run-for-all
       '(
+	LaTeX-babel-insert-hyphen
 	LaTeX-insert-left-brace
 	TeX-insert-backslash
 	agda2-load
@@ -22,6 +23,7 @@
 	cdlatex-math-modify
 	cdlatex-math-symbol
 	cdlatex-pbb
+	cdlatex-sub-superscript
 	comment-line
 	comment-set-column
 	count-words
@@ -51,6 +53,7 @@
 	indent-for-tab-command
 	isearch-repeat-forward
 	ivy-occur-delete-candidate
+	kill-visual-line
 	kmacro-end-or-call-macro
 	lean4-tab-indent
 	markdown-outdent-or-delete

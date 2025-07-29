@@ -1,0 +1,10 @@
+# -*- mode: snippet -*-
+# name: Lean proposition (Latex)
+# key: propl
+# --
+
+\begin{proposition}[$1]
+\label{prop:$2}
+\lean{$3}
+$0
+\end{proposition}

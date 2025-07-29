@@ -1,0 +1,10 @@
+# -*- mode: snippet -*-
+# name: Lean theorem (Latex)
+# key: thml
+# --
+
+\begin{theorem}[$1]
+\label{thm:$2}
+\lean{$3}
+$0
+\end{theorem}

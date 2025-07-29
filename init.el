@@ -273,6 +273,8 @@ between Emacs sessions.")
   (tab-bar-format '(tab-bar-format-tabs tab-bar-separator))
   (tab-bar-close-last-tab-choice 'delete-frame)
   (tab-bar-auto-width nil)
+  (tab-bar-select-tab-modifiers '(super))
+
   :bind (("s-t" . tab-bar-new-tab)
 	 ("s-T" . tab-undo)
 	 ("s-w" . tab-close)
@@ -710,7 +712,10 @@ between Emacs sessions.")
 
 (use-package yasnippet
   :functions yas-global-mode
-  :init (yas-global-mode 1))
+  :init (yas-global-mode 1)
+  :custom
+  (yas-fallback-behavior 'return-nil)
+  )
 
 (use-package undo-fu
   :functions
@@ -2845,6 +2850,51 @@ All other subheadings will be ignored."
   (add-to-list 'org-structure-template-alist '("item" . "itemize"))
   )
 
+;;; -> Org Mode -> Checklists
+
+(use-package org-checklist-export
+  :load-path "~/.emacs.d/lisp/"
+  :after org
+  :custom
+  ;; CLI command configuration - choose one:
+  (js-checklist-cli-command "checklist")              ; if globally installed
+  ;; (js-checklist-cli-command "npm run dev")         ; if running from project dir
+  ;; (js-checklist-cli-command "/full/path/to/checklist") ; custom path
+  
+  ;; Output and behavior settings
+  (js-checklist-auto-open-pdf t)                      ; auto-open PDFs after generation
+  (js-checklist-default-output-dir nil)               ; nil = same dir as input, or set path like "~/Downloads/"
+  
+  ;; :bind
+  ;; (:map org-mode-map
+  ;;  ;; Main export functions
+  ;;  ;; ("C-c C-e c"   . js/checklist-export-buffer)       ; Export current buffer
+  ;;  ;; ("C-c C-e C-c" . js/checklist-export-with-preview) ; Preview then export
+   
+  ;;  ;; Additional utility functions
+  ;;  ;; ("C-c C-e C-p" . js/checklist-show-filtered-content) ; Preview filtered content only
+  ;;  ;; ("C-c C-e C-f" . js/checklist-export-file)         ; Export specific file
+  ;; 	)
+  
+  :commands
+  (js/checklist-export-buffer
+   js/checklist-export-file
+   js/checklist-filter-content
+   js/checklist-show-filtered-content
+   js/checklist-export-with-preview)
+  
+  :config
+  ;; Optional: Add to org export dispatcher
+  ;; (with-eval-after-load 'ox
+  ;;   (add-to-list 'org-export-backends 'checklist t))
+  
+  ;; Optional: Set up automatic export for specific tags
+  ;; (add-hook 'org-mode-hook
+  ;;           (lambda ()
+  ;;             (when (member "checklist" (org-get-tags))
+  ;;               (local-set-key (kbd "C-c C-c") #'js/checklist-export-buffer))))
+  )
+
 ;;; -> Org Mode -> Open Street map
 
 (use-package osm
@@ -3916,6 +3966,7 @@ If a key is provided, use it instead of the default capture template."
   :custom
   (font-latex-fontify-script nil)
   (latex-run-command "lualatex")
+  (TeX-engine 'luatex)
   (TeX-source-correlate-method 'synctex)
   (TeX-view-program-list '(("Skim" "/Applications/Skim.app/Contents/SharedSupport/displayline -g -b %n %o %b")))
   (TeX-view-program-selection '((output-pdf "Skim")))
@@ -3938,6 +3989,45 @@ If a key is provided, use it instead of the default capture template."
 
 ;;; -> Programming -> LaTeX -> CDLaTeX
 (use-package cdlatex
+  :config
+  (defun js/cdlatex-sub-superscript ()
+    "Insert ^{} or _{} unless the number of backslashes before point is odd.
+When not in LaTeX math environment, insert raw ^ or _ character.
+When pressed twice, make the sub/superscript roman."
+    (interactive)
+    (if (and cdlatex-make-sub-superscript-roman-if-pressed-twice
+             (equal this-command last-command))
+	(progn
+          (insert "\\mathrm{}")
+          (backward-char 1))
+      (if (cdlatex-number-of-backslashes-is-odd) 
+          ;; Quoted - insert raw character
+          (insert (event-basic-type last-command-event))
+	;; Check if we are in math mode (ignore the outside-math-mode setting)
+	(if (cdlatex--texmathp)
+            ;; In math mode - do the full template
+            (progn
+              (cdlatex-ensure-math)
+              (insert (event-basic-type last-command-event))
+              (insert "{}")
+              (forward-char -1))
+          ;; Not in math mode - just insert raw character
+          (insert (event-basic-type last-command-event))))))
+
+  (defun js/yas-cdlatex-tab ()
+    "Try yasnippet expansion first, then fall back to cdlatex-tab."
+    (interactive)
+    (unless (yas-expand)
+      (cdlatex-tab)))
+  
+  ;; Replace cdlatex's TAB binding with our integrated version
+  (define-key cdlatex-mode-map (kbd "TAB") #'js/yas-cdlatex-tab)
+
+
+  ;; Bind the custom function to ^ and _
+  (define-key cdlatex-mode-map (kbd "^") 'js/cdlatex-sub-superscript)
+  (define-key cdlatex-mode-map (kbd "_") 'js/cdlatex-sub-superscript)
+
   :custom
   (cdlatex-takeover-parenthesis nil)
   (cdlatex-takeover-dollar nil)
@@ -4016,7 +4106,6 @@ If a key is provided, use it instead of the default capture template."
   (org-mode . org-cdlatex-mode)
   (LaTeX-mode . turn-on-cdlatex)
   )
-
 ;;; -> Programming -> LaTeX -> Math delimiters
 
 (use-package math-delimiters
