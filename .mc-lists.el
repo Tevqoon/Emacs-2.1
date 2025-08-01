@@ -50,6 +50,7 @@
 	haskell-indentation-newline-and-indent
 	haskell-interactive-mode-return
 	ibuffer-mark-for-delete
+	ibuffer-mark-forward
 	indent-for-tab-command
 	isearch-repeat-forward
 	ivy-occur-delete-candidate

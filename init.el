@@ -2045,6 +2045,108 @@ For emacsclient:
 
   (setq org-archive-subtree-save-file-p t)
 
+  (defun js/org-unarchive-subtree-from-daily ()
+    "Unarchive the current subtree back to its original location.
+Uses ARCHIVE_NODE and ARCHIVE_OLPATH properties to restore the entry."
+    (interactive)
+    (require 'org-roam)
+    
+    ;; Ensure we're at a heading
+    (unless (org-at-heading-p)
+      (org-back-to-heading t))
+    
+    ;; Verify we're in an archive section
+    (let ((archive-tag (member "ARCHIVE" (org-get-tags))))
+      (unless archive-tag
+	(user-error "Current heading doesn't appear to be in an archive section")))
+    
+    ;; Get archive metadata
+    (let* ((archive-node-link (org-entry-get nil "ARCHIVE_NODE"))
+           (archive-file (org-entry-get nil "ARCHIVE_FILE"))
+           (archive-olpath (org-entry-get nil "ARCHIVE_OLPATH"))
+           (archive-time (org-entry-get nil "ARCHIVE_TIME"))
+           (archive-category (org-entry-get nil "ARCHIVE_CATEGORY"))
+           (archive-itags (org-entry-get nil "ARCHIVE_ITAGS")))
+      
+      (unless archive-node-link
+	(user-error "No ARCHIVE_NODE property found. This doesn't appear to be an archived entry"))
+      
+      ;; Extract node ID from the org-roam link
+      (let* ((node-id (when (string-match "\\[\\[id:\\([^]]+\\)\\]" archive-node-link)
+			(match-string 1 archive-node-link)))
+             (target-node (when node-id (org-roam-node-from-id node-id)))
+             (target-file (or (when target-node (org-roam-node-file target-node))
+                              archive-file))) ; Fallback to ARCHIVE_FILE if node lookup fails
+	
+	(unless target-file
+          (user-error "Could not determine target file from node %s or archive file %s" 
+                      archive-node-link archive-file))
+	
+	(unless (file-exists-p target-file)
+          (user-error "Target file does not exist: %s" target-file))
+	
+	;; Store the current buffer and position
+	(let ((archive-buffer (current-buffer))
+              (archive-point (point-marker))
+              paste-level)
+          
+          ;; Copy the subtree content (without cutting yet)
+          (org-copy-subtree 1 nil)
+          
+          ;; Navigate to target and paste
+          (save-window-excursion  ; This ensures we stay in the same window
+            (with-current-buffer (find-file-noselect target-file)
+              (save-excursion
+		(goto-char (point-min))
+		
+		;; Navigate to the correct location
+		(if (and node-id (org-roam-id-find node-id))
+                    (progn
+                      ;; Go to the node
+                      (org-id-goto node-id)
+                      (setq paste-level 1) ; Start at level 1 under the node
+                      
+                      ;; If we have an OLPATH, navigate through it
+                      (when (and archive-olpath (not (string-empty-p archive-olpath)))
+			(let ((path-components (split-string archive-olpath "/")))
+                          ;; Use org-roam-capture-find-or-create-olp to handle the path
+                          (goto-char (org-roam-capture-find-or-create-olp path-components))
+                          ;; Calculate the paste level based on the path depth
+                          (setq paste-level (+ 1 (length path-components))))))
+                  ;; Fallback: if no node ID, try to use file and OLPATH
+                  (when (and archive-olpath (not (string-empty-p archive-olpath)))
+                    (let ((path-components (split-string archive-olpath "/")))
+                      (goto-char (org-roam-capture-find-or-create-olp path-components))
+                      (setq paste-level (+ 1 (length path-components))))))
+		
+		;; Move to end of current subtree for insertion
+		(org-end-of-subtree t t)
+		
+		;; Paste the subtree at the correct level
+		(org-paste-subtree paste-level)
+		
+		;; Move to the pasted subtree and clean up properties
+		(org-back-to-heading t)
+		(mapc #'org-delete-property 
+                      '("ARCHIVE_NODE" "ARCHIVE_TIME" "ARCHIVE_FILE" 
+			"ARCHIVE_OLPATH" "ARCHIVE_CATEGORY" "ARCHIVE_ITAGS"))
+		
+		(save-buffer))))
+          
+          ;; Now remove the original from archive buffer
+          (goto-char archive-point)
+          (org-back-to-heading t)
+          ;; Use org-cut-subtree with explicit count
+          (org-cut-subtree 1)
+          (save-buffer)
+          
+          ;; Stay in the archive buffer with a success message
+          (message "Unarchived subtree to %s%s" 
+                   target-file
+                   (if archive-olpath 
+                       (format " under %s" archive-olpath)
+                     ""))))))
+
   (add-to-list 'display-buffer-alist
                '("\\*org-roam\\*"
 		 (display-buffer-in-direction)
