@@ -26,3 +26,8 @@
 /private-config.el
 .aider*
 
+/wallabag-cache.el
+*.DS_Store
+/.cache/
+/defaults/auto/
+/variables.el
