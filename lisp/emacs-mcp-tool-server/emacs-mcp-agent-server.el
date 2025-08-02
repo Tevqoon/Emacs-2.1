@@ -31,40 +31,9 @@
 
 ;;; Code:
 
-;; Set up load paths for headless mode
-(let ((elpa-dir (expand-file-name "~/.emacs.d/elpa/"))
-      (lisp-dir (expand-file-name "~/.emacs.d/lisp/")))
-  (when (file-directory-p elpa-dir)
-    ;; Add mcp-server package
-    (let ((mcp-server-dir (file-name-concat elpa-dir "mcp-server")))
-      (when (file-directory-p mcp-server-dir)
-        (add-to-list 'load-path mcp-server-dir)
-        (let ((mcp-servers-dir (file-name-concat mcp-server-dir "mcp-servers")))
-          (when (file-directory-p mcp-servers-dir)
-            (add-to-list 'load-path mcp-servers-dir)))))
-    
-    ;; Add gptel package - find the versioned directory
-    (dolist (dir (directory-files elpa-dir t "^gptel-"))
-      (when (file-directory-p dir)
-        (add-to-list 'load-path dir)))
-    
-    ;; Add our server directory  
-    (when (file-directory-p lisp-dir)
-      (add-to-list 'load-path (file-name-concat lisp-dir "emacs-mcp-tool-server")))))
-
-;; Load core Emacs libraries first
-(require 'eieio)
-(require 'cl-lib)
-(require 'json)
-
-;; Load required libraries
 (require 'mcp-server)
-
-;; Conditional gptel loading
-(condition-case nil
-    (require 'gptel)
-  (error 
-   (message "Warning: gptel not available, agent functionality will be limited")))
+(require 'gptel)
+(require 'cl-lib)
 
 ;;; GPTel Helper Functions
 
