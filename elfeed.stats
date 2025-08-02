@@ -3,8 +3,8 @@
 	  #s(hash-table test equal data
 			(#s(elfeed-score-adjust-tags-rule
 			    (nil . -1000) (t trash) nil)
-			   #s(elfeed-score-rule-stats 938
-						      1754032470.835622)
+			   #s(elfeed-score-rule-stats 940
+						      1754081441.531856)
 			   #s(elfeed-score-title-rule "OPEN THREAD"
 						      -1000 s nil nil
 						      nil)
@@ -13,8 +13,8 @@
 			   #s(elfeed-score-title-rule
 			      "🔴\\|🚨🚨\\|ACTUALLY LIVE ASMR\\|livestream"
 			      -1000 r nil nil "Livestreams")
-			   #s(elfeed-score-rule-stats 803
-						      1754032470.835547)
+			   #s(elfeed-score-rule-stats 804
+						      1754081441.531829)
 			   #s(elfeed-score-tag-rule (t papers) -500
 						    "Papers should be read by default.")
 			   #s(elfeed-score-rule-stats 5387
@@ -22,5 +22,5 @@
 			   #s(elfeed-score-title-rule
 			      "#shorts\\|#fyp\\|#asmr" -1000 r nil nil
 			      "Shorts")
-			   #s(elfeed-score-rule-stats 98
-						      1754028552.60286))))
+			   #s(elfeed-score-rule-stats 99
+						      1754079585.149764))))

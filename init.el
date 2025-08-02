@@ -29,7 +29,8 @@
 (package-initialize)
 
 (setq use-package-always-ensure t)
-(setq package-native-compile t)
+;; (setq package-native-compile t)
+(setq package-native-compile nil)
 ;; (setq package-check-signature nil)
 
 (require 'use-package)
@@ -1186,20 +1187,21 @@ exactly like the old ace-jump integration."
   (defvar org-roam-chatlogs-directory "chatlogs/"
     "The directory to save gptel chatlogs in.")
   
-  (gptel-make-anthropic "Claude"
-    :stream t
-    :models
-    '(claude-3-7-sonnet-latest
-      claude-3-5-haiku-latest
-      claude-3-5-sonnet-latest)
-    :host "api.anthropic.com"
-    :key 'gptel-api-key-from-auth-source
-    )
-  (gptel-make-gemini "Gemini"
-    :stream t
-    ;; :host "api.anthropic.com"
-    :key 'gptel-api-key-from-auth-source
-    )
+  ;; (gptel-make-anthropic "Claude"
+  ;;   :stream t
+  ;;   :models
+  ;;   '(claude-3-7-sonnet-latest
+  ;;     claude-3-5-haiku-latest
+  ;;     claude-3-5-sonnet-latest)
+  ;;   :host "api.anthropic.com"
+  ;;   :key 'gptel-api-key-from-auth-source
+  ;;   )
+  
+  ;; (gptel-make-gemini "Gemini"
+  ;;   :stream t
+  ;;   ;; :host "api.anthropic.com"
+  ;;   :key 'gptel-api-key-from-auth-source
+  ;;   )
 
   
   (defvar gptel-tools-files `(,(expand-file-name "lisp/ai-tools-list.el" user-emacs-directory)
@@ -1337,38 +1339,64 @@ If the buffer already has an ID property, just save the buffer."
 
 ;;; End of GPTel package block
 
-;;; -> AI configuration -> elysium
+;;; -> AI configuration -> Claude Code
 
-(use-package elysium
-  :hook
-  (prog-mode . smerge-mode)
-  :custom
-  ;; Below are the default values
-  (elysium-window-size 0.33) ; The elysium buffer will be 1/3 your screen
-  ;; Can be customized to horizontal
-  (elysium-window-style 'vertical)) 
+;; add melp to package archives, as vterm is on melpa:
 
-;;; End of elysium package block
+;; TODO: install claude-code.el
+;; (use-package claude-code
+;;   :ensure t
+;;   :after vterm
+;;   :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
+;;   ;; :config (claude-code-mode)
+;;   ;; (defun my-claude-notify (title message)
+;;   ;;   "Display a macOS notification with sound."
+;;   ;;   (call-process "osascript" nil nil nil
+;;   ;;                 "-e" (format "display notification \"%s\" with title \"%s\" sound name \"Glass\""
+;;   ;;                              message title)))
+
+;;   ;; (setq claude-code-notification-function #'my-claude-notify)
+;;   ;; :bind-keymap ("C-c g d" . claude-code-command-map)
+;;   )
+
+;;; -> AI configuration -> Emacs MCP Server
+
+(use-package mcp-server-lib)
+
+;;; -> AI configuration -> Agent MCP server
+
+(use-package emacs-mcp-agent-server
+  :load-path "~/.emacs.d/lisp/emacs-mcp-agent-server"
+  :after (mcp-server-lib)
+  :config
+  ;; Only enable specific tools
+  (setq emacs-mcp-enabled-tools '("hello_world" "get_emacs_version"))
+  ;; Auto-load org tools
+  (load "~/.emacs.d/lisp/emacs-mcp-agent-server/tools/org-tools.el")
+  ;; Start server
+  (emacs-mcp-start-server))
 
 ;;; -> AI configuration -> aidermacs
 
-(use-package aidermacs
-  :if (eq system-type 'darwin)
-  :after gptel vterm
-  :bind ("C-c g a" . aidermacs-transient-menu)
-  :custom
-  (aidermacs-backend 'vterm)
-  (aidermacs-use-architect-mode t)
-  (aidermacs-default-model "gpt-4o-mini")
-  (aidermacs-extra-args '("--edit-format editor-diff" "--copy-paste"))
-  ;; (aidermacs-architect-model "your-architect-model")  ;; Optional
-  ;; (aidermacs-editor-model "your-editor-model")        ;; Optional
-  :config
-  ;; Set API keys from the auth source once for both OpenAI and Claude
-  (setenv "OPENAI_API_KEY" (gptel-api-key-from-auth-source "api.openai.com"))
-  (setenv "CLAUDE_API_KEY" (gptel-api-key-from-auth-source "api.anthropic.com")))
+;; (use-package aidermacs
+;;   :if (eq system-type 'darwin)
+;;   :after gptel vterm
+;;   :bind ("C-c g a" . aidermacs-transient-menu)
+;;   :custom
+;;   (aidermacs-backend 'vterm)
+;;   (aidermacs-use-architect-mode t)
+;;   (aidermacs-default-model "gpt-4o-mini")
+;;   ;; (aidermacs-extra-args '("--edit-format editor-diff" "--copy-paste"))
+;;   ;; (aidermacs-architect-model "your-architect-model")  ;; Optional
+;;   ;; (aidermacs-editor-model "your-editor-model")        ;; Optional
+;;   :config
+;;   ;; Set API keys from the auth source once for both OpenAI and Claude
+;;   (setenv "OPENAI_API_KEY" (gptel-api-key-from-auth-source "api.openai.com"))
+;;   (setenv "CLAUDE_API_KEY" (gptel-api-key-from-auth-source "api.anthropic.com"))
+;;   )
 
 ;;; End of aidermacs package block
+;;; End of AI configuration block
 
 ;;; --> Org mode
 
