@@ -1363,18 +1363,18 @@ If the buffer already has an ID property, just save the buffer."
 
 (use-package mcp-server-lib) ;; Great for sync tools
 
-(use-package mcp-server
-  :ensure t
-  :demand t
-  :vc (:url "https://github.com/utsahi/mcp-server.el" :rev :newest)
-  )
+;; (use-package mcp-server ;; For async
+;;   :ensure t
+;;   :demand t
+;;   :vc (:url "https://github.com/utsahi/mcp-server.el" :rev :newest)
+;;   )
 
 ;;; -> AI configuration -> Agent MCP server
 
 ;; Synchronous tool server for direct MCP tool calls
 (use-package emacs-mcp-tool-server
     :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
-    :after (mcp-server-lib)
+    :ensure mcp-server-lib
     :bind
     (("C-c g t i" . emacs-mcp-install-stdio-script)
      ("C-c g t s" . emacs-mcp-start-server)
@@ -1382,32 +1382,15 @@ If the buffer already has an ID property, just save the buffer."
      ("C-c g t r" . emacs-mcp-restart-server)
      ("C-c g t ?" . emacs-mcp-server-status))
     :config
-    ;; Auto-start tool server when Emacs loads
-    (emacs-mcp-start-server))
+    (emacs-mcp-tool-start-server)
+    )
 
 ;; Asynchronous agent server for delegated AI tasks
-(use-package emacs-mcp-agent-server
-  :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
-  :after (mcp-server gptel)
-  :bind
-  (("C-c g a s" . emacs-mcp-agent-start-server)
-   ("C-c g a k" . emacs-mcp-agent-stop-server)
-   ("C-c g a r" . emacs-mcp-agent-restart-server)
-   ("C-c g a ?" . emacs-mcp-agent-server-status))
-  :config
-  ;; Auto-start agent server when Emacs loads
-  (emacs-mcp-agent-start-server))
-
 ;; (use-package emacs-mcp-agent-server
-;;   :load-path "~/.emacs.d/lisp/emacs-mcp-agent-server"
-;;   :after (mcp-server-lib)
-;;   :config
-;;   ;; Only enable specific tools
-;;   (setq emacs-mcp-enabled-tools 'all)
-;;   ;; Auto-load org tools
-;;   (load "~/.emacs.d/lisp/emacs-mcp-agent-server/tools/org-tools.el")
-;;   ;; Start server
-;;   (emacs-mcp-start-server))
+;;   :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
+;;   :after (mcp-server gptel)
+;;   )
+
 
 ;;; -> AI configuration -> aidermacs
 

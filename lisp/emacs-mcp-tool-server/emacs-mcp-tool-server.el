@@ -13,7 +13,7 @@
 ;; exposes direct Emacs functionality as synchronous tools.
 ;; 
 ;; Usage:
-;; 1. M-x emacs-mcp-install-stdio-script (one-time setup)
+;; 1. M-x emacs-mcp-tool-install-stdio-script (one-time setup)
 ;; 2. M-x emacs-mcp-start-server (start the server)
 ;; 3. Register with Claude: claude mcp add -s user -t stdio emacs-tool-server -- ~/.emacs.d/emacs-mcp-tool-stdio.sh --init-function=emacs-mcp-tool-start-server --stop-function=emacs-mcp-tool-stop-server
 

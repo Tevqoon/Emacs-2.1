@@ -41,11 +41,11 @@ RESOURCE-DEF should be a plist with :uri, :name, :description, :handler, and opt
     (setq emacs-mcp-resources (assoc-delete-all uri emacs-mcp-resources))
     (push (cons uri resource-def) emacs-mcp-resources)))
 
-(defun emacs-mcp-get-tools ()
+(defun emacs-mcp-tool-get-tools ()
   "Get all registered tools."
   emacs-mcp-tools)
 
-(defun emacs-mcp-get-resources ()
+(defun emacs-mcp-tool-get-resources ()
   "Get all registered resources."
   emacs-mcp-resources)
 
@@ -311,5 +311,5 @@ PARAMS should contain 'name' key with buffer name."
                   (buffer-string)))
       (format "Buffer '%s' not found" name))))
 
-(provide 'emacs-mcp-tools)
+(provide 'emacs-mcp-tool-tools)
 ;;; emacs-mcp-tools.el ends here
