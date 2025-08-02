@@ -246,10 +246,9 @@ MCP Parameters:
 
 When answering questions:
 1. Use find_symbols_by_name to discover relevant functions and variables
-2. Use helpful_function_inspect and helpful_variable_inspect for detailed information
-3. Use eval_elisp to test concepts or demonstrate functionality when helpful
-4. Provide clear, practical explanations
-5. Include relevant examples when appropriate
+2. Use helpful_function_inspect and helpful_variable_inspect for detailed information. These provide the soucre, which you should include if relevant.
+3. Provide clear, practical explanations
+4. Include relevant examples when appropriate
 
 Focus on being helpful and accurate. Use the tools to gather information, then synthesize a comprehensive answer.")
           (result nil)
@@ -267,7 +266,7 @@ Focus on being helpful and accurate. Use the tools to gather information, then s
       
       ;; Wait for completion with timeout
       (let ((timeout-count 0))
-        (while (and (not completed) (< timeout-count 300)) ; 30 second timeout
+        (while (and (not completed) (< timeout-count 600)) ; 60 second timeout
           (sit-for 0.1)
           (setq timeout-count (1+ timeout-count))))
       
