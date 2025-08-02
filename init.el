@@ -1365,7 +1365,9 @@ If the buffer already has an ID property, just save the buffer."
 
 (use-package mcp-server
   :ensure t
-  :vc (:url "https://github.com/utsahi/mcp-server.el" :rev :newest))
+  :demand t
+  :vc (:url "https://github.com/utsahi/mcp-server.el" :rev :newest)
+  )
 
 ;;; -> AI configuration -> Agent MCP server
 

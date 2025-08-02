@@ -11,212 +11,166 @@
 
 ;; This package implements an MCP (Model Context Protocol) agent server that
 ;; delegates complex tasks to Emacs-based agents using gptel.
-;; The server uses asynchronous communication for agentic tasks.
+;; The server uses asynchronous communication with headless transport.
 ;;
 ;; Usage:
-;; 1. M-x emacs-mcp-agent-install-stdio-script (one-time setup)
-;; 2. M-x emacs-mcp-agent-start-server (start the server)
-;; 3. Register with Claude: claude mcp add -s user -t stdio emacs-agent-server -- ~/.emacs.d/emacs-mcp-agent-stdio.sh --init-function=emacs-mcp-agent-start-server --stop-function=emacs-mcp-agent-stop-server
+;; Register with Claude Code:
+;; {
+;;   "mcpServers": {
+;;     "emacs-agent-server": {
+;;       "command": "emacs",
+;;       "args": [
+;;         "--script", 
+;;         "~/.emacs.d/elpa/mcp-server/mcp-server-headless-stdio-transport.el",
+;;         "~/.emacs.d/lisp/emacs-mcp-tool-server/emacs-mcp-agent-server.el",
+;;         "emacs-mcp-agent-server"
+;;       ]
+;;     }
+;;   }
+;; }
 
 ;;; Code:
 
+;; Set up load paths for headless mode
+(let ((elpa-dir (expand-file-name "~/.emacs.d/elpa/"))
+      (lisp-dir (expand-file-name "~/.emacs.d/lisp/")))
+  (when (file-directory-p elpa-dir)
+    ;; Add mcp-server package
+    (let ((mcp-server-dir (file-name-concat elpa-dir "mcp-server")))
+      (when (file-directory-p mcp-server-dir)
+        (add-to-list 'load-path mcp-server-dir)
+        (let ((mcp-servers-dir (file-name-concat mcp-server-dir "mcp-servers")))
+          (when (file-directory-p mcp-servers-dir)
+            (add-to-list 'load-path mcp-servers-dir)))))
+    
+    ;; Add gptel package - find the versioned directory
+    (dolist (dir (directory-files elpa-dir t "^gptel-"))
+      (when (file-directory-p dir)
+        (add-to-list 'load-path dir)))
+    
+    ;; Add our server directory  
+    (when (file-directory-p lisp-dir)
+      (add-to-list 'load-path (file-name-concat lisp-dir "emacs-mcp-tool-server")))))
+
+;; Load core Emacs libraries first
+(require 'eieio)
+(require 'cl-lib)
+(require 'json)
+
+;; Load required libraries
 (require 'mcp-server)
-(require 'emacs-mcp-agent-tools)
 
-;;; Customization
+;; Conditional gptel loading
+(condition-case nil
+    (require 'gptel)
+  (error 
+   (message "Warning: gptel not available, agent functionality will be limited")))
 
-(defgroup emacs-mcp-agent nil
-  "Emacs MCP Agent Server."
-  :group 'applications
-  :prefix "emacs-mcp-agent-")
+;;; GPTel Helper Functions
 
-(defcustom emacs-mcp-agent-enabled-agents 'all
-  "List of enabled agents, or 'all for all agents."
-  :type '(choice (const all)
-                 (repeat string))
-  :group 'emacs-mcp-agent)
+(defun emacs-mcp-agent-extract-response-block (response)
+  "Extract content between <RESPONSE> tags from RESPONSE."
+  (if (string-match "<RESPONSE>\\(\\(?:.\\|\n\\)*?\\)</RESPONSE>" response)
+      (match-string 1 response)
+    response))
+
+(defun emacs-mcp-agent-get-tools-by-category (category)
+  "Get all tools from a specific CATEGORY in gptel--known-tools."
+  (when (require 'gptel nil t)
+    (let ((category-tools (assoc category gptel--known-tools)))
+      (when category-tools
+        (mapcar #'cdr (cdr category-tools))))))
+
+(cl-defun emacs-mcp-agent-gptel-agent (prompt
+                                       &key
+                                       callback
+                                       model
+                                       tools
+                                       tool-category
+                                       system-prompt
+                                       extract-block)
+  "Execute a GPTel agent task asynchronously.
+
+PROMPT is the task input text.
+CALLBACK is called with the result when the task completes.
+MODEL is the optional model to use (defaults to gpt-4o-mini).
+TOOLS is an optional list of specific tools to enable.
+TOOL-CATEGORY is an optional category name to enable all tools from that category.
+SYSTEM-PROMPT overrides the default system message.
+EXTRACT-BLOCK when non-nil, extracts content from <RESPONSE> tags."
+  (let* ((gptel-model (or model 'gpt-4o-mini))
+         ;; Handle tool selection by category or specific tools
+         (gptel-tools (cond
+                       (tool-category (emacs-mcp-agent-get-tools-by-category tool-category))
+                       (tools (if (eq tools t) gptel-tools tools))
+                       (t nil)))
+         (gptel-use-tools (when (or tools tool-category) t))
+         (gptel-use-context nil)
+         ;; Modify system prompt to include response block format if needed
+         (block-format-instruction 
+          (when extract-block
+            "After you complete your thinking, place your final response between <RESPONSE> and </RESPONSE> tags. Only content within these tags will be returned to the user."))
+         (modified-system-prompt 
+          (if (and extract-block system-prompt)
+              (concat system-prompt "\n\n" block-format-instruction)
+            (if extract-block
+                (concat (or system-prompt gptel--system-message) "\n\n" block-format-instruction)
+              system-prompt)))
+         (gptel--system-message (or modified-system-prompt gptel--system-message))
+         ;; The callback function
+         (wrapped-callback
+          (lambda (response info)
+            (when callback
+              (if (plist-get info :error)
+                  (funcall callback (format "Error: %s" (plist-get info :error)))
+                (cond ((and (consp response)
+                           (equal (car response) 'tool-result))
+                       nil) ; Drop tool results
+                      ((stringp response)
+                       (funcall callback 
+                               (if extract-block
+                                   (emacs-mcp-agent-extract-response-block response)
+                                 response)))
+                      (_ (error "GPTel agent error: Unexpected response format!"))))))))
+    ;; The actual request to gptel
+    (gptel-request prompt
+      :callback wrapped-callback
+      :stream nil)))
 
 ;;; Server Class Definition
 
 (defclass emacs-mcp-agent-server (mcp-server)
   ((name :initform "emacs-agent-server")
-   (version :initform "1.0.0")
-   (agents :initform nil :documentation "List of registered agents"))
+   (version :initform "1.0.0"))
   "MCP agent server for delegating tasks to Emacs-based agents.")
 
-;;; Server Instance Management
-
-(defvar emacs-mcp-agent-server-instance nil
-  "The current MCP agent server instance.")
-
-(defvar emacs-mcp-agent-server-running nil
-  "Whether the MCP agent server is currently running.")
-
-;;; Agent Enumeration
+;;; Agent Tool Definitions
 
 (cl-defmethod mcp-server-enumerate-tools ((this emacs-mcp-agent-server))
   "Return list of available agent tools."
-  (emacs-mcp-agent-get-enabled-agents))
+  '((:name "documentation_agent"
+     :description "Agentic documentation explorer that uses introspection tools to answer Emacs-related questions. Provides comprehensive answers by automatically searching functions, variables, and symbols as needed."
+     :properties ((:name query :type "string" :required t :description "The documentation question or request"))
+     :async-lambda (lambda (request arguments cb-response)
+                     (let ((query (gethash "query" arguments))
+                           (system-prompt "You are a documentation agent for Emacs. You have access to introspection tools to explore Emacs functions, variables, and symbols.
 
-;;; Server Management Functions
+When answering questions:
+1. Use find_symbols_by_name to discover relevant functions and variables
+2. Use helpful_function_inspect and helpful_variable_inspect for detailed information
+3. Use eval_elisp to test concepts or demonstrate functionality when helpful
+4. Provide clear, practical explanations
+5. Include relevant examples when appropriate
 
-;;;###autoload
-(defun emacs-mcp-agent-install-stdio-script ()
-  "Install the stdio transport script for MCP agent clients."
-  (interactive)
-  (let ((script-path "~/.emacs.d/emacs-mcp-agent-stdio.sh"))
-    (with-temp-file (expand-file-name script-path)
-      (insert (emacs-mcp-agent-generate-stdio-script)))
-    (shell-command (format "chmod +x %s" (expand-file-name script-path)))
-    (message "MCP agent stdio script installed. Use: claude mcp add -s user -t stdio emacs-agent-server -- ~/.emacs.d/emacs-mcp-agent-stdio.sh --init-function=emacs-mcp-agent-start-server --stop-function=emacs-mcp-agent-stop-server")))
+Focus on being helpful and accurate. Use the tools to gather information, then synthesize a comprehensive answer."))
+                       (emacs-mcp-agent-gptel-agent 
+                        query
+                        :callback (lambda (result)
+                                    (mcp-server-write-tool-call-text-result request result cb-response))
+                        :tool-category "introspection"
+                        :system-prompt system-prompt
+                        :extract-block t))))))
 
-;;;###autoload
-(defun emacs-mcp-agent-start-server ()
-  "Start the MCP agent server."
-  (interactive)
-  (if emacs-mcp-agent-server-running
-      (message "MCP agent server already running")
-    (setq emacs-mcp-agent-server-instance (emacs-mcp-agent-server))
-    (emacs-mcp-agent-register-all-agents)
-    (setq emacs-mcp-agent-server-running t)
-    (message "MCP agent server started with %d agents"
-             (length (emacs-mcp-agent-get-enabled-agents)))))
-
-;;;###autoload
-(defun emacs-mcp-agent-stop-server ()
-  "Stop the MCP agent server."
-  (interactive)
-  (when emacs-mcp-agent-server-running
-    (setq emacs-mcp-agent-server-instance nil
-          emacs-mcp-agent-server-running nil)
-    (message "MCP agent server stopped")))
-
-;;;###autoload
-(defun emacs-mcp-agent-restart-server ()
-  "Restart the MCP agent server."
-  (interactive)
-  (emacs-mcp-agent-stop-server)
-  (emacs-mcp-agent-start-server))
-
-;;;###autoload
-(defun emacs-mcp-agent-server-status ()
-  "Show MCP agent server status."
-  (interactive)
-  (if emacs-mcp-agent-server-running
-      (message "MCP agent server running with %d agents"
-               (length (emacs-mcp-agent-get-enabled-agents)))
-    (message "MCP agent server not running")))
-
-;;; Internal Functions
-
-(defun emacs-mcp-agent-get-enabled-agents ()
-  "Get list of enabled agent IDs."
-  (if (eq emacs-mcp-agent-enabled-agents 'all)
-      (mapcar #'car (emacs-mcp-agent-get-agents))
-    emacs-mcp-agent-enabled-agents))
-
-(defun emacs-mcp-agent-register-all-agents ()
-  "Register all enabled agents with the server."
-  (let ((enabled-agents (emacs-mcp-agent-get-enabled-agents)))
-    (dolist (agent (emacs-mcp-agent-get-agents))
-      (let ((id (car agent))
-            (def (cdr agent)))
-        (when (member id enabled-agents)
-          (oset emacs-mcp-agent-server-instance agents
-                (cons def (oref emacs-mcp-agent-server-instance agents))))))))
-
-(defun emacs-mcp-agent-generate-stdio-script ()
-  "Generate the stdio transport script content."
-  "#!/bin/bash
-
-# emacs-mcp-agent-stdio.sh - stdio transport script for Emacs MCP agent server
-# This script provides stdio-based JSON-RPC communication for MCP clients
-# to interact with Emacs agent server through emacsclient.
-
-# Default functions for MCP server lifecycle
-INIT_FUNCTION=\"emacs-mcp-agent-start-server\"
-STOP_FUNCTION=\"emacs-mcp-agent-stop-server\"
-
-# Parse command line arguments
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --init-function=*)
-            INIT_FUNCTION=\"${1#*=}\"
-            shift
-            ;;
-        --stop-function=*)
-            STOP_FUNCTION=\"${1#*=}\"
-            shift
-            ;;
-        *)
-            echo \"Unknown option: $1\" >&2
-            exit 1
-            ;;
-    esac
-done
-
-# Function to check if Emacs daemon is running
-check_emacs_daemon() {
-    if ! emacsclient -e \"(+ 1 1)\" >/dev/null 2>&1; then
-        echo \"Error: Emacs daemon not running. Start with: emacs --daemon\" >&2
-        exit 1
-    fi
-}
-
-# Function to start MCP server
-start_mcp_server() {
-    emacsclient -e \"(progn (require '$INIT_FUNCTION) ($INIT_FUNCTION))\" >/dev/null 2>&1
-}
-
-# Function to stop MCP server on exit
-cleanup() {
-    if [[ -n \"$STOP_FUNCTION\" ]]; then
-        emacsclient -e \"($STOP_FUNCTION)\" >/dev/null 2>&1
-    fi
-}
-
-# Set up cleanup trap
-trap cleanup EXIT
-
-# Check if Emacs daemon is running
-check_emacs_daemon
-
-# Start the MCP server
-start_mcp_server
-
-# Main stdio loop - forward stdin/stdout between MCP client and emacsclient
-while IFS= read -r line; do
-    # Send JSON-RPC request to Emacs and get response
-    response=$(emacsclient -e \"(emacs-mcp-agent-handle-request '$line')\" 2>/dev/null)
-    
-    # Forward response back to client
-    if [[ -n \"$response\" ]]; then
-        echo \"$response\"
-    fi
-done")
-
-;;; Request Handler
-
-(defun emacs-mcp-agent-handle-request (request-json)
-  "Handle MCP JSON-RPC request for agent server."
-  (when emacs-mcp-agent-server-instance
-    (mcp-server-process-request 
-     emacs-mcp-agent-server-instance 
-     request-json
-     (lambda (response) response))))
-
-;;; Keybindings
-
-(defvar emacs-mcp-agent-map (make-sparse-keymap)
-  "Keymap for MCP agent server commands.")
-
-(define-key emacs-mcp-agent-map (kbd "i") #'emacs-mcp-agent-install-stdio-script)
-(define-key emacs-mcp-agent-map (kbd "s") #'emacs-mcp-agent-start-server)
-(define-key emacs-mcp-agent-map (kbd "k") #'emacs-mcp-agent-stop-server)
-(define-key emacs-mcp-agent-map (kbd "r") #'emacs-mcp-agent-restart-server)
-(define-key emacs-mcp-agent-map (kbd "?") #'emacs-mcp-agent-server-status)
-
-(global-set-key (kbd "C-c g a") emacs-mcp-agent-map)
 
 (provide 'emacs-mcp-agent-server)
 ;;; emacs-mcp-agent-server.el ends here
