@@ -22,287 +22,55 @@ This project implements a single MCP (Model Context Protocol) server for Emacs u
 - Perfect for direct Emacs operations
 - Future agent functionality will be implemented as tools within this server
 
-## Agent Architecture & Vision
+## Direct Tool Access Architecture
 
-### Overview
+This project provides **direct, immediate access** to Emacs functionality through MCP tools. Rather than using complex agentic workflows that require multiple round-trips and "babysitting", all tools return results immediately and synchronously.
 
-This tool server serves as the foundation for a comprehensive **agent ecosystem** within Emacs. The documentation agent currently being developed is a **prototype** that establishes patterns for much more sophisticated agents with direct vision into Emacs' live environment.
+### Core Philosophy
 
-### The Agent Dream
+**Direct > Agentic**: When a model needs Emacs functionality, it calls the tool and gets the result immediately. No job management, no polling, no complex async patterns. This approach is:
 
-**Current State**: Basic MCP tools providing synchronous Emacs operations  
-**Vision**: Sophisticated agents with direct access to live Emacs state, capable of complex analysis, automation, and collaboration
+- **More efficient**: Single tool call vs multiple agent management calls
+- **More reliable**: Immediate results vs async failures and timeouts  
+- **Simpler**: Direct function calls vs complex job orchestration
+- **More predictable**: Deterministic results vs agent variability
 
-**Key Insight**: This documentation agent prototype will enable agents with direct vision into:
-- **Live code execution** (compilation, testing, debugging)
-- **Live project state** (file changes, git status, running processes)  
-- **Live user workflow** (editing patterns, command usage, productivity metrics)
-- **Live system integration** (databases, APIs, external tools)
+### Documentation Tools
 
-### Core Agent Infrastructure
+The server provides three core documentation tools that give immediate access to Emacs' introspection capabilities:
 
-#### 1. Universal Job Management System
-```elisp
-;; Agent-agnostic job system using resource-based async patterns
-;; Any agent can create jobs, track progress, return results
-(defvar mcp-agent-jobs (make-hash-table :test 'equal))
+#### `find_symbols_by_name(keyword)`
+- Searches for functions and variables matching a keyword
+- Returns formatted list with brief descriptions
+- Perfect for discovering relevant Emacs functionality
 
-;; Resource templates for status tracking
-;; Pattern: emacs://agent/{type}/{id}/{status|logs|result}
-```
+#### `helpful_function_inspect(function_name)`  
+- Returns comprehensive function documentation using the `helpful` package
+- Includes signature, documentation, source code, and references
+- Provides the same detailed view a human developer would see
 
-**Benefits:**
-- Scales to hundreds of parallel agent operations
-- No polling overhead (resources read on-demand)
-- Works within client timeout constraints
-- Consistent progress tracking across all agent types
+#### `helpful_variable_inspect(variable_name)`
+- Returns comprehensive variable documentation using the `helpful` package
+- Shows current value, documentation, customization options
+- Includes all metadata about the variable
 
-#### 2. Immediate + Background Pattern
-**The Core Pattern**: Return quick results immediately (<100ms), continue deep analysis in background
+### Tool Integration Pattern
 
-```elisp
-(defun agent-task-start (domain query)
-  ;; Phase 1: Immediate response (quick search, basic analysis)
-  (let ((quick-results (domain-quick-search query))
-        (job-id (start-background-analysis domain query)))
-    ;; Return partial results + resource URIs for full results
-    (format "Quick analysis: %s\n\nDeep analysis: emacs://agent/%s/%s/result" 
-            quick-results domain job-id)))
-```
+These tools are designed to work together in a simple, linear fashion:
 
-**Applications:**
-- **Documentation Agent**: Quick symbol lookup + deep introspection analysis
-- **Code Agent**: Syntax check + comprehensive static analysis
-- **Project Agent**: Current status + trend analysis & planning
+1. **Discover** relevant symbols with `find_symbols_by_name`
+2. **Inspect** specific functions/variables with the `helpful_*` tools
+3. **Get immediate, comprehensive results** without any additional coordination
 
-#### 3. Agent Tool Integration Layer
-**Standardized tool access** for all agents:
+### Benefits Over Agentic Approaches
 
-```elisp
-;; Agent declares tool dependencies
-(defvar doc-agent-tools '(find_symbols_by_name helpful_function_inspect))
-(defvar code-agent-tools '(compile_buffer run_tests static_analysis))
+- **No timeout issues**: All operations complete immediately
+- **No resource management**: No need to track jobs, poll status, or manage lifecycles
+- **No error complexity**: Simple function calls with immediate error handling
+- **Better user experience**: Users get answers in one step, not multiple waiting periods
+- **Predictable performance**: Every call has consistent, immediate response time
 
-;; Universal tool invocation
-(agent-invoke-tool agent-type tool-name params callback)
-```
-
-#### 4. Result Management & Streaming
-**Chunked results** for large datasets:
-- Return first chunk immediately (e.g., first 20 functions)
-- Register remaining chunks as resources
-- "Streaming" simulation via incremental tool calls
-- Progressive enhancement of results
-
-### Async Patterns & Research Findings
-
-#### Resource-Based Async (MCP Standard)
-**Research Finding**: Most efficient pattern for MCP operations without progress notification support.
-
-**Pattern**: 
-1. Tool returns immediately with resource URIs
-2. Background work updates resource state  
-3. Client reads resources on-demand (no polling overhead)
-4. Much more efficient than job/poll patterns
-
-```elisp
-;; Immediate return with resource URIs
-"Analysis started: emacs://doc-agent/job-123/status"
-
-;; Resource templates provide real-time status
-(mcp-server-lib-register-resource "emacs://doc-agent/{id}/status"
-  #'doc-agent-status-handler)
-```
-
-#### Battle-Tested Patterns
-Based on research of production MCP servers (Firecrawl, etc.):
-
-- **Immediate + Background**: Quick partial results + deep analysis
-- **Chunked results**: Handle large datasets without timeouts
-- **Resource-based status**: Real-time progress without polling
-- **Cross-client compatibility**: Works with strict timeout limits
-
-### Future Agent Types & Capabilities
-
-#### Code Analysis Agents
-**Immediate**: Syntax check, basic metrics, quick symbol lookup  
-**Background**: Deep static analysis, dependency graphs, security scanning, cross-references  
-**Tools**: AST parsing, symbol resolution, compilation, testing frameworks
-
-#### Project Management Agents  
-**Immediate**: Current status, quick searches, immediate issues  
-**Background**: Trend analysis, automated planning, resource optimization, workflow analysis  
-**Tools**: Git history, file system monitoring, task tracking, CI/CD integration
-
-#### Research & Writing Agents
-**Immediate**: Existing notes, quick searches, citation lookup  
-**Background**: Deep synthesis, cross-referencing, comprehensive analysis  
-**Tools**: Org-mode integration, bibliography management, web research, document analysis
-
-#### Development Workflow Agents
-**Immediate**: Current state, quick fixes, immediate diagnostics  
-**Background**: Comprehensive testing, deployment pipelines, monitoring, optimization  
-**Tools**: Testing frameworks, CI/CD systems, monitoring tools, performance analysis
-
-### Architectural Decision Process
-
-#### When to Escalate Complex Decisions
-For major architectural decisions or roadblocks, escalate to web research agent with focused prompts:
-
-**Example Research Prompts:**
-- "Best practices for multi-agent coordination in MCP environments"
-- "Scalable async patterns for Emacs integration with external AI agents"  
-- "Resource management strategies for long-running agent operations"
-
-**Process:**
-1. Identify architectural decision point or roadblock
-2. Formulate specific, focused research prompt
-3. Get external research and analysis  
-4. Document decision rationale in CLAUDE.md
-5. **Future**: Implement as tool call integration (not yet implemented)
-
-#### Documentation-Driven Development
-All architectural decisions and patterns must be documented in CLAUDE.md before implementation:
-- Establishes clear patterns for future agents
-- Enables consistent development across agent types
-- Provides blueprint for sophisticated agent ecosystem
-
-### Implementation Guidelines
-
-#### Agent-Agnostic Design Principles
-- **Universal job system**: Any agent can create and manage jobs
-- **Consistent resource patterns**: `emacs://agent/{type}/{id}/{status|logs|result}`
-- **Tool registry**: Agents declare tool dependencies explicitly
-- **Composable results**: Agents can consume outputs from other agents
-
-#### Resource URI Conventions
-```
-emacs://agent/{agent_type}/{job_id}/status   # Job status and progress
-emacs://agent/{agent_type}/{job_id}/logs     # Incremental logs
-emacs://agent/{agent_type}/{job_id}/result   # Final results
-emacs://agent/{agent_type}/{job_id}/chunks/{n} # Chunked large results
-```
-
-#### Background Processing Standards
-- Use `run-at-time` for non-blocking operations
-- Update job state and resources incrementally
-- Implement automatic cleanup with TTL
-- Handle errors gracefully with detailed logging
-
-#### Error Handling & Cleanup
-- Jobs automatically cleaned up after TTL expiration
-- Failed jobs provide detailed error information
-- Partial results preserved even on failure
-- Resource URIs remain valid during cleanup period
-
-### The Documentation Agent Prototype
-
-The current documentation agent implementation establishes these patterns:
-
-1. **Immediate symbol lookup** + **background deep analysis**
-2. **Resource-based status tracking** for long operations  
-3. **Chunked results** for large searches (e.g., "all functions starting with js/")
-4. **Tool integration** with GPTel and introspection tools
-5. **Cross-client compatibility** with timeout resilience
-
-**Success Metrics:**
-- Timeouts eliminated for complex queries
-- Immediate user feedback for all operations
-- Scalable to hundreds of parallel documentation queries
-- Foundation established for more sophisticated agents
-
-This prototype validates the infrastructure and patterns needed for the full agent ecosystem vision.
-
-### Next Implementation Phase: Await Pattern for Seamless Results
-
-#### Problem Identified
-Current resource-based agent works perfectly but requires manual polling of resources to get final results. Users must repeatedly check status/results rather than having seamless "wait for completion" experience.
-
-#### Research Findings - Cross-Client UX Patterns
-Based on production MCP server analysis (Firecrawl, etc.):
-
-**Key Constraints:**
-- Many clients enforce ~60s tool-call limits regardless of progress
-- Design for short, repeatable calls (1-5s each)
-- stdio transport + "short calls delivering deltas" most portable
-- Resources + subscribe/updated are spec's first-class async mechanism
-
-**Standard "Await" Pattern:**
-1. `start_task` → returns job_id immediately
-2. `await_job(job_id, since_seq, wait_ms)` → blocks briefly, returns deltas
-3. Agent/client calls `await_job` in loop until done
-4. **User never manually polls** - agent handles it automatically
-
-#### Implementation Plan: Universal Await Tools
-
-**Tool 1: Enhanced Start Tool**
-Modify `documentation_agent_start` to return structured response:
-```elisp
-{
-  "job_id": "job-123",
-  "state": "running",
-  "partials": ["Starting analysis..."],
-  "next_seq": 0,
-  "await_hint_ms": 1500,
-  "status_uri": "emacs://agent/doc_agent/job-123/status"
-}
-```
-
-**Tool 2: Universal Await Tool**
-Add `await_agent_job(job_id, since_seq, wait_ms)` that:
-- Blocks briefly (1-5s) waiting for new events since `since_seq`
-- Returns incremental logs/progress as delta events
-- Includes state ("running"/"done"/"error") and next sequence number
-- Works for any agent type (doc-agent, future code-agent, etc.)
-- Implements progressive backoff if no new events
-
-**Tool 3: Agent-Specific Await**
-Add `await_doc_job` as wrapper for documentation agent convenience.
-
-#### Technical Implementation Details
-
-**Delta-Based Event Tracking:**
-```elisp
-;; Job system enhancements needed
-(defvar mcp-log-cursors (make-hash-table :test 'equal)) ;; job-id -> seq
-
-;; Await tool implementation
-(defun await-agent-job (&key job_id since_seq wait_ms)
-  ;; Blocks briefly, returns only new events since since_seq
-  ;; Includes progressive backoff and timeout management
-  )
-```
-
-**Key Features:**
-- **Short calls**: 1-5s blocking to stay under 60s client timeouts
-- **Delta events**: Only return new logs/progress since last check
-- **Progressive backoff**: Increase wait time if no new data
-- **Cross-client compatible**: Works with stdio transport
-- **Agent-managed**: Client/agent handles polling loop automatically
-
-**Files to Modify:**
-- `emacs-mcp-tool-tools.el` - add await tools and enhance start tool
-- Update job system to track sequence numbers
-- Add cursor tracking for delta events
-
-#### Expected Outcome
-
-**Before**: User manually polls resources repeatedly
-```
-1. Call documentation_agent_start → get URIs
-2. User manually calls ReadMcpResourceTool repeatedly  
-3. User checks status until done
-```
-
-**After**: Agent automatically waits for completion with streaming-like UX
-```
-1. Call documentation_agent_start → get job_id
-2. Agent automatically calls await_agent_job in loop
-3. User sees streaming progress, gets final result
-4. No manual polling needed
-```
-
-This matches production MCP server patterns and provides seamless user experience while maintaining scalable async foundation.
+This direct approach maintains all the power of sophisticated documentation analysis while eliminating the overhead and complexity of agent orchestration.
 
 ## Transport Mechanism (stdio)
 
@@ -376,7 +144,9 @@ Add to Claude Code MCP config:
 - `search_buffers`: Search content across open buffers
 - `get_buffer_list`: Get list of open buffers
 - `eval_elisp`: Safely evaluate Emacs Lisp code
-- `documentation_agent`: Agentic documentation explorer using introspection tools
+- `find_symbols_by_name`: Search for Emacs Lisp symbols (functions and variables) by keyword
+- `helpful_function_inspect`: Get comprehensive documentation for any Emacs Lisp function
+- `helpful_variable_inspect`: Get comprehensive documentation for any Emacs Lisp variable
 
 ## Available Resources (for LLMs)
 
@@ -500,32 +270,34 @@ Future agent functionality (using GPTel or other AI tools) will be implemented a
 
 ## Implementation Status (2025-08-03)
 
-### ✅ Completed: Universal Agent Infrastructure
+### ✅ Completed: Direct Tool Architecture
 
-**Core Agent System:**
-- Universal job system with TTL cleanup and background processing
-- Delta-based event tracking with sequence numbers for streaming UX  
-- Cross-client timeout safety (<5s calls, works under 60s limits)
-- Agent-agnostic design supporting unlimited future agent types
+**Core Achievement:** Successfully simplified from complex agentic infrastructure to direct, immediate tool access.
+
+**Architectural Change:**
+- **Removed**: Complex agent job system, async patterns, GPTel integration, resource-based job tracking
+- **Added**: Direct documentation tools with immediate, synchronous results
+- **Result**: Much simpler, more reliable, and more efficient tool interface
 
 **Working Tools:**
-- `documentation_agent_start` - Starts GPTel-powered documentation analysis
-- `await_agent_job(jobid)` - Streams progress updates with progressive backoff
-- `get_agent_result(jobid)` - Simple direct result fetching
-- `await_doc_job(jobid)` - Documentation-optimized convenience wrapper
+- `find_symbols_by_name(keyword)` - Search symbols by keyword with immediate results
+- `helpful_function_inspect(function_name)` - Get comprehensive function documentation
+- `helpful_variable_inspect(variable_name)` - Get comprehensive variable documentation
+- All existing tools: `hello_world`, `get_emacs_version`, `search_buffers`, `get_buffer_list`, `eval_elisp`
 
 **User Experience Achieved:**
 ```
-Simple: documentation_agent_start → get_agent_result (2 calls)
-Streaming: documentation_agent_start → await_agent_job loop (live updates)  
-Resource: Traditional MCP resource access (backward compatible)
+Direct: find_symbols_by_name("mapcar") → immediate symbol list
+Detailed: helpful_function_inspect("mapcar") → comprehensive docs
+Simple: Single tool call gets complete results
 ```
 
 **Success Metrics:**
-- ✅ Eliminated timeout issues on complex queries (finds all 24 `js/` functions)
-- ✅ Scales to hundreds of parallel agent jobs
+- ✅ Eliminated all timeout issues (immediate responses)
+- ✅ Removed complex job management overhead  
+- ✅ Simplified from multi-step agent workflows to single tool calls
+- ✅ Maintained full documentation analysis capabilities
 - ✅ Works seamlessly in both Claude Code and Claude Desktop
-- ✅ Provides foundation for unlimited future agent types
 
 ### ✅ Resolved: MCP Resource Protocol
 
@@ -539,6 +311,50 @@ Resource: Traditional MCP resource access (backward compatible)
 - All resource operations now work correctly:
   - `resources/list` returns proper resource metadata
   - `resources/read` successfully reads both static and templated resources
-  - Agent job results accessible as MCP resources
 
 **Status:** ✅ **FULLY WORKING** - Resources are now properly accessible via MCP protocol.
+
+### 🔄 Ongoing: MCP Resource Protocol Compliance (Low Priority)
+
+**Problem:** MCP Inspector shows validation errors because `mcp-server-lib` violates the 2025-06-18 MCP specification by mixing concrete resources and templates in `resources/list` responses.
+
+**Root Cause Analysis:**
+- **Line 699-705 in mcp-server-lib.el**: Concatenates both concrete resources and templates into single array
+- **Missing handler**: No `resources/templates/list` method in dispatcher 
+- **Validation failure**: Templates have `"uriTemplate"` field but `resources/list` requires `"uri"` field
+
+**Attempted Solution:**
+Implemented downstream fix in `emacs-mcp-tool-server.el`:
+- Custom handlers `emacs-mcp-tool--handle-resources-list` (concrete only) and `emacs-mcp-tool--handle-resources-templates-list`
+- Dispatcher override via `advice-add` to intercept resource calls
+- Enhanced metadata support for `title` and `annotations`
+
+**Current Status:**
+- ✅ Code implemented and added to server startup/shutdown
+- ❌ Advice override not applying correctly during server restart
+- ❌ Still seeing mixed resources in `resources/list` responses
+
+**Files Modified:**
+- `emacs-mcp-tool-server.el` lines 44-84: Custom handlers and dispatcher
+- `emacs-mcp-tool-server.el` lines 103, 115: Override application in start/stop
+
+**Why Low Priority:**
+- Claude Code works fine with current resource implementation
+- Main functionality (direct tool access) is complete and working perfectly
+- Issue is primarily cosmetic for MCP Inspector compliance
+- Core goal achieved: Live Emacs documentation access for AI agents
+
+**Future Resolution Approach:**
+1. Debug why `advice-add` isn't taking effect during server restart
+2. Alternative: Hook into `mcp-server-lib-process-jsonrpc` instead of dispatcher
+3. Alternative: Patch mcp-server-lib directly if needed for strict compliance
+4. Test with actual MCP Inspector to confirm fix effectiveness
+
+**Next Steps When Resuming:**
+```elisp
+;; Debug the advice system
+(advice--p (advice--symbol-function 'mcp-server-lib--dispatch-jsonrpc-method))
+
+;; Alternative hook approach
+(advice-add 'mcp-server-lib-process-jsonrpc :around #'custom-processor)
+```

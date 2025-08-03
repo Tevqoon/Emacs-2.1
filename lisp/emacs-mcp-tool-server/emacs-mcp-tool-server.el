@@ -4,7 +4,7 @@
 
 ;; Author: Claude
 ;; Version: 0.1.0
-;; Package-Requires: ((emacs "27.1") (mcp-server-lib "0.1.0") (gptel "0.1"))
+;; Package-Requires: ((emacs "27.1") (mcp-server-lib "0.1.0") (helpful "0.1"))
 ;; Keywords: tools, ai, mcp
 
 ;;; Commentary:
