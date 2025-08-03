@@ -37,7 +37,7 @@ Keys are job IDs, values are job structures.")
   :group 'emacs-mcp-tool)
 
 (cl-defstruct (emacs-mcp-agent-job (:constructor emacs-mcp-agent-job--make))
-  id agent-type state started-at finished-at progress logs result error)
+  id agent-type state started-at finished-at progress logs result error sequence)
 
 (defun emacs-mcp-agent--generate-job-id ()
   "Generate a unique job ID."
@@ -54,7 +54,8 @@ Keys are job IDs, values are job structures.")
                :state "queued"
                :started-at (current-time)
                :progress 0
-               :logs nil)))
+               :logs nil
+               :sequence 0)))
     (puthash id job emacs-mcp-agent-jobs)
     job))
 
@@ -83,6 +84,9 @@ UPDATES can include :state, :progress, :result, :error."
                   (format-time-string "%H:%M:%S") 
                   message)
           (emacs-mcp-agent-job-logs job))
+    ;; Increment sequence number for delta tracking
+    (setf (emacs-mcp-agent-job-sequence job) 
+          (1+ (emacs-mcp-agent-job-sequence job)))
     (puthash job-id job emacs-mcp-agent-jobs)))
 
 (defun emacs-mcp-agent--cleanup-jobs ()
@@ -233,6 +237,17 @@ PARAMS should contain 'agent_type' and 'id' keys."
    :handler emacs-mcp-tool-documentation-agent-start
    :async t))
 
+;; Universal await tools
+(emacs-mcp-register-tool
+ '(:id "await_agent_job"
+   :description "Block briefly for new output from any agent job; returns deltas and state. Works with any agent type for streaming-like UX."
+   :handler emacs-mcp-tool-await-agent-job))
+
+(emacs-mcp-register-tool
+ '(:id "await_doc_job"
+   :description "Block briefly for new output from documentation agent job; returns deltas and state."
+   :handler emacs-mcp-tool-await-doc-job))
+
 ;; Legacy compatibility (deprecated)
 (emacs-mcp-register-tool
  '(:id "documentation_agent"
@@ -331,6 +346,19 @@ EXTRACT-BLOCK when non-nil, extracts content from <RESPONSE> tags."
       (when category-tools
         (mapcar #'cdr (cdr category-tools))))))
 
+;;; Development Helper
+
+(defun emacs-mcp-tool-reload-and-restart ()
+  "Reload tool definitions and restart MCP server for development."
+  (interactive)
+  (message "Reloading emacs-mcp-tool-tools.el...")
+  (let ((tools-file (expand-file-name "emacs-mcp-tool-tools.el" 
+                                      "~/.emacs.d/lisp/emacs-mcp-tool-server/")))
+    (load-file tools-file))
+  (message "Restarting MCP server...")
+  (emacs-mcp-tool-restart-server)
+  (message "MCP server reloaded and restarted"))
+
 ;;; Tool Handlers
 
 (defun emacs-mcp-tool-hello-world ()
@@ -393,6 +421,7 @@ MCP Parameters:
 
 ;;; New Resource-Based Documentation Agent
 
+
 (defun emacs-mcp-tool-documentation-agent-start (query)
   "Start documentation analysis using immediate + background pattern.
 
@@ -400,23 +429,26 @@ MCP Parameters:
   query - The documentation question or request"
   (mcp-server-lib-with-error-handling
     (let* ((job (emacs-mcp-agent--make-job "doc-agent"))
-           (job-id (emacs-mcp-agent-job-id job)))
+           (job-id (emacs-mcp-agent-job-id job))
+           ;; No immediate partials - keep it fully agentic
+           (immediate-partials '("Documentation analysis starting..." "Agent will use introspection tools")))
       
       ;; Log the start
       (emacs-mcp-agent--log-message job-id (format "Starting documentation analysis for: %s" query))
       
-      ;; Start background analysis immediately - let the agent handle everything
+      ;; Start background analysis immediately
       (emacs-mcp-documentation-start-background-analysis job-id query)
       
-      ;; Return immediate status + resource URIs
-      (format "Documentation Analysis Started for: %s
-
-The agent will use its introspection tools to search functions, variables, and symbols.
-
-Status: emacs://agent/doc_agent/%s/status
-Logs: emacs://agent/doc_agent/%s/logs  
-Results: emacs://agent/doc_agent/%s/result"
-              query job-id job-id job-id))))
+      ;; Return structured JSON response with immediate partials + await hints
+      (json-encode
+       `(("job_id" . ,job-id)
+         ("state" . "running")
+         ("partials" . ,(vconcat immediate-partials))
+         ("next_seq" . 0)
+         ("await_hint_ms" . 1500)
+         ("status_uri" . ,(format "emacs://agent/doc_agent/%s/status" job-id))
+         ("logs_uri" . ,(format "emacs://agent/doc_agent/%s/logs" job-id))
+         ("result_uri" . ,(format "emacs://agent/doc_agent/%s/result" job-id)))))))
 
 (defun emacs-mcp-documentation-start-background-analysis (job-id query)
   "Start background deep analysis for documentation query."
@@ -480,6 +512,73 @@ Query: %s
 
 For full agentic analysis, call: documentation_agent_start" 
             query)))
+
+;;; Universal Await Tools
+
+(defun emacs-mcp-tool-await-agent-job (jobid)
+  "Block briefly for new output from any agent job; returns deltas and state.
+
+MCP Parameters:
+  jobid - The agent job ID to wait for (format: 'job-id' or 'job-id,since-seq,wait-ms')"
+  (mcp-server-lib-with-error-handling
+    (let* ((parts (split-string jobid ","))
+           (job-id (car parts))
+           (since (if (> (length parts) 1) (string-to-number (nth 1 parts)) 0))
+           (wait-time (min (if (> (length parts) 2) (string-to-number (nth 2 parts)) 2000) 5000))
+           (job (gethash job-id emacs-mcp-agent-jobs))
+           (deadline (+ (float-time) (/ wait-time 1000.0)))
+           (initial-seq (if job (emacs-mcp-agent-job-sequence job) 0))
+           (backoff-factor 1.0))
+      
+      (unless job
+        (error "Job %s not found" job-id))
+      
+      ;; Wait for new events or deadline
+      (while (and (< (float-time) deadline)
+                  job
+                  (<= (emacs-mcp-agent-job-sequence job) since)
+                  (not (member (emacs-mcp-agent-job-state job) '("done" "error"))))
+        (sleep-for (* 0.05 backoff-factor))  ; Progressive backoff from 50ms
+        (setq backoff-factor (min 2.0 (* backoff-factor 1.1)))  ; Increase up to 100ms
+        (setq job (gethash job-id emacs-mcp-agent-jobs)))  ; Refresh job state
+      
+      ;; Calculate delta events
+      (let* ((logs (reverse (emacs-mcp-agent-job-logs job)))
+             (total-events (length logs))
+             (new-events (if (> total-events since)
+                            (cl-subseq logs since total-events)
+                          []))
+             (next-seq (emacs-mcp-agent-job-sequence job))
+             (state (emacs-mcp-agent-job-state job))
+             (eta-estimate (if (string= state "running") 
+                              (max 1000 (* wait-time 0.8))  ; Adaptive ETA
+                            nil)))
+        
+        ;; Return JSON response
+        (json-encode 
+         `(("events" . ,(vconcat new-events))
+           ("next_seq" . ,next-seq)
+           ("state" . ,state)
+           ("eta_ms" . ,eta-estimate)
+           ("progress" . ,(emacs-mcp-agent-job-progress job))
+           ,@(when (string= state "done")
+               `(("result_uri" . ,(format "emacs://agent/%s/%s/result" 
+                                         (emacs-mcp-agent-job-agent-type job)
+                                         job-id))))
+           ,@(when (string= state "error")
+               `(("error" . ,(emacs-mcp-agent-job-error job))))))))))
+
+(defun emacs-mcp-tool-await-doc-job (jobid)
+  "Block briefly for new output from documentation agent job; returns deltas and state.
+
+MCP Parameters:
+  jobid - The documentation agent job ID to wait for (format: 'job-id' or 'job-id,since-seq' or 'job-id,since-seq,wait-ms')"
+  (mcp-server-lib-with-error-handling
+    ;; Use universal await with doc-agent optimized defaults (1500ms wait)
+    (let ((parts (split-string jobid ",")))
+      (if (= (length parts) 1)
+          (emacs-mcp-tool-await-agent-job (format "%s,0,1500" jobid))
+        (emacs-mcp-tool-await-agent-job jobid)))))
 
 
 ;;; Resource Handlers

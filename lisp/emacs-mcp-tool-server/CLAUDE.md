@@ -213,6 +213,97 @@ The current documentation agent implementation establishes these patterns:
 
 This prototype validates the infrastructure and patterns needed for the full agent ecosystem vision.
 
+### Next Implementation Phase: Await Pattern for Seamless Results
+
+#### Problem Identified
+Current resource-based agent works perfectly but requires manual polling of resources to get final results. Users must repeatedly check status/results rather than having seamless "wait for completion" experience.
+
+#### Research Findings - Cross-Client UX Patterns
+Based on production MCP server analysis (Firecrawl, etc.):
+
+**Key Constraints:**
+- Many clients enforce ~60s tool-call limits regardless of progress
+- Design for short, repeatable calls (1-5s each)
+- stdio transport + "short calls delivering deltas" most portable
+- Resources + subscribe/updated are spec's first-class async mechanism
+
+**Standard "Await" Pattern:**
+1. `start_task` → returns job_id immediately
+2. `await_job(job_id, since_seq, wait_ms)` → blocks briefly, returns deltas
+3. Agent/client calls `await_job` in loop until done
+4. **User never manually polls** - agent handles it automatically
+
+#### Implementation Plan: Universal Await Tools
+
+**Tool 1: Enhanced Start Tool**
+Modify `documentation_agent_start` to return structured response:
+```elisp
+{
+  "job_id": "job-123",
+  "state": "running",
+  "partials": ["Starting analysis..."],
+  "next_seq": 0,
+  "await_hint_ms": 1500,
+  "status_uri": "emacs://agent/doc_agent/job-123/status"
+}
+```
+
+**Tool 2: Universal Await Tool**
+Add `await_agent_job(job_id, since_seq, wait_ms)` that:
+- Blocks briefly (1-5s) waiting for new events since `since_seq`
+- Returns incremental logs/progress as delta events
+- Includes state ("running"/"done"/"error") and next sequence number
+- Works for any agent type (doc-agent, future code-agent, etc.)
+- Implements progressive backoff if no new events
+
+**Tool 3: Agent-Specific Await**
+Add `await_doc_job` as wrapper for documentation agent convenience.
+
+#### Technical Implementation Details
+
+**Delta-Based Event Tracking:**
+```elisp
+;; Job system enhancements needed
+(defvar mcp-log-cursors (make-hash-table :test 'equal)) ;; job-id -> seq
+
+;; Await tool implementation
+(defun await-agent-job (&key job_id since_seq wait_ms)
+  ;; Blocks briefly, returns only new events since since_seq
+  ;; Includes progressive backoff and timeout management
+  )
+```
+
+**Key Features:**
+- **Short calls**: 1-5s blocking to stay under 60s client timeouts
+- **Delta events**: Only return new logs/progress since last check
+- **Progressive backoff**: Increase wait time if no new data
+- **Cross-client compatible**: Works with stdio transport
+- **Agent-managed**: Client/agent handles polling loop automatically
+
+**Files to Modify:**
+- `emacs-mcp-tool-tools.el` - add await tools and enhance start tool
+- Update job system to track sequence numbers
+- Add cursor tracking for delta events
+
+#### Expected Outcome
+
+**Before**: User manually polls resources repeatedly
+```
+1. Call documentation_agent_start → get URIs
+2. User manually calls ReadMcpResourceTool repeatedly  
+3. User checks status until done
+```
+
+**After**: Agent automatically waits for completion with streaming-like UX
+```
+1. Call documentation_agent_start → get job_id
+2. Agent automatically calls await_agent_job in loop
+3. User sees streaming progress, gets final result
+4. No manual polling needed
+```
+
+This matches production MCP server patterns and provides seamless user experience while maintaining scalable async foundation.
+
 ## Transport Mechanism (stdio)
 
 The project uses stdio transport via the `mcp-server-lib` stdio script:

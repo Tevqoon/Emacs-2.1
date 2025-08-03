@@ -1382,6 +1382,7 @@ If the buffer already has an ID property, just save the buffer."
      ("C-c g t r" . emacs-mcp-restart-server)
      ("C-c g t ?" . emacs-mcp-server-status))
     :config
+    (require 'emacs-mcp-tool-server)
     (emacs-mcp-tool-start-server)
     )
 
