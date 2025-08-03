@@ -177,10 +177,10 @@ All architectural decisions and patterns must be documented in CLAUDE.md before 
 
 #### Resource URI Conventions
 ```
-emacs://agent/{agent-type}/{job-id}/status   # Job status and progress
-emacs://agent/{agent-type}/{job-id}/logs     # Incremental logs
-emacs://agent/{agent-type}/{job-id}/result   # Final results
-emacs://agent/{agent-type}/{job-id}/chunks/{n} # Chunked large results
+emacs://agent/{agent_type}/{job_id}/status   # Job status and progress
+emacs://agent/{agent_type}/{job_id}/logs     # Incremental logs
+emacs://agent/{agent_type}/{job_id}/result   # Final results
+emacs://agent/{agent_type}/{job_id}/chunks/{n} # Chunked large results
 ```
 
 #### Background Processing Standards

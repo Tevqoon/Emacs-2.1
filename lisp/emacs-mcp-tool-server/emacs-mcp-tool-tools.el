@@ -25,7 +25,82 @@
 (defvar emacs-mcp-resources '()
   "Registry of available MCP resources.")
 
-;;; Tool Registration API
+;;; Universal Agent Job System
+
+(defvar emacs-mcp-agent-jobs (make-hash-table :test 'equal)
+  "Hash table of active agent jobs.
+Keys are job IDs, values are job structures.")
+
+(defcustom emacs-mcp-agent-job-ttl 3600
+  "Time to live for completed jobs in seconds (default: 1 hour)."
+  :type 'integer
+  :group 'emacs-mcp-tool)
+
+(cl-defstruct (emacs-mcp-agent-job (:constructor emacs-mcp-agent-job--make))
+  id agent-type state started-at finished-at progress logs result error)
+
+(defun emacs-mcp-agent--generate-job-id ()
+  "Generate a unique job ID."
+  (format "job-%s-%d" 
+          (format-time-string "%s") 
+          (random 10000)))
+
+(defun emacs-mcp-agent--make-job (agent-type)
+  "Create a new agent job of AGENT-TYPE."
+  (let* ((id (emacs-mcp-agent--generate-job-id))
+         (job (emacs-mcp-agent-job--make 
+               :id id
+               :agent-type agent-type
+               :state "queued"
+               :started-at (current-time)
+               :progress 0
+               :logs nil)))
+    (puthash id job emacs-mcp-agent-jobs)
+    job))
+
+(defun emacs-mcp-agent--update-job (job-id &rest updates)
+  "Update job with JOB-ID with UPDATES plist.
+UPDATES can include :state, :progress, :result, :error."
+  (when-let ((job (gethash job-id emacs-mcp-agent-jobs)))
+    (while updates
+      (let ((key (pop updates))
+            (value (pop updates)))
+        (pcase key
+          (:state (setf (emacs-mcp-agent-job-state job) value))
+          (:progress (setf (emacs-mcp-agent-job-progress job) value))
+          (:result (setf (emacs-mcp-agent-job-result job) value))
+          (:error (setf (emacs-mcp-agent-job-error job) value))
+          (:finished-at (setf (emacs-mcp-agent-job-finished-at job) value)))))
+    (when (member (emacs-mcp-agent-job-state job) '("done" "error"))
+      (setf (emacs-mcp-agent-job-finished-at job) (current-time)))
+    (puthash job-id job emacs-mcp-agent-jobs)
+    job))
+
+(defun emacs-mcp-agent--log-message (job-id message)
+  "Add a log MESSAGE to job with JOB-ID."
+  (when-let ((job (gethash job-id emacs-mcp-agent-jobs)))
+    (push (format "[%s] %s" 
+                  (format-time-string "%H:%M:%S") 
+                  message)
+          (emacs-mcp-agent-job-logs job))
+    (puthash job-id job emacs-mcp-agent-jobs)))
+
+(defun emacs-mcp-agent--cleanup-jobs ()
+  "Clean up expired jobs based on TTL."
+  (let ((now (current-time)))
+    (maphash 
+     (lambda (job-id job)
+       (when (and (emacs-mcp-agent-job-finished-at job)
+                  (> (float-time 
+                      (time-subtract now (emacs-mcp-agent-job-finished-at job)))
+                     emacs-mcp-agent-job-ttl))
+         (remhash job-id emacs-mcp-agent-jobs)))
+     emacs-mcp-agent-jobs)))
+
+;; Clean up jobs every 10 minutes
+(run-at-time "10 min" 600 #'emacs-mcp-agent--cleanup-jobs)
+
+;;; Tool/Resource Registration Functions
 
 (defun emacs-mcp-register-tool (tool-def)
   "Register a tool definition.
@@ -48,6 +123,79 @@ RESOURCE-DEF should be a plist with :uri, :name, :description, :handler, and opt
 (defun emacs-mcp-tool-get-resources ()
   "Get all registered resources."
   emacs-mcp-resources)
+
+;;; Agent Job Resource Handlers
+
+(defun emacs-mcp-agent--job-status-resource (params)
+  "Resource handler for agent job status.
+PARAMS should contain 'agent_type' and 'id' keys."
+  (let* ((agent-type (alist-get "agent_type" params nil nil #'string=))
+         (job-id (alist-get "id" params nil nil #'string=))
+         (job (gethash job-id emacs-mcp-agent-jobs)))
+    (if job
+        (json-encode
+         `(("id" . ,(emacs-mcp-agent-job-id job))
+           ("agentType" . ,(emacs-mcp-agent-job-agent-type job))
+           ("state" . ,(emacs-mcp-agent-job-state job))
+           ("progress" . ,(emacs-mcp-agent-job-progress job))
+           ("startedAt" . ,(format-time-string "%Y-%m-%dT%H:%M:%SZ" 
+                                               (emacs-mcp-agent-job-started-at job)))
+           ("finishedAt" . ,(when (emacs-mcp-agent-job-finished-at job)
+                              (format-time-string "%Y-%m-%dT%H:%M:%SZ" 
+                                                  (emacs-mcp-agent-job-finished-at job))))
+           ("error" . ,(emacs-mcp-agent-job-error job))))
+      (json-encode `(("error" . ,(format "Job %s not found" job-id)))))))
+
+(defun emacs-mcp-agent--job-logs-resource (params)
+  "Resource handler for agent job logs.
+PARAMS should contain 'agent_type' and 'id' keys."
+  (let* ((job-id (alist-get "id" params nil nil #'string=))
+         (job (gethash job-id emacs-mcp-agent-jobs)))
+    (if job
+        (json-encode
+         `(("logs" . ,(vconcat (reverse (emacs-mcp-agent-job-logs job))))
+           ("count" . ,(length (emacs-mcp-agent-job-logs job)))))
+      (json-encode `(("error" . ,(format "Job %s not found" job-id)))))))
+
+(defun emacs-mcp-agent--job-result-resource (params)
+  "Resource handler for agent job result.
+PARAMS should contain 'agent_type' and 'id' keys."
+  (let* ((job-id (alist-get "id" params nil nil #'string=))
+         (job (gethash job-id emacs-mcp-agent-jobs)))
+    (cond
+     ((not job)
+      (json-encode `(("error" . ,(format "Job %s not found" job-id)))))
+     ((string= (emacs-mcp-agent-job-state job) "done")
+      (or (emacs-mcp-agent-job-result job) 
+          (json-encode `(("result" . "Job completed with no result")))))
+     ((string= (emacs-mcp-agent-job-state job) "error")
+      (json-encode `(("error" . ,(or (emacs-mcp-agent-job-error job) 
+                                     "Job failed with unknown error")))))
+     (t
+      (json-encode `(("status" . ,(format "Job %s still %s" 
+                                          job-id 
+                                          (emacs-mcp-agent-job-state job)))))))))
+
+;;; Register Agent Job Resources
+
+(emacs-mcp-register-resource
+ '(:uri "emacs://agent/{agent_type}/{id}/status"
+   :name "Agent Job Status"
+   :description "Status and progress of an agent job"
+   :handler emacs-mcp-agent--job-status-resource))
+
+(emacs-mcp-register-resource
+ '(:uri "emacs://agent/{agent_type}/{id}/logs"
+   :name "Agent Job Logs"
+   :description "Logs from an agent job"
+   :handler emacs-mcp-agent--job-logs-resource))
+
+(emacs-mcp-register-resource
+ '(:uri "emacs://agent/{agent_type}/{id}/result"
+   :name "Agent Job Result"
+   :description "Result of a completed agent job"
+   :handler emacs-mcp-agent--job-result-resource))
+
 
 ;;; Built-in Tools
 
@@ -80,10 +228,17 @@ RESOURCE-DEF should be a plist with :uri, :name, :description, :handler, and opt
 
 ;; Agent tools
 (emacs-mcp-register-tool
- '(:id "documentation_agent"
-   :description "Agentic documentation explorer that uses introspection tools to answer Emacs-related questions. Provides comprehensive answers by automatically searching functions, variables, and symbols as needed."
-   :handler emacs-mcp-tool-documentation-agent
+ '(:id "documentation_agent_start"
+   :description "Start documentation analysis using immediate + background pattern. Returns quick results immediately and provides resource URIs for full analysis status and results."
+   :handler emacs-mcp-tool-documentation-agent-start
    :async t))
+
+;; Legacy compatibility (deprecated)
+(emacs-mcp-register-tool
+ '(:id "documentation_agent"
+   :description "[DEPRECATED] Use documentation_agent_start instead. Quick symbol search with redirect to new agent."
+   :handler emacs-mcp-tool-documentation-agent))
+
 
 ;;; Built-in Resources
 
@@ -236,43 +391,96 @@ MCP Parameters:
         (mapconcat #'identity (reverse results) "\n")
       (format "No matches found for '%s'" pattern))))
 
-(defun emacs-mcp-tool-documentation-agent (query)
-  "Documentation agent that uses introspection tools to answer queries.
+;;; New Resource-Based Documentation Agent
+
+(defun emacs-mcp-tool-documentation-agent-start (query)
+  "Start documentation analysis using immediate + background pattern.
 
 MCP Parameters:
   query - The documentation question or request"
   (mcp-server-lib-with-error-handling
-    (let ((system-prompt "You are a documentation agent for Emacs. You have access to introspection tools to explore Emacs functions, variables, and symbols.
+    (let* ((job (emacs-mcp-agent--make-job "doc-agent"))
+           (job-id (emacs-mcp-agent-job-id job)))
+      
+      ;; Log the start
+      (emacs-mcp-agent--log-message job-id (format "Starting documentation analysis for: %s" query))
+      
+      ;; Start background analysis immediately - let the agent handle everything
+      (emacs-mcp-documentation-start-background-analysis job-id query)
+      
+      ;; Return immediate status + resource URIs
+      (format "Documentation Analysis Started for: %s
+
+The agent will use its introspection tools to search functions, variables, and symbols.
+
+Status: emacs://agent/doc_agent/%s/status
+Logs: emacs://agent/doc_agent/%s/logs  
+Results: emacs://agent/doc_agent/%s/result"
+              query job-id job-id job-id))))
+
+(defun emacs-mcp-documentation-start-background-analysis (job-id query)
+  "Start background deep analysis for documentation query."
+  (emacs-mcp-agent--update-job job-id :state "running" :progress 10)
+  (emacs-mcp-agent--log-message job-id "Starting GPTel deep analysis...")
+  
+  ;; Start background work with run-at-time
+  (run-at-time 0.1 nil
+               (lambda ()
+                 (emacs-mcp-documentation-background-worker job-id query))))
+
+(defun emacs-mcp-documentation-background-worker (job-id query)
+  "Background worker for deep documentation analysis."
+  (let ((system-prompt "You are a documentation agent for Emacs. You have access to introspection tools to explore Emacs functions, variables, and symbols.
 
 When answering questions:
 1. Use find_symbols_by_name to discover relevant functions and variables
-2. Use helpful_function_inspect and helpful_variable_inspect for detailed information. These provide the soucre, which you should include if relevant.
+2. Use helpful_function_inspect and helpful_variable_inspect for detailed information. These provide the source, which you should include if relevant.
 3. Provide clear, practical explanations
 4. Include relevant examples when appropriate
 
-Focus on being helpful and accurate. Use the tools to gather information, then synthesize a comprehensive answer.")
-          (result nil)
-          (completed nil))
-      
-      ;; Use a callback to capture the result
-      (emacs-mcp-gptel-agent 
-       query
-       :callback (lambda (response)
-                   (setq result response
-                         completed t))
-       :tool-category "introspection"
-       :system-prompt system-prompt
-       :extract-block t)
-      
-      ;; Wait for completion with timeout
-      (let ((timeout-count 0))
-        (while (and (not completed) (< timeout-count 600)) ; 60 second timeout
-          (sit-for 0.1)
-          (setq timeout-count (1+ timeout-count))))
-      
-      (if completed
-          (or result "No response received from documentation agent")
-        "Documentation agent timed out. Please try again."))))
+Focus on being helpful and accurate. Use the tools to gather information, then synthesize a comprehensive answer."))
+    
+    (emacs-mcp-agent--update-job job-id :progress 20)
+    (emacs-mcp-agent--log-message job-id "Invoking GPTel with introspection tools...")
+    
+    ;; Use GPTel with callback for async operation
+    (emacs-mcp-gptel-agent 
+     query
+     :callback (lambda (response)
+                 (emacs-mcp-documentation-handle-completion job-id response))
+     :tool-category "introspection"
+     :system-prompt system-prompt
+     :extract-block t)))
+
+(defun emacs-mcp-documentation-handle-completion (job-id response)
+  "Handle completion of documentation analysis."
+  (if response
+      (progn
+        (emacs-mcp-agent--log-message job-id "Analysis completed successfully")
+        (emacs-mcp-agent--update-job job-id 
+                                     :state "done" 
+                                     :progress 100 
+                                     :result response))
+    (progn
+      (emacs-mcp-agent--log-message job-id "Analysis failed - no response")
+      (emacs-mcp-agent--update-job job-id 
+                                   :state "error" 
+                                   :error "No response received from GPTel agent"))))
+
+;; Legacy compatibility tool (deprecated)
+(defun emacs-mcp-tool-documentation-agent (query)
+  "Legacy documentation agent - redirects to new resource-based agent.
+
+MCP Parameters:
+  query - The documentation question or request"
+  (mcp-server-lib-with-error-handling
+    (format "This tool is deprecated. Use 'documentation_agent_start' instead.
+
+Query: %s
+
+For full agentic analysis, call: documentation_agent_start" 
+            query)))
+
 
 ;;; Resource Handlers
 
