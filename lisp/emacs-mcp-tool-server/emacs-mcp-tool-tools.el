@@ -248,6 +248,12 @@ PARAMS should contain 'agent_type' and 'id' keys."
    :description "Block briefly for new output from documentation agent job; returns deltas and state."
    :handler emacs-mcp-tool-await-doc-job))
 
+;; Result fetching tools
+(emacs-mcp-register-tool
+ '(:id "get_agent_result"
+   :description "Get the final result of a completed agent job directly"
+   :handler emacs-mcp-tool-get-agent-result))
+
 ;; Legacy compatibility (deprecated)
 (emacs-mcp-register-tool
  '(:id "documentation_agent"
@@ -579,6 +585,28 @@ MCP Parameters:
       (if (= (length parts) 1)
           (emacs-mcp-tool-await-agent-job (format "%s,0,1500" jobid))
         (emacs-mcp-tool-await-agent-job jobid)))))
+
+(defun emacs-mcp-tool-get-agent-result (jobid)
+  "Get the final result of a completed agent job directly.
+
+MCP Parameters:
+  jobid - The agent job ID to get the result for"
+  (mcp-server-lib-with-error-handling
+    (let ((job (gethash jobid emacs-mcp-agent-jobs)))
+      (cond
+       ((not job)
+        (format "Error: Job %s not found" jobid))
+       ((string= (emacs-mcp-agent-job-state job) "done")
+        (or (emacs-mcp-agent-job-result job) 
+            "Job completed with no result"))
+       ((string= (emacs-mcp-agent-job-state job) "error")
+        (format "Error: %s" (or (emacs-mcp-agent-job-error job) 
+                                "Job failed with unknown error")))
+       (t
+        (format "Job %s is still %s (progress: %d%%)" 
+                jobid 
+                (emacs-mcp-agent-job-state job)
+                (emacs-mcp-agent-job-progress job)))))))
 
 
 ;;; Resource Handlers
