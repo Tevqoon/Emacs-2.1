@@ -132,8 +132,8 @@ RESOURCE-DEF should be a plist with :uri, :name, :description, :handler, and opt
 
 (defun emacs-mcp-agent--job-status-resource (params)
   "Resource handler for agent job status.
-PARAMS should contain 'agent_type' and 'id' keys."
-  (let* ((agent-type (alist-get "agent_type" params nil nil #'string=))
+PARAMS should contain 'type' and 'id' keys."
+  (let* ((agent-type (alist-get "type" params nil nil #'string=))
          (job-id (alist-get "id" params nil nil #'string=))
          (job (gethash job-id emacs-mcp-agent-jobs)))
     (if job
@@ -152,7 +152,7 @@ PARAMS should contain 'agent_type' and 'id' keys."
 
 (defun emacs-mcp-agent--job-logs-resource (params)
   "Resource handler for agent job logs.
-PARAMS should contain 'agent_type' and 'id' keys."
+PARAMS should contain 'type' and 'id' keys."
   (let* ((job-id (alist-get "id" params nil nil #'string=))
          (job (gethash job-id emacs-mcp-agent-jobs)))
     (if job
@@ -163,7 +163,7 @@ PARAMS should contain 'agent_type' and 'id' keys."
 
 (defun emacs-mcp-agent--job-result-resource (params)
   "Resource handler for agent job result.
-PARAMS should contain 'agent_type' and 'id' keys."
+PARAMS should contain 'type' and 'id' keys."
   (let* ((job-id (alist-get "id" params nil nil #'string=))
          (job (gethash job-id emacs-mcp-agent-jobs)))
     (cond
@@ -183,22 +183,31 @@ PARAMS should contain 'agent_type' and 'id' keys."
 ;;; Register Agent Job Resources
 
 (emacs-mcp-register-resource
- '(:uri "emacs://agent/{agent_type}/{id}/status"
+ '(:uri "emacs://agent/{type}/{id}/status"
    :name "Agent Job Status"
-   :description "Status and progress of an agent job"
-   :handler emacs-mcp-agent--job-status-resource))
+   :title "Agent Job Status and Progress"
+   :description "Real-time status and progress information for an agent job"
+   :mimeType "application/json"
+   :handler emacs-mcp-agent--job-status-resource
+   :annotations (:audience ("assistant" "user") :priority 0.8)))
 
 (emacs-mcp-register-resource
- '(:uri "emacs://agent/{agent_type}/{id}/logs"
+ '(:uri "emacs://agent/{type}/{id}/logs"
    :name "Agent Job Logs"
-   :description "Logs from an agent job"
-   :handler emacs-mcp-agent--job-logs-resource))
+   :title "Agent Job Execution Logs"
+   :description "Detailed execution logs and progress messages from an agent job"
+   :mimeType "application/json"
+   :handler emacs-mcp-agent--job-logs-resource
+   :annotations (:audience ("assistant" "user") :priority 0.6)))
 
 (emacs-mcp-register-resource
- '(:uri "emacs://agent/{agent_type}/{id}/result"
+ '(:uri "emacs://agent/{type}/{id}/result"
    :name "Agent Job Result"
-   :description "Result of a completed agent job"
-   :handler emacs-mcp-agent--job-result-resource))
+   :title "Agent Job Final Result"
+   :description "Final output and results from a completed agent job"
+   :mimeType "text/plain"
+   :handler emacs-mcp-agent--job-result-resource
+   :annotations (:audience ("assistant" "user") :priority 1.0)))
 
 
 ;;; Built-in Tools
@@ -266,20 +275,29 @@ PARAMS should contain 'agent_type' and 'id' keys."
 (emacs-mcp-register-resource
  '(:uri "emacs://version"
    :name "Emacs Version"
-   :description "Current Emacs version and build info"
-   :handler emacs-mcp-resource-version))
+   :title "Emacs Configuration and Version Information"
+   :description "Detailed Emacs version, build info, features, and configuration"
+   :mimeType "text/plain"
+   :handler emacs-mcp-resource-version
+   :annotations (:audience ("assistant" "user") :priority 0.7)))
 
 (emacs-mcp-register-resource
  '(:uri "emacs://buffer/current"
    :name "Current Buffer"
-   :description "Contents of the current buffer"
-   :handler emacs-mcp-resource-current-buffer))
+   :title "Current Active Buffer Contents"
+   :description "Contents and metadata of the currently active Emacs buffer"
+   :mimeType "text/plain"
+   :handler emacs-mcp-resource-current-buffer
+   :annotations (:audience ("assistant") :priority 0.9)))
 
 (emacs-mcp-register-resource
  '(:uri "emacs://buffer/{name}"
-   :name "Buffer by name"
-   :description "Contents of a specific buffer"
-   :handler emacs-mcp-resource-buffer-by-name))
+   :name "Buffer by Name"
+   :title "Named Buffer Contents"
+   :description "Contents and metadata of a specific Emacs buffer by name"
+   :mimeType "text/plain"
+   :handler emacs-mcp-resource-buffer-by-name
+   :annotations (:audience ("assistant") :priority 0.8)))
 
 ;;; Agent Helpers
 
@@ -452,9 +470,9 @@ MCP Parameters:
          ("partials" . ,(vconcat immediate-partials))
          ("next_seq" . 0)
          ("await_hint_ms" . 1500)
-         ("status_uri" . ,(format "emacs://agent/doc_agent/%s/status" job-id))
-         ("logs_uri" . ,(format "emacs://agent/doc_agent/%s/logs" job-id))
-         ("result_uri" . ,(format "emacs://agent/doc_agent/%s/result" job-id)))))))
+         ("status_uri" . ,(format "emacs://agent/doc-agent/%s/status" job-id))
+         ("logs_uri" . ,(format "emacs://agent/doc-agent/%s/logs" job-id))
+         ("result_uri" . ,(format "emacs://agent/doc-agent/%s/result" job-id)))))))
 
 (defun emacs-mcp-documentation-start-background-analysis (job-id query)
   "Start background deep analysis for documentation query."

@@ -177,7 +177,8 @@
            uri
            (plist-get def :handler)
            :name (plist-get def :name)
-           :description (plist-get def :description)))))))
+           :description (plist-get def :description)
+           :mime-type (plist-get def :mimeType)))))))
 
 ;;; Tool/Resource Loading
 
