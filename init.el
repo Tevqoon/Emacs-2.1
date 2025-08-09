@@ -1278,36 +1278,59 @@ If not set buffer-locally, starts with 'auto."
     "Save the current gptel chat buffer as an org-roam node and link it in today's journal.
 If the buffer already has an ID property, just save the buffer."
     (interactive)
-    (cond
-     ((not (derived-mode-p 'org-mode))
-      (message "Current buffer is not in org-mode"))
-     
-     ((org-id-get 1) ; If ID exists, just save the buffer
-      (save-buffer))
-    
-     (t              ; Otherwise, proceed with the full node creation
-      (let* ((title (read-string "Title for chat node: " (format-time-string "Chat %Y-%m-%d %H:%M")))
-             (file-name (concat (format-time-string "Chat-%Y-%m-%d_%H-%M") ".org"))
-             (chatlog-directory (concat org-roam-directory "/" org-roam-chatlogs-directory))
-             (full-path (expand-file-name file-name chatlog-directory)))
-
-	;; Create the chatlogs directory if it doesn't exist
-	(unless (file-directory-p chatlog-directory)
-          (make-directory chatlog-directory t))
-
-	;; Save the current buffer to the specified file
-	(write-file full-path)     ; Directly save the current buffer content to the specified path
-	(save-excursion            ; Add the title
+    (unless (derived-mode-p 'org-mode)
+      (user-error "This buffer is not in org-mode (gptel-default-mode should be 'org-mode)"))
+    (require 'org)
+    (require 'org-id)
+    (let* ((existing-id (org-id-get))
+           (title (read-string "Title for chat node: " (format-time-string "Chat %Y-%m-%d %H:%M")))
+           (chatlog-dir (expand-file-name (or (bound-and-true-p org-roam-chatlogs-directory) "chatlogs/")
+                                          (or (bound-and-true-p org-roam-directory)
+                                              (user-error "org-roam-directory is not set"))))
+           (file-name (format-time-string "Chat-%Y-%m-%d_%H-%M.org"))
+           (full-path (expand-file-name file-name chatlog-dir)))
+      
+      (if existing-id
+          ;; Buffer already has an ID, just save it
+          (save-buffer)
+        
+        ;; Create new org-roam node
+        (unless (file-directory-p chatlog-dir)
+          (make-directory chatlog-dir t))
+        
+        ;; Save/rename buffer to the new file
+        (write-file full-path)
+        
+        ;; Ensure proper file structure: properties drawer first, then #+title
+        (save-excursion
           (goto-char (point-min))
-	  (org-id-get-create)      ; Generate an ID for the new node
-          (re-search-forward ":END:" nil t)
-          (insert (concat "\n#+title: " title)))
-	(save-buffer)              ; Save the buffer to get the id going and to activate vulpea etc
-
-	;; Link the new node in today's journal
-	(let ((node-id (org-id-get)))
-          (org-roam-dailies-autocapture-today "c" (org-roam-link-make-string node-id title))
-          (message "Chat saved as '%s' and linked in today's journal." title))))))
+          ;; Create/set the :ID: property (org-id-get-create handles existing drawers)
+          (org-id-get-create)
+          ;; Insert #+title after the properties drawer if missing
+          (unless (save-excursion
+                    (goto-char (point-min))
+                    (re-search-forward "^#\\+title:" nil t))
+            (goto-char (point-min))
+            ;; Find the end of the properties drawer
+            (when (re-search-forward "^:END:$" nil t)
+              (forward-line 1)
+              (insert (format "#+title: %s\n" title)))))
+        (save-buffer)
+        
+        ;; Sync org-roam database to make the new file discoverable
+        (when (fboundp 'org-roam-db-sync)
+          (org-roam-db-sync))
+        
+        ;; Try to link in today's daily with error handling
+        (let* ((node-id (org-id-get))
+               (link (if (and (fboundp 'org-roam-link-make-string) node-id)
+                         (org-roam-link-make-string node-id title)
+                       (format "[[id:%s][%s]]" node-id title))))
+          (if (fboundp 'org-roam-dailies-autocapture-today)
+              (ignore-errors
+                (org-roam-dailies-autocapture-today "c" link))
+            (message "Warning: org-roam-dailies-autocapture-today not available"))
+          (message "Chat saved as '%s' and (attempted) link added to today's journal." title)))))
 
   ;;; -> GPTel -> rewrite utilities
   (defun my/gptel-translate-to-english ()
