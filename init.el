@@ -1195,7 +1195,7 @@ exactly like the old ace-jump integration."
 	  :key 'gptel-api-key-from-auth-source
 	  :models '(openai/gpt-oss-20b:online
 		    openai/gpt-oss-120b:online)))
-    
+  
   (defvar gptel-tools-files `(,(expand-file-name "lisp/ai-tools-list.el" user-emacs-directory)
 			      ;;,(expand-file-name "lisp/gptel-subtask/gptel-subtask-tool.el" user-emacs-directory)
 			      )
@@ -1275,62 +1275,37 @@ If not set buffer-locally, starts with 'auto."
       (gptel-mode 1)))
   
   (defun org/save-gptel-chat-as-node ()
-    "Save the current gptel chat buffer as an org-roam node and link it in today's journal.
-If the buffer already has an ID property, just save the buffer."
+    "Save the current gptel chat buffer as an org-roam node and link it in today's journal."
     (interactive)
-    (unless (derived-mode-p 'org-mode)
-      (user-error "This buffer is not in org-mode (gptel-default-mode should be 'org-mode)"))
-    (require 'org)
-    (require 'org-id)
     (let* ((existing-id (org-id-get))
            (title (read-string "Title for chat node: " (format-time-string "Chat %Y-%m-%d %H:%M")))
-           (chatlog-dir (expand-file-name (or (bound-and-true-p org-roam-chatlogs-directory) "chatlogs/")
-                                          (or (bound-and-true-p org-roam-directory)
-                                              (user-error "org-roam-directory is not set"))))
+           (chatlog-dir (expand-file-name org-roam-chatlogs-directory org-roam-directory))
            (file-name (format-time-string "Chat-%Y-%m-%d_%H-%M.org"))
            (full-path (expand-file-name file-name chatlog-dir)))
       
       (if existing-id
-          ;; Buffer already has an ID, just save it
           (save-buffer)
         
-        ;; Create new org-roam node
         (unless (file-directory-p chatlog-dir)
           (make-directory chatlog-dir t))
         
-        ;; Save/rename buffer to the new file
         (write-file full-path)
         
-        ;; Ensure proper file structure: properties drawer first, then #+title
-        (save-excursion
+        (goto-char (point-min))
+        (org-id-get-create)
+        (unless (save-excursion (re-search-forward "^#\\+title:" nil t))
           (goto-char (point-min))
-          ;; Create/set the :ID: property (org-id-get-create handles existing drawers)
-          (org-id-get-create)
-          ;; Insert #+title after the properties drawer if missing
-          (unless (save-excursion
-                    (goto-char (point-min))
-                    (re-search-forward "^#\\+title:" nil t))
-            (goto-char (point-min))
-            ;; Find the end of the properties drawer
-            (when (re-search-forward "^:END:$" nil t)
-              (forward-line 1)
-              (insert (format "#+title: %s\n" title)))))
+          (re-search-forward "^:END:$")
+          (forward-line 1)
+          (insert (format "#+title: %s\n" title)))
+        
         (save-buffer)
+        (org-roam-db-sync)
         
-        ;; Sync org-roam database to make the new file discoverable
-        (when (fboundp 'org-roam-db-sync)
-          (org-roam-db-sync))
-        
-        ;; Try to link in today's daily with error handling
         (let* ((node-id (org-id-get))
-               (link (if (and (fboundp 'org-roam-link-make-string) node-id)
-                         (org-roam-link-make-string node-id title)
-                       (format "[[id:%s][%s]]" node-id title))))
-          (if (fboundp 'org-roam-dailies-autocapture-today)
-              (ignore-errors
-                (org-roam-dailies-autocapture-today "c" link))
-            (message "Warning: org-roam-dailies-autocapture-today not available"))
-          (message "Chat saved as '%s' and (attempted) link added to today's journal." title)))))
+               (link (org-roam-link-make-string node-id title)))
+          (org-roam-dailies-autocapture-today "c" link)
+          (message "Chat saved as '%s' and linked in today's journal." title)))))
 
   ;;; -> GPTel -> rewrite utilities
   (defun my/gptel-translate-to-english ()
