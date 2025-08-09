@@ -1180,30 +1180,22 @@ exactly like the old ace-jump integration."
   (org-mode . org/enable-gptel-for-chatlog-buffer)
   :custom
   (gptel-default-mode 'org-mode)
-  :init
-  (setq gptel-model 'gpt-4o-mini)
   :config
   (require 'gptel-org)
   (defvar org-roam-chatlogs-directory "chatlogs/"
     "The directory to save gptel chatlogs in.")
-  
-  ;; (gptel-make-anthropic "Claude"
-  ;;   :stream t
-  ;;   :models
-  ;;   '(claude-3-7-sonnet-latest
-  ;;     claude-3-5-haiku-latest
-  ;;     claude-3-5-sonnet-latest)
-  ;;   :host "api.anthropic.com"
-  ;;   :key 'gptel-api-key-from-auth-source
-  ;;   )
-  
-  ;; (gptel-make-gemini "Gemini"
-  ;;   :stream t
-  ;;   ;; :host "api.anthropic.com"
-  ;;   :key 'gptel-api-key-from-auth-source
-  ;;   )
 
-  
+  ;; OpenRouter offers an OpenAI compatible API
+  (setq gptel-model 'openai/gpt-oss-120b:online
+	gptel-backend
+	(gptel-make-openai "OpenRouter"               
+	  :host "openrouter.ai"
+	  :endpoint "/api/v1/chat/completions"
+	  :stream t
+	  :key 'gptel-api-key-from-auth-source
+	  :models '(openai/gpt-oss-20b:online
+		    openai/gpt-oss-120b:online)))
+    
   (defvar gptel-tools-files `(,(expand-file-name "lisp/ai-tools-list.el" user-emacs-directory)
 			      ;;,(expand-file-name "lisp/gptel-subtask/gptel-subtask-tool.el" user-emacs-directory)
 			      )
@@ -1911,7 +1903,6 @@ Automatically expands the heading if it's folded."
 			    (org-roam-node-title node))))
       (org-link-make-string (concat "id:" id) description)))
 
-  
   (defvar js/browsers
     (pcase system-type
       ('darwin
@@ -1942,6 +1933,29 @@ Using the org-mac-link, this comes pre-formatted with the url title."
                               (org-element-property :contents-begin link-context)
                               (org-element-property :contents-end link-context))))
             (list raw-link description))))))
+
+  (defun js/ensure-heading-path (path)
+    "Create the series of headings PATH (list of strings) if absent,
+and leave point at the end of the last one."
+    (dolist (heading path)
+      (unless (org-goto--local-search-headings heading nil t)
+	(outline-next-heading)
+	(org-insert-heading)
+	(insert heading))
+      (org-narrow-to-subtree)
+      (widen)))
+
+  (defun js/url-exists-in-subtree-p (url)
+    "Return non-nil if URL already appears as a link in the current subtree."
+    (save-excursion
+      (let ((end (org-end-of-subtree t t))
+            (found nil))
+	(while (and (not found)
+                    (re-search-forward org-link-bracket-re end t))
+          (let* ((ctx (org-element-context))
+		 (raw (org-element-property :raw-link ctx)))
+            (setq found (string= raw url))))
+	found)))
 
   (defvar js/url-targets
     '((Log . js/url-target-log)
@@ -2011,7 +2025,7 @@ For emacsclient:
 	;; Apply each requested target
 	(dolist (target targets)
           (when-let* ((handler-fn (cdr (assq target js/url-targets)))
-                      (result (funcall handler-fn url-source)))
+                       (result (funcall handler-fn url-source)))
             (push result results)))
 	
 	;; Alert based on actions taken
@@ -2021,42 +2035,89 @@ For emacsclient:
 	;; Return the URL source for potential chaining
 	url-source)))
 
-  (defun js/roamify-url-at-point ()
-    "Convert a URL at point into an org-roam node and replace the link."
-    (interactive)
+  (defun js/roamify-url-at-point (&optional node-id post-cleanup-functions)
+    "Convert a URL at point into an org-roam node and replace the link.
+
+With C-u prefix, prompt for existing node to add URL as ref to.
+Can optionally pass in your own `NODE-ID' which will get used as the target node.
+
+`POST-CLEANUP-FUNCTIONS' will be executed upon completion of the finalizer."
+    (interactive 
+     (when current-prefix-arg
+       (list (org-roam-node-id (org-roam-node-read nil nil nil 'require-match)))))
     (let* ((context (org-element-context))
            (type (org-element-type context))
            (link-type (org-element-property :type context))
            (url (org-element-property :raw-link context))
            (end (org-element-property :end context))
            (beg (org-element-property :begin context))
-	   (title-beg (org-element-property :contents-begin context))
-	   (title-end (org-element-property :contents-end context))
-	   (working-title (or (buffer-substring-no-properties title-beg title-end)
-			      (js/get-link-title url))))
-      (cond ((not (equal type 'link))
-	     (message "No link found at point."))
-	    ((equal link-type "id")
-	     (message "Is already roam link."))
-	    (t
-	     ;; TODO: Add failsafe for roamify if title doesn't exist
-	     (let* ((node-title working-title)
-		    (node (org-roam-node-create :title node-title)))
-	       (defun roamify-finalizer ()
-		 "The functions to run after successfully capturing the new node."
-		 ;;; TODO: Handle headings with existing id
-		 (when-let* ((full-node (org-roam-node-from-ref url))
-			     (new-id (org-roam-node-id full-node)))
-		   (delete-region beg end)
-		   (insert (org-roam-link-make-string new-id node-title))
-		   (message "Created org-roam node: %s" node-title)))
-	       
-	       (org-roam-capture-
-		:keys "d"
-		:node node
-		:info (list :ref url)
-		:props (list :finalize #'roamify-finalizer))
-	       )))))
+           (title-beg (org-element-property :contents-begin context))
+           (title-end (org-element-property :contents-end context))
+           (working-title (or (buffer-substring-no-properties title-beg title-end)
+                              (js/get-link-title url)))
+           (capture-node nil)
+           (target-id nil)
+           (message-text nil))
+      (pcase (list type link-type)
+	(`(link "id")
+	 (message "Is already roam link.")
+	 (return))
+	(`(link ,_)
+	 ;; Check if ref already exists first - this takes precedence
+	 (if-let ((existing-ref-node (org-roam-node-from-ref url)))
+           ;; Ref already exists - just replace link, no capture
+           (let ((existing-id (org-roam-node-id existing-ref-node))
+                 (existing-title (org-roam-node-title existing-ref-node)))
+             (delete-region beg end)
+             (insert (org-roam-link-make-string existing-id working-title))
+             (message "Using existing node with this ref: %s" existing-title))
+           ;; No existing ref - proceed with capture logic
+           (pcase node-id
+             (`nil
+              ;; Default behavior: create new node
+              (setq capture-node (org-roam-node-create :title working-title))
+              (setq target-id 'from-ref)
+              (setq message-text (format "Created org-roam node: %s" working-title)))
+             ((and id (guard (org-roam-node-from-id id)))
+              ;; Add ref to existing node - use the actual existing node object
+              (let ((existing-node (org-roam-node-from-id id)))
+		(setq capture-node existing-node)
+		(setq target-id id)
+		(setq message-text (format "Added ref to existing node: %s" (org-roam-node-title existing-node)))))
+             (id
+              ;; Create new node with specified ID
+              (setq capture-node (org-roam-node-create :title working-title :id id))
+              (setq target-id 'from-ref)
+              (setq message-text (format "Created org-roam node: %s" working-title))))))
+	(_
+	 (message "No link found at point.")
+	 (return)))
+      
+      ;; Single org-roam-capture- call (always runs when we have a capture-node)
+      (when capture-node
+	(defun roamify-finalizer ()
+          "Replace URL with roam link after capture completes."
+          (let ((final-id (cond
+                           ((eq target-id 'from-ref)
+                            (when-let* ((full-node (org-roam-node-from-ref url)))
+                              (org-roam-node-id full-node)))
+                           (target-id
+                            ;; Add ref to existing node
+                            (let ((existing-node (org-roam-node-from-id target-id)))
+                              (with-current-buffer (find-file-noselect (org-roam-node-file existing-node))
+				(goto-char (org-roam-node-point existing-node))
+				(org-roam-ref-add url))
+                              target-id)))))
+            (when final-id
+              (delete-region beg end)
+              (insert (org-roam-link-make-string final-id working-title))
+              (message message-text)
+	      )))
+	(org-roam-capture-
+	 :keys "d"
+	 :node capture-node
+	 :info (list :ref url)
+	 :props (list :finalize #'roamify-finalizer)))))
 
   ;;; -> org-roam -> Archiving
   (defun archived-backlink-p (backlink)
@@ -2826,7 +2887,7 @@ All other subheadings will be ignored."
 	       "|" "DONE(d)" "CANCELLED(c)" "FAILED(F)" "NAREDU(N)")))
 
   (org-agenda-start-with-log-mode t)
-  (org-log-done nil)
+  (org-log-done 'time)
   (org-log-into-drawer nil)
   (org-agenda-start-on-weekday nil)
   (org-reverse-note-order nil)
@@ -2850,6 +2911,8 @@ All other subheadings will be ignored."
 	 ("<backtab>" . outline-cycle-buffer)
 	 ("<return>" . org-agenda-goto)
 	 ("S-<return>" . org-agenda-switch-to)
+	 ("R" . js/agenda-refile)
+	 ("O" . js/agenda-roamify)
 	 )
   
   :config
@@ -2949,7 +3012,121 @@ All other subheadings will be ignored."
 		  (todo "HOLD" ((org-agenda-overriding-header "* Currently on hold: ")))
 		  (todo "EXPLORE" ((org-agenda-overriding-header "* Things to explore: ")))
 		  )))))
-  )
+
+  ;;; -> Org mode -> Agenda -> Refiling integration
+
+  
+  ;; TODO: Make this work for links with no titles
+  (defun js/process-current-heading (target-id)
+    "Move current heading to today's *Processed today* section and
+leave a copy of the first line under the original day's *Web* heading.
+TARGET-ID is the org-roam node ID where the content will be refiled to.
+Must be called within org-agenda-with-point-at-orig-entry."
+    (interactive)
+    (save-window-excursion
+      (let ((head-line)
+            (title)
+            (formatted-link)
+            )
+	
+	;; Ensure we're at a heading
+	(org-back-to-heading t)
+	(let ((start-pos (point-marker)))
+	  
+	  ;; Step 2: Read the whole link text from the heading (without stars)
+	  (setq head-line (buffer-substring (line-beginning-position)
+                                            (line-end-position)))
+	  ;; Remove only the heading prefix (stars + space + optional TODO keyword + space)
+	  (when (string-match "^\\(\\*+\\) \\(?:\\([A-Z]+\\) \\)?\\(.*\\)" head-line)
+            (setq head-line (match-string 3 head-line)))
+
+	  ;; Step 3: Get the link title - discard url
+	  (unless (setq title (cadr (js/extract-org-link head-line)))
+              (error "No org link found in heading: %s" head-line))
+	  
+	  ;; Step 4: Format the new link
+	  (setq formatted-link (org-roam-link-make-string target-id title))
+	  
+	  ;; Step 5: Put formatted link under Web heading in source file
+	  (save-excursion
+            (let ((target-point (org-roam-capture-find-or-create-olp '("Web"))))
+              (goto-char target-point)
+              (end-of-line)
+              (insert "\n** " formatted-link)
+              (save-buffer)))
+	  
+	  ;; Step 6: Add DONE to the formatted link
+	  (setq formatted-link
+		(replace-regexp-in-string "^\\(\\*+\\) " "\\1 DONE " formatted-link))
+	  
+	  ;; Step 7: Put into processed today section with link to target
+	  (save-excursion
+            (org-roam-dailies-goto-today)
+            (let ((target-point (org-roam-capture-find-or-create-olp '("Processed today"))))
+              (goto-char target-point)
+              (end-of-line)
+              (insert "\n** " formatted-link)
+              (save-buffer)))
+	  
+	  ))))
+
+  (defun js/agenda-roamify ()
+    "Process current heading, then roamify URL at point from agenda."
+    (interactive)
+    (org-agenda-with-point-at-orig-entry nil
+      (end-of-line)
+      (call-interactively #'js/roamify-url-at-point))
+    )
+
+  ;; (defun js/agenda-roamify ()
+  ;;   "Roamify URL at point from agenda."
+
+  ;;   (interactive)
+  ;;   (org-agenda-with-point-at-orig-entry nil
+  ;;     (let* ((head-line)
+  ;; 	     (url)
+  ;; 	     (target-id))
+
+  ;; 	;; Extract the URL
+  ;; 	(org-back-to-heading t)
+  ;; 	(let ((start-pos (point-marker)))
+  ;; 	  ;; Read the whole link text from the heading (without stars)
+  ;; 	  (setq head-line (buffer-substring (line-beginning-position)
+  ;;                                           (line-end-position)))
+  ;; 	  ;; Remove only the heading prefix (stars + space + optional TODO keyword + space)
+  ;; 	  (when (string-match "^\\(\\*+\\) \\(?:\\([A-Z]+\\) \\)?\\(.*\\)" head-line)
+  ;;           (setq head-line (match-string 3 head-line)))
+
+  ;; 	  ;; Get the link title - discard url
+  ;; 	  (setq url (car (js/extract-org-link head-line)))
+
+  ;; 	  ;; The target id is either the ref node, a chosen one with C-u or a fresh one
+  ;; 	  (setq target-id
+  ;; 		(or (when-let ((full-node (org-roam-node-from-ref url)))
+  ;; 		      (org-roam-node-id full-node))
+  ;; 		    (and current-prefix-arg
+  ;; 			 (org-roam-node-id (org-roam-node-read)))
+  ;; 		    (org-id-new)))
+
+  ;; 	  ;; Try roamifying
+  ;; 	  (end-of-line)
+  ;; 	  (js/roamify-url-at-point target-id)
+  ;; 	  ;; If this succeeds, continue with processing
+  ;; 	  (js/process-current-heading target-id)
+  ;; 	  ))))
+
+  (defun js/agenda-refile ()
+    "Process current heading, then refile to selected roam node from agenda."
+    (interactive)
+    (let ((dest-node (org-roam-node-read nil nil nil 'require-match)))
+      (org-agenda-todo "DONE")
+      (org-agenda-with-point-at-orig-entry nil
+	(js/process-current-heading (org-roam-node-id dest-node))
+	(org-roam-refile dest-node)))
+    (next-line)
+    )
+)
+
 ;;; End of org agenda package block
 
 ;;; -> Org mode -> Babel
@@ -4475,3 +4652,4 @@ If more than 100 hours remain, shows days + hours instead."
 ;;;
 ;;; End of configuration file.
 ;;; init.el ends here
+
