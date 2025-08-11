@@ -1716,22 +1716,32 @@ Automatically expands the heading if it's folded."
   :hook org-mode)
 
 (use-package org-edna
-  :after org
+  :after org org-roam
   :hook
   org-mode
   (org-after-todo-state-change . mm/org-insert-trigger)
   (org-after-todo-statistics . org-summary-todo)
   :config
-  (defun org-user/add-trigger-next ()
-    "A NEXT heading propagates itself upon completion
-     to the next sibling with state TODO"
+
+  (defun js/org-log-processed-today ()
+    "Log a DONE link to the current node under today's 'Processed today'."
     (interactive)
-    (org-set-property "TRIGGER" "next-sibling(todo-only) todo!(NEXT) chain!(\"TRIGGER\") self delete-property!(\"TRIGGER\")"))
+    (save-excursion
+      (org-back-to-heading t)
+      ;; If there's no id or content, don't capture
+      (if-let* ((title (js/org--derive-title))
+		(id    (js/org-current-node-id))
+		(link (org-roam-link-make-string id title)))
+	  (org-roam-dailies-autocapture-today "x" link))))
 
   (defun mm/org-insert-trigger ()
-    "Automatically insert chain-find-next trigger when entry becomes NEXT"
+    "An org-edna handler which adds TRIGGER properties."
     (cond ((equal org-state "NEXT")
-           (org-user/add-trigger-next))))
+           (org-set-property "TRIGGER" "next-sibling(todo-only) todo!(NEXT) chain!(\"TRIGGER\") self delete-property!(\"TRIGGER\")"))
+
+	  ;; Changing from PROCESS logs the file to today
+	  ((equal org-last-state "PROCESS")
+	   (js/org-log-processed-today))))
 
    ;; Automatically complete the parent with a statistics cookie when all children are complete
   (defun org-summary-todo (_n-done n-not-done)
@@ -1876,8 +1886,12 @@ Automatically expands the heading if it's folded."
       ("c" "chatlog capture" entry "* %(eval org-roam-capture-content)"
        :target (file+head+olp "%<%Y-%m-%d>.org"
                               "#+title: %<%Y-%m-%d>\n#+startup: content" ("Chats"))
-       :immediate-finish t))
-    
+       :immediate-finish t)
+      ("x" "processed log" entry "* DONE %(eval org-roam-capture-content)"
+       :target (file+head+olp "%<%Y-%m-%d>.org"
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processed today"))
+       :immediate-finish t)
+      )
     "A list of templates to use for automatic daily capture."
     )
   
@@ -1918,19 +1932,34 @@ Using the org-mac-link, this comes pre-formatted with the url title."
           (funcall url-function)
 	(user-error "Browser %s not supported" browser))))
 
+  ;; (defun js/extract-org-link (org-link-string)
+  ;;   "Extract the URL and description from an Org formatted link string."
+  ;;   (with-temp-buffer
+  ;;     (insert org-link-string)
+  ;;     (org-mode)
+  ;;     (goto-char (point-min))
+  ;;     (let ((link-context (org-element-link-parser)))
+  ;; 	(when link-context
+  ;;         (let ((raw-link (org-element-property :raw-link link-context))
+  ;; 		(description (buffer-substring-no-properties
+  ;;                             (org-element-property :contents-begin link-context)
+  ;;                             (org-element-property :contents-end link-context))))
+  ;;           (list raw-link description))))))
+
   (defun js/extract-org-link (org-link-string)
-    "Extract the URL and description from an Org formatted link string."
+    "Return (URL DESCRIPTION) if ORG-LINK-STRING contains an Org link, else nil."
     (with-temp-buffer
       (insert org-link-string)
       (org-mode)
       (goto-char (point-min))
-      (let ((link-context (org-element-link-parser)))
-	(when link-context
-          (let ((raw-link (org-element-property :raw-link link-context))
-		(description (buffer-substring-no-properties
-                              (org-element-property :contents-begin link-context)
-                              (org-element-property :contents-end link-context))))
-            (list raw-link description))))))
+      (let ((ctx (ignore-errors (org-element-link-parser))))
+	(when ctx
+          (let ((raw (org-element-property :raw-link ctx))
+		(cb  (org-element-property :contents-begin ctx))
+		(ce  (org-element-property :contents-end   ctx)))
+            (list raw (if (and cb ce)
+                          (buffer-substring-no-properties cb ce)
+			"")))))))
 
   (defun js/ensure-heading-path (path)
     "Create the series of headings PATH (list of strings) if absent,
@@ -2116,6 +2145,28 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 	 :node capture-node
 	 :info (list :ref url)
 	 :props (list :finalize #'roamify-finalizer)))))
+
+  ;;; -> org-roam -> Helper functions
+
+  (defun js/org--derive-title ()
+    "Return the first link's description in the heading, or the whole heading, as a plain string."
+    (save-excursion
+      (org-back-to-heading t)
+      (let* ((raw  (buffer-substring-no-properties (line-beginning-position)
+                                                   (line-end-position)))
+             (head (if (string-match "^\\*+ \\(?:[A-Z]+ \\)?\\(.*\\)$" raw)
+                       (match-string 1 raw)
+                     raw))
+             (parsed (js/extract-org-link head))
+             (desc   (and parsed (cadr parsed)))
+             (res    (if (and desc (not (string-empty-p desc))) desc head)))
+	(substring-no-properties res))))
+
+  (defun js/org-current-node-id ()
+    "Return org-roam node ID at point, nil if nonexistent."
+    (when-let* ((node (ignore-errors (org-roam-node-at-point)))
+		(id (org-roam-node-id node)))
+      id))
 
   ;;; -> org-roam -> Archiving
   (defun archived-backlink-p (backlink)
@@ -3013,116 +3064,20 @@ All other subheadings will be ignored."
 
   ;;; -> Org mode -> Agenda -> Refiling integration
 
-  
-  ;; TODO: Make this work for links with no titles
-  (defun js/process-current-heading (target-id)
-    "Move current heading to today's *Processed today* section and
-leave a copy of the first line under the original day's *Web* heading.
-TARGET-ID is the org-roam node ID where the content will be refiled to.
-Must be called within org-agenda-with-point-at-orig-entry."
+  (defun js/agenda-refile ()
+    "From org-agenda, refile the subtree into the selected org-roam node."
     (interactive)
-    (save-window-excursion
-      (let ((head-line)
-            (title)
-            (formatted-link)
-            )
-	
-	;; Ensure we're at a heading
-	(org-back-to-heading t)
-	(let ((start-pos (point-marker)))
-	  
-	  ;; Step 2: Read the whole link text from the heading (without stars)
-	  (setq head-line (buffer-substring (line-beginning-position)
-                                            (line-end-position)))
-	  ;; Remove only the heading prefix (stars + space + optional TODO keyword + space)
-	  (when (string-match "^\\(\\*+\\) \\(?:\\([A-Z]+\\) \\)?\\(.*\\)" head-line)
-            (setq head-line (match-string 3 head-line)))
-
-	  ;; Step 3: Get the link title - discard url
-	  (unless (setq title (cadr (js/extract-org-link head-line)))
-              (error "No org link found in heading: %s" head-line))
-	  
-	  ;; Step 4: Format the new link
-	  (setq formatted-link (org-roam-link-make-string target-id title))
-	  
-	  ;; Step 5: Put formatted link under Web heading in source file
-	  (save-excursion
-            (let ((target-point (org-roam-capture-find-or-create-olp '("Web"))))
-              (goto-char target-point)
-              (end-of-line)
-              (insert "\n** " formatted-link)
-              (save-buffer)))
-	  
-	  ;; Step 6: Add DONE to the formatted link
-	  (setq formatted-link
-		(replace-regexp-in-string "^\\(\\*+\\) " "\\1 DONE " formatted-link))
-	  
-	  ;; Step 7: Put into processed today section with link to target
-	  (save-excursion
-            (org-roam-dailies-goto-today)
-            (let ((target-point (org-roam-capture-find-or-create-olp '("Processed today"))))
-              (goto-char target-point)
-              (end-of-line)
-              (insert "\n** " formatted-link)
-              (save-buffer)))
-	  
-	  ))))
-
+    (let ((dest-node (org-roam-node-read nil nil nil 'require-match)))
+      (org-agenda-with-point-at-orig-entry nil
+	(org-roam-refile dest-node)))
+    (next-line))
+  
   (defun js/agenda-roamify ()
-    "Process current heading, then roamify URL at point from agenda."
+    "Roamify URL at point from agenda."
     (interactive)
     (org-agenda-with-point-at-orig-entry nil
       (end-of-line)
-      (call-interactively #'js/roamify-url-at-point))
-    )
-
-  ;; (defun js/agenda-roamify ()
-  ;;   "Roamify URL at point from agenda."
-
-  ;;   (interactive)
-  ;;   (org-agenda-with-point-at-orig-entry nil
-  ;;     (let* ((head-line)
-  ;; 	     (url)
-  ;; 	     (target-id))
-
-  ;; 	;; Extract the URL
-  ;; 	(org-back-to-heading t)
-  ;; 	(let ((start-pos (point-marker)))
-  ;; 	  ;; Read the whole link text from the heading (without stars)
-  ;; 	  (setq head-line (buffer-substring (line-beginning-position)
-  ;;                                           (line-end-position)))
-  ;; 	  ;; Remove only the heading prefix (stars + space + optional TODO keyword + space)
-  ;; 	  (when (string-match "^\\(\\*+\\) \\(?:\\([A-Z]+\\) \\)?\\(.*\\)" head-line)
-  ;;           (setq head-line (match-string 3 head-line)))
-
-  ;; 	  ;; Get the link title - discard url
-  ;; 	  (setq url (car (js/extract-org-link head-line)))
-
-  ;; 	  ;; The target id is either the ref node, a chosen one with C-u or a fresh one
-  ;; 	  (setq target-id
-  ;; 		(or (when-let ((full-node (org-roam-node-from-ref url)))
-  ;; 		      (org-roam-node-id full-node))
-  ;; 		    (and current-prefix-arg
-  ;; 			 (org-roam-node-id (org-roam-node-read)))
-  ;; 		    (org-id-new)))
-
-  ;; 	  ;; Try roamifying
-  ;; 	  (end-of-line)
-  ;; 	  (js/roamify-url-at-point target-id)
-  ;; 	  ;; If this succeeds, continue with processing
-  ;; 	  (js/process-current-heading target-id)
-  ;; 	  ))))
-
-  (defun js/agenda-refile ()
-    "Process current heading, then refile to selected roam node from agenda."
-    (interactive)
-    (let ((dest-node (org-roam-node-read nil nil nil 'require-match)))
-      (org-agenda-todo "DONE")
-      (org-agenda-with-point-at-orig-entry nil
-	(js/process-current-heading (org-roam-node-id dest-node))
-	(org-roam-refile dest-node)))
-    (next-line)
-    )
+      (call-interactively #'js/roamify-url-at-point)))
 )
 
 ;;; End of org agenda package block
