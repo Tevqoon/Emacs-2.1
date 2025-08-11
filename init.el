@@ -1921,7 +1921,8 @@ Automatically expands the heading if it's folded."
        '((Safari . org-mac-link-safari-get-frontmost-url)
 	 (Firefox . org-mac-link-firefox-get-frontmost-url)))
       (_ '(NoBrowser . (lambda () "No browser function configured!"))))
-    "Association list of available browsers with their corresponding URL retrieval functions.")
+    "Available browsers with their corresponding URL retrieval functions."
+    )
 
   (defun js/retrieve-url (&optional browser)
     "Retrieve the URL of the given browser page as a string.
@@ -1931,20 +1932,6 @@ Using the org-mac-link, this comes pre-formatted with the url title."
       (if url-function
           (funcall url-function)
 	(user-error "Browser %s not supported" browser))))
-
-  ;; (defun js/extract-org-link (org-link-string)
-  ;;   "Extract the URL and description from an Org formatted link string."
-  ;;   (with-temp-buffer
-  ;;     (insert org-link-string)
-  ;;     (org-mode)
-  ;;     (goto-char (point-min))
-  ;;     (let ((link-context (org-element-link-parser)))
-  ;; 	(when link-context
-  ;;         (let ((raw-link (org-element-property :raw-link link-context))
-  ;; 		(description (buffer-substring-no-properties
-  ;;                             (org-element-property :contents-begin link-context)
-  ;;                             (org-element-property :contents-end link-context))))
-  ;;           (list raw-link description))))))
 
   (defun js/extract-org-link (org-link-string)
     "Return (URL DESCRIPTION) if ORG-LINK-STRING contains an Org link, else nil."
@@ -1960,29 +1947,6 @@ Using the org-mac-link, this comes pre-formatted with the url title."
             (list raw (if (and cb ce)
                           (buffer-substring-no-properties cb ce)
 			"")))))))
-
-  (defun js/ensure-heading-path (path)
-    "Create the series of headings PATH (list of strings) if absent,
-and leave point at the end of the last one."
-    (dolist (heading path)
-      (unless (org-goto--local-search-headings heading nil t)
-	(outline-next-heading)
-	(org-insert-heading)
-	(insert heading))
-      (org-narrow-to-subtree)
-      (widen)))
-
-  (defun js/url-exists-in-subtree-p (url)
-    "Return non-nil if URL already appears as a link in the current subtree."
-    (save-excursion
-      (let ((end (org-end-of-subtree t t))
-            (found nil))
-	(while (and (not found)
-                    (re-search-forward org-link-bracket-re end t))
-          (let* ((ctx (org-element-context))
-		 (raw (org-element-property :raw-link ctx)))
-            (setq found (string= raw url))))
-	found)))
 
   (defvar js/url-targets
     '((Log . js/url-target-log)
@@ -2009,9 +1973,9 @@ and leave point at the end of the last one."
            (url (when url-parts (car url-parts))))
       (when url
 	(message "Adding to wallabag: %s" url)
+	(run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)
 	(wallabag-add-entry url "")
 	;; Sync wallabag changes to server
-	(run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)
 	"added to wallabag")))
 
   (cl-defun js/log-page (&key url browser clipboard (targets '(Log)) interactive)
