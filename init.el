@@ -1180,21 +1180,20 @@ exactly like the old ace-jump integration."
   (org-mode . org/enable-gptel-for-chatlog-buffer)
   :custom
   (gptel-default-mode 'org-mode)
+  
   :config
+  (setq gptel-model 'gpt-5-mini)
   (require 'gptel-org)
   (defvar org-roam-chatlogs-directory "chatlogs/"
     "The directory to save gptel chatlogs in.")
 
-  ;; OpenRouter offers an OpenAI compatible API
-  (setq gptel-model 'openai/gpt-oss-120b:online
-	gptel-backend
-	(gptel-make-openai "OpenRouter"               
-	  :host "openrouter.ai"
-	  :endpoint "/api/v1/chat/completions"
-	  :stream t
-	  :key 'gptel-api-key-from-auth-source
-	  :models '(openai/gpt-oss-20b:online
-		    openai/gpt-oss-120b:online)))
+  (gptel-make-openai "OpenRouter"               
+    :host "openrouter.ai"
+    :endpoint "/api/v1/chat/completions"
+    :stream t
+    :key 'gptel-api-key-from-auth-source
+    :models '(openai/gpt-oss-20b:online
+	      openai/gpt-oss-120b:online))
   
   (defvar gptel-tools-files `(,(expand-file-name "lisp/ai-tools-list.el" user-emacs-directory)
 			      ;;,(expand-file-name "lisp/gptel-subtask/gptel-subtask-tool.el" user-emacs-directory)
