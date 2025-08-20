@@ -1816,6 +1816,7 @@ Automatically expands the heading if it's folded."
   (org-link-set-parameters "id" :face 'org-roam-link)
   ;; Folded backlink buffer
   (add-to-list 'magit-section-initial-visibility-alist (cons 'org-roam-node-section 'hide))
+
 ;;; -> org-roam -> Dailies
   (setq org-extend-today-until 4)
 
@@ -4440,6 +4441,16 @@ When pressed twice, make the sub/superscript roman."
   ;;             (setq comment-start "% ")
   ;;             (setq comment-add 0)))
   )
+
+;;; --> Video Trimmer
+(use-package video-trimmer
+  :load-path "~/.emacs.d/lisp/"
+  :commands video-trimmer-trim
+  :bind (:map dired-mode-map
+              ("V" . video-trimmer-trim))
+  :custom
+  (video-trimmer-move-by-increment 1.0)
+  (video-trimmer-auto-show-transient-menu t))
 
 ;;; --> Misc functions
 
