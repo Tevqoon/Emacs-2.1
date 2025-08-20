@@ -950,7 +950,32 @@ exactly like the old ace-jump integration."
   :ensure nil
   :bind (:map dired-mode-map ("C-o" . casual-dired-tmenu))
   :custom
-  (dired-listing-switches "-lagGFDh"))
+  (dired-listing-switches "-lagGFDh")
+  :config
+  ;; Handle video files with external viewer via file-name-handler-alist
+  (defun video-external-handler (operation &rest args)
+    "Handle video files by opening them externally."
+    (cond
+     ;; For insert-file-contents (what find-file uses), open externally instead
+     ((eq operation 'insert-file-contents)
+      (let ((filename (car args)))
+        (start-process "open-video" nil "open" filename)
+        (message "Opening %s externally..." (file-name-nondirectory filename))
+        ;; Signal that we handled it by throwing an error that find-file will catch
+        (error "Video file opened externally")))
+     
+     ;; For all other operations, delegate to the default handler
+     (t
+      (let ((inhibit-file-name-handlers
+             (cons 'video-external-handler
+                   (and (eq inhibit-file-name-operation operation)
+                        inhibit-file-name-handlers)))
+            (inhibit-file-name-operation operation))
+        (apply operation args)))))
+  
+  ;; Register the handler for video files
+  (add-to-list 'file-name-handler-alist
+               '("\\.\\(mp4\\|avi\\|mkv\\|mov\\|webm\\|flv\\|wmv\\|m4v\\|3gp\\|ogv\\|mpg\\|mpeg\\|vob\\)\\'" . video-external-handler)))
 
 (use-package dired-preview
   :bind (:map dired-mode-map ("P" . dired-preview-mode)))
