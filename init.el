@@ -3227,6 +3227,7 @@ All other subheadings will be ignored."
 	 ("P" . js/log-elfeed-process)
 	 ("B" . elfeed-browse-with-secondary-browser)
 	 ("W" . my/elfeed-entries-to-wallabag)
+	 ("O" . my/elfeed-entries-to-podcastify)
 	 ("<wheel-up>" . previous-line)
 	 ("<wheel-down>" . next-line)
 	 
@@ -3240,6 +3241,7 @@ All other subheadings will be ignored."
 	 ("M-o" . ace-link-safari)
 	 ("B" . elfeed-browse-with-secondary-browser)
 	 ("W" . my/elfeed-entries-to-wallabag)
+	 ("O" . my/elfeed-entries-to-podcastify)
          )
   :hook
   (elfeed-show-mode . mixed-pitch-mode)
@@ -3461,6 +3463,124 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
 	(run-with-timer 2 nil #'wallabag-request-and-synchronize-entries))
       
       (message "Added %d entries to wallabag" added-count)))
+
+  ;;; -> Elfeed -> Podcastify integration
+  (defvar my/elfeed-podcastify-feed-rules nil
+    "List of (feed-name . predicate-function) pairs for automatic feed classification.
+Each predicate function should take an elfeed entry and return non-nil if the entry
+should go to that feed. Rules are checked in order, first match wins.
+Falls back to 'default' feed if no rules match.
+
+Example configuration:
+  (setq my/elfeed-podcastify-feed-rules
+    '((\"asmr\" . my/elfeed-entry-has-asmr-tag-p)
+      (\"tech-channels\" . (lambda (entry) 
+                            (my/elfeed-entry-from-channel-p entry '(\"TechChannel\" \"CodeTube\"))))
+      (\"music\" . (lambda (entry)
+                     (string-match-p \"music\\\\|song\\\\|audio\"
+                                   (downcase (elfeed-entry-title entry)))))))")
+
+  (defun my/elfeed-entry-has-asmr-tag-p (entry)
+    "Return t if elfeed ENTRY has asmr tag."
+    (member 'asmr (elfeed-entry-tags entry)))
+  
+  (setq my/elfeed-podcastify-feed-rules
+    '(("asmr" . my/elfeed-entry-has-asmr-tag-p)
+      ))
+  
+
+  (defun my/podcastify-determine-feed (entry)
+    "Determine which feed an elfeed ENTRY should go to based on feed rules.
+Returns the feed name, defaulting to 'default' if no rules match."
+    (or (cl-loop for (feed-name . predicate-fn) in my/elfeed-podcastify-feed-rules
+                 when (funcall predicate-fn entry)
+                 return feed-name)
+        "default"))
+
+;;   (defun my/elfeed-entry-from-channel-p (entry channel-patterns)
+;;     "Return t if elfeed ENTRY is from a channel matching any of CHANNEL-PATTERNS.
+;; CHANNEL-PATTERNS should be a list of strings or regexps to match against feed title."
+;;     (let ((feed-title (elfeed-feed-title (elfeed-entry-feed entry))))
+;;       (cl-some (lambda (pattern)
+;;                  (string-match-p pattern (or feed-title "")))
+;;                channel-patterns)))
+
+  (defun my/elfeed-entries-to-podcastify (&optional prompt-for-feed entries feed-name)
+    "Send elfeed entries to podcastify and mark as read.
+PROMPT-FOR-FEED when non-nil (or called with C-u), prompts for feed selection.
+If ENTRIES is provided, use those instead of the selected entries.
+FEED-NAME specifies which feed to add videos to.
+In show mode, adds the current entry; in search mode, adds all selected entries."
+    (interactive "P")
+    (let* ((entries
+            (cond
+             (entries entries)
+             ((derived-mode-p 'elfeed-show-mode) (list elfeed-show-entry))
+             ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
+             (t (user-error "Not in an Elfeed buffer or no entries provided"))))
+           ;; Handle feed selection logic
+           (feed (cond
+                  ;; If prompt-for-feed (C-u was used), prompt user
+                  (prompt-for-feed
+                   (let* ((rule-feeds (mapcar 'car my/elfeed-podcastify-feed-rules))
+                          (all-feeds (cl-remove-duplicates 
+                                     (append rule-feeds '("default")) 
+                                     :test 'string=)))
+                     (completing-read "Podcastify feed: " all-feeds nil nil nil nil "default")))
+                  ;; If feed-name was explicitly provided, use it
+                  (feed-name feed-name)
+                  ;; Otherwise, use automatic classification for first entry
+                  (t (my/podcastify-determine-feed (car entries)))))
+           (added-count 0)
+           (failed-count 0))
+      
+      ;; Show which feed is being used
+      (unless prompt-for-feed 
+        (message "Using podcastify feed: %s" feed))
+      
+      ;; Process each entry
+      (dolist (entry entries)
+	(let ((url (elfeed-entry-link entry))
+              (title (elfeed-entry-title entry)))
+          (if (and url (string-match-p "youtube\\.com\\|youtu\\.be" url))
+              (condition-case err
+                  (progn
+                    (message "Adding to podcastify: %s" title)
+                    ;; Send to podcastify API
+                    (url-retrieve
+                     (format "http://localhost:8081/add?url=%s&feed=%s" 
+                             (url-encode-url url) 
+                             (url-encode-url feed))
+                     (lambda (status)
+                       (if (plist-get status :error)
+                           (message "Failed to add %s to podcastify: %s" 
+                                    title (plist-get status :error))
+			 (message "Successfully added %s to podcastify" title)))
+                     nil nil t)
+                    
+                    ;; Mark entry as read in elfeed
+                    (elfeed-untag entry 'unread)
+                    (elfeed-tag entry 'podcastify)
+                    
+                    ;; Move point to next entry in search mode
+                    (when (derived-mode-p 'elfeed-search-mode)
+                      (forward-line 1))
+                    
+                    (cl-incf added-count))
+		(error
+		 (message "Error processing %s: %s" title (error-message-string err))
+		 (cl-incf failed-count)))
+            (message "Skipping non-YouTube entry: %s" title))))
+      
+      ;; Update elfeed display
+      (when (derived-mode-p 'elfeed-search-mode)
+	(elfeed-search-update--force))
+      
+      ;; Show summary
+      (if (> failed-count 0)
+          (message "Added %d entries to podcastify (feed: %s), %d failed" 
+                   added-count feed failed-count)
+	(message "Added %d entries to podcastify (feed: %s)" added-count feed))))
   
 ;;; -> Elfeed -> Multi-Device Syncing
 
@@ -3708,6 +3828,7 @@ This is attached directly to database modification functions."
   (advice-add 'elfeed-search-show-entry :after #'js/elfeed-search-logger)
   (advice-add 'open-youtube-in-iina :before #'js/log-elfeed-entries)
   (advice-add 'my/elfeed-entries-to-wallabag :before #'js/log-elfeed-entries)
+  (advice-add 'my/elfeed-entries-to-podcastify :before #'js/log-elfeed-entries)
 
   (defun js/elfeed-search-logger (entry)
     "Wrapper for elfeed entry logger for elfeed-search-show-entry"
@@ -4133,6 +4254,13 @@ If a key is provided, use it instead of the default capture template."
                         (if wallabag-show-entry-after-creation
                             (wallabag-show-entry (car (wallabag-db-select :id id))) ))))))))
   )
+
+;;; -> Verb for HTTP Requests
+(use-package verb
+  :ensure t
+  :defer t
+  :commands (verb-send-request-on-point verb-mode))
+
 ;;; --> Programming
 
 (use-package magit
