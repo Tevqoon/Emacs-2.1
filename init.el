@@ -3641,48 +3641,60 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
             ((derived-mode-p 'elfeed-show-mode) (list elfeed-show-entry))
             ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
             (t (user-error "Not in an Elfeed buffer or no entries provided"))))
-          
-          (added-count 0)
-          (failed-count 0))
+          (total-count (length entries))
+          (completed-count 0))
       
       ;; Ensure the watch directory exists
       (unless (file-directory-p deluge-watch-dir)
 	(user-error "Deluge watch directory does not exist: %s" deluge-watch-dir))
       
-      ;; Process each entry
+      (message "Starting download of %d torrent(s)..." total-count)
+      
+      ;; Process each entry asynchronously
       (dolist (entry entries)
 	(let ((url (elfeed-entry-link entry))
               (title (elfeed-entry-title entry)))
           (if url
-              (condition-case err
-                  (progn
-                    (message "Downloading torrent: %s" title)
-                    
-                    ;; Generate a filename based on the entry title
-                    (let* ((safe-title (replace-regexp-in-string "[^A-Za-z0-9._-]" "_" title))
-                           (filename (concat safe-title ".torrent"))
-                           (filepath (expand-file-name filename deluge-watch-dir)))
-                      
-                      ;; Download the .torrent file
-                      (url-copy-file url filepath t)
-
-		      (elfeed-untag entry 'unread)
-                      (message "Downloaded torrent to: %s" filepath)
-                      (cl-incf added-count)))
-		(error
-		 (message "Error downloading torrent for %s: %s" title (error-message-string err))
-		 (cl-incf failed-count)))
-            (message "No URL found for entry: %s" title))))
-      
-      ;; Update elfeed display if in search mode
-      (when (derived-mode-p 'elfeed-search-mode)
-	(elfeed-search-update--force))
-      
-      ;; Show summary
-      (if (> failed-count 0)
-          (message "Downloaded %d torrents to Deluge watch folder, %d failed" 
-                   added-count failed-count)
-	(message "Downloaded %d torrents to Deluge watch folder" added-count))))
+              (let* ((safe-title (replace-regexp-in-string "[^A-Za-z0-9._-]" "_" title))
+                     (filename (concat safe-title ".torrent"))
+                     (filepath (expand-file-name filename deluge-watch-dir)))
+		
+		(message "Starting download: %s" title)
+		
+		;; Use url-retrieve for non-blocking download
+		(url-retrieve
+		 url
+		 (lambda (status entry title filepath completed-count total-count)
+                   (let ((error (plist-get status :error)))
+                     (if error
+			 (message "Failed to download torrent for %s: %s" title error)
+                       ;; Success - write the torrent file
+                       (progn
+			 ;; Move past HTTP headers
+			 (goto-char (point-min))
+			 (re-search-forward "\n\n" nil t)
+			 
+			 ;; Write the torrent data to file
+			 (write-region (point) (point-max) filepath nil 'quiet)
+			 (message "Downloaded torrent: %s" title)
+			 
+			 ;; Mark as read in elfeed
+			 (elfeed-untag entry 'unread)))
+                     
+                     ;; Update completion counter
+                     (cl-incf completed-count)
+                     (when (= completed-count total-count)
+                       (message "Completed downloading %d torrent(s) to Deluge watch folder" total-count)
+                       ;; Update elfeed display if in search mode
+                       (when (and (get-buffer "*elfeed-search*")
+                                  (with-current-buffer "*elfeed-search*"
+                                    (derived-mode-p 'elfeed-search-mode)))
+			 (with-current-buffer "*elfeed-search*"
+                           (elfeed-search-update--force))))))
+		 ;; Pass variables to the callback
+		 (list entry title filepath completed-count total-count)
+		 nil t))  ; silent, no-cookies
+            (message "No URL found for entry: %s" title))))))
   
 ;;; -> Elfeed -> Multi-Device Syncing
 
