@@ -61,6 +61,10 @@
   (delete-by-moving-to-trash t)
   (sentence-end-double-space nil)
   (pixel-scroll-precision-use-momentum t)
+  (auto-hscroll-mode t)
+  (mouse-wheel-scroll-amount '(1 ((meta)) 
+                                 ((control meta) . global-text-scale)
+                                 ((control) . text-scale)))
 
   :bind (("C-h" . delete-backward-char)
 	 ("<pinch>" . 'ignore)
@@ -3037,7 +3041,10 @@ All other subheadings will be ignored."
 							       (air-org-skip-if-blocked)
 							       (air-org-skip-subtree-if-ancestor-is-hold)))
 				(org-agenda-overriding-header "* Up next: ")))
-		  (agenda "" ((org-agenda-span 'week)))
+		  ;; (agenda "" ((org-agenda-span 'week)))
+		  (agenda "" ((org-agenda-span 'week)
+			      (org-agenda-skip-function
+			       '(org-agenda-skip-entry-if 'todo 'done))))
 		  (todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")))
 		  (alltodo "" ((org-agenda-skip-function
 				'(or (air-org-skip-subtree-if-habit)
