@@ -3581,6 +3581,35 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
           (message "Added %d entries to podcastify (feed: %s), %d failed" 
                    added-count feed failed-count)
 	(message "Added %d entries to podcastify (feed: %s)" added-count feed))))
+
+  (defun my/podcastify-add-link ()
+    "Interactively add a link to podcastify.
+Prompts for a URL and feed name, then adds the link to the specified podcastify feed."
+    (interactive)
+    (let* ((url (read-string "Enter URL to add to podcastify: "))
+           (rule-feeds (mapcar 'car my/elfeed-podcastify-feed-rules))
+           (all-feeds (cl-remove-duplicates 
+                      (append rule-feeds '("default")) 
+                      :test 'string=))
+           (feed (completing-read "Podcastify feed: " all-feeds nil nil nil nil "default")))
+      
+      (if (string-empty-p url)
+          (message "URL cannot be empty")
+        (condition-case err
+            (progn
+              (message "Adding %s to podcastify feed: %s" url feed)
+              (url-retrieve
+               (format "http://localhost:8081/add?url=%s&feed=%s" 
+                       (url-encode-url url) 
+                       (url-encode-url feed))
+               (lambda (status)
+                 (if (plist-get status :error)
+                     (message "Failed to add to podcastify: %s" 
+                              (plist-get status :error))
+                   (message "Successfully added to podcastify")))
+               nil nil t))
+          (error
+           (message "Error adding to podcastify: %s" (error-message-string err)))))))
   
 ;;; -> Elfeed -> Multi-Device Syncing
 
