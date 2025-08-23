@@ -3240,8 +3240,8 @@ All other subheadings will be ignored."
 	 ("s" . my/elfeed-show-default)
 	 ("P" . js/log-elfeed-process)
 	 ("B" . elfeed-browse-with-secondary-browser)
-	 ("W" . my/elfeed-entries-to-wallabag)
-	 ("O" . my/elfeed-entries-to-podcastify)
+	 ("W" . js/elfeed-entries-to-wallabag)
+	 ("O" . js/elfeed-entries-to-podcastify)
 	 ("<wheel-up>" . previous-line)
 	 ("<wheel-down>" . next-line)
 	 
@@ -3254,8 +3254,8 @@ All other subheadings will be ignored."
          ("i" . open-youtube-in-iina)
 	 ("M-o" . ace-link-safari)
 	 ("B" . elfeed-browse-with-secondary-browser)
-	 ("W" . my/elfeed-entries-to-wallabag)
-	 ("O" . my/elfeed-entries-to-podcastify)
+	 ("W" . js/elfeed-entries-to-wallabag)
+	 ("O" . js/elfeed-entries-to-podcastify)
          )
   :hook
   (elfeed-show-mode . mixed-pitch-mode)
@@ -3447,7 +3447,7 @@ Executing a filter in bytecode form is generally faster than
 
 
 ;;; -> Elfeed -> Wallabag integration
-  (defun my/elfeed-entries-to-wallabag (&optional entries)
+  (defun js/elfeed-entries-to-wallabag (&optional entries)
     "Add elfeed entries to wallabag and sync to server.
 If ENTRIES is provided, use those instead of the selected entries.
 In show mode, adds the current entry; in search mode, adds all selected entries."
@@ -3519,7 +3519,7 @@ Returns the feed name, defaulting to 'default' if no rules match."
 ;;                  (string-match-p pattern (or feed-title "")))
 ;;                channel-patterns)))
 
-  (defun my/elfeed-entries-to-podcastify (&optional prompt-for-feed entries feed-name)
+  (defun js/elfeed-entries-to-podcastify (&optional prompt-for-feed entries feed-name)
     "Send elfeed entries to podcastify and mark as read.
 PROMPT-FOR-FEED when non-nil (or called with C-u), prompts for feed selection.
 If ENTRIES is provided, use those instead of the selected entries.
@@ -3624,6 +3624,65 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
                nil nil t))
           (error
            (message "Error adding to podcastify: %s" (error-message-string err)))))))
+
+;;; -> Elfeed -> Deluge integration
+
+  (defvar deluge-watch-dir (expand-file-name "~/Downloads/")
+    "The folder into which to download the .torrent files.")
+  
+  (defun js/elfeed-entries-to-deluge (&optional entries)
+    "Download .torrent files from elfeed entries to Deluge watch folder.
+If ENTRIES is provided, use those instead of the selected entries.
+In show mode, adds the current entry; in search mode, adds all selected entries."
+    (interactive)
+    (let ((entries
+           (cond
+            (entries entries)
+            ((derived-mode-p 'elfeed-show-mode) (list elfeed-show-entry))
+            ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
+            (t (user-error "Not in an Elfeed buffer or no entries provided"))))
+          
+          (added-count 0)
+          (failed-count 0))
+      
+      ;; Ensure the watch directory exists
+      (unless (file-directory-p deluge-watch-dir)
+	(user-error "Deluge watch directory does not exist: %s" deluge-watch-dir))
+      
+      ;; Process each entry
+      (dolist (entry entries)
+	(let ((url (elfeed-entry-link entry))
+              (title (elfeed-entry-title entry)))
+          (if url
+              (condition-case err
+                  (progn
+                    (message "Downloading torrent: %s" title)
+                    
+                    ;; Generate a filename based on the entry title
+                    (let* ((safe-title (replace-regexp-in-string "[^A-Za-z0-9._-]" "_" title))
+                           (filename (concat safe-title ".torrent"))
+                           (filepath (expand-file-name filename deluge-watch-dir)))
+                      
+                      ;; Download the .torrent file
+                      (url-copy-file url filepath t)
+
+		      (elfeed-untag entry 'unread)
+                      (message "Downloaded torrent to: %s" filepath)
+                      (cl-incf added-count)))
+		(error
+		 (message "Error downloading torrent for %s: %s" title (error-message-string err))
+		 (cl-incf failed-count)))
+            (message "No URL found for entry: %s" title))))
+      
+      ;; Update elfeed display if in search mode
+      (when (derived-mode-p 'elfeed-search-mode)
+	(elfeed-search-update--force))
+      
+      ;; Show summary
+      (if (> failed-count 0)
+          (message "Downloaded %d torrents to Deluge watch folder, %d failed" 
+                   added-count failed-count)
+	(message "Downloaded %d torrents to Deluge watch folder" added-count))))
   
 ;;; -> Elfeed -> Multi-Device Syncing
 
@@ -3870,8 +3929,9 @@ This is attached directly to database modification functions."
   (advice-add 'elfeed-search-browse-url :before #'js/log-elfeed-entries)
   (advice-add 'elfeed-search-show-entry :after #'js/elfeed-search-logger)
   (advice-add 'open-youtube-in-iina :before #'js/log-elfeed-entries)
-  (advice-add 'my/elfeed-entries-to-wallabag :before #'js/log-elfeed-entries)
-  (advice-add 'my/elfeed-entries-to-podcastify :before #'js/log-elfeed-entries)
+  (advice-add 'js/elfeed-entries-to-wallabag :before #'js/log-elfeed-entries)
+  (advice-add 'js/elfeed-entries-to-podcastify :before #'js/log-elfeed-entries)
+  (advice-add 'js/elfeed-entries-to-deluge :before #'js/log-elfeed-entries)
 
   (defun js/elfeed-search-logger (entry)
     "Wrapper for elfeed entry logger for elfeed-search-show-entry"
