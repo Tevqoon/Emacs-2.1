@@ -1595,6 +1595,7 @@ With prefix ARG, use secondary browser."
 					   browse-url-secondary-browser-function
 					 browse-url-browser-function)))
       (if (use-region-p)
+	  ;; If we have a region, try extracting all of the links.
           (let ((text (buffer-substring-no-properties (region-beginning) (region-end)))
 		(count 0))
             (with-temp-buffer
@@ -1638,10 +1639,16 @@ With prefix ARG, use secondary browser."
             (message "Opened %d URLs in browser" count))
 	
 	;; Otherwise just use the built-in browse-url for single URL
-	(let ((url (thing-at-point 'url)))
-          (if url
-              (browse-url url)
-            (message "No URL at point"))))))
+	(save-excursion
+          (let ((url (thing-at-point 'url)))
+            (if url
+                (browse-url url)
+              ;; Try moving forward one word and recursing
+              (if (and (< (point) (line-end-position))
+                       (forward-word 1)
+                       (< (point) (line-end-position)))
+                  (open-urls-at-point-or-region arg)
+                (message "No URL at point"))))))))
 
   ;;; -> Org mode -> Navigation
   (defun my/org-narrow-to-heading-content ()
