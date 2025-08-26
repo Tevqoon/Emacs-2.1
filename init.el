@@ -1640,15 +1640,23 @@ With prefix ARG, use secondary browser."
 	
 	;; Otherwise just use the built-in browse-url for single URL
 	(save-excursion
-          (let ((url (thing-at-point 'url)))
-            (if url
-                (browse-url url)
-              ;; Try moving forward one word and recursing
-              (if (and (< (point) (line-end-position))
-                       (forward-word 1)
-                       (< (point) (line-end-position)))
-                  (open-urls-at-point-or-region arg)
-                (message "No URL at point"))))))))
+          (cond
+           ;; First try org links
+           ((get-org-link-at-point)
+            ;; Move to beginning of link to ensure org-open-at-point works
+            (when (org-in-regexp org-link-any-re)
+              (goto-char (match-beginning 0)))
+            (org-open-at-point arg))
+           ;; Then try plain URLs
+           ((thing-at-point 'url)
+            (browse-url (thing-at-point 'url)))
+           ;; Try moving forward one word and recursing
+           ((and (< (point) (line-end-position))
+		 (forward-word 1)
+		 (< (point) (line-end-position)))
+            (open-urls-at-point-or-region arg))
+           ;; Finally, give up
+           (t (message "No URL at point")))))))
 
   ;;; -> Org mode -> Navigation
   (defun my/org-narrow-to-heading-content ()
