@@ -1394,11 +1394,11 @@ If not set buffer-locally, starts with 'auto."
     :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
     :ensure mcp-server-lib
     :bind
-    (("C-c g t i" . emacs-mcp-install-stdio-script)
-     ("C-c g t s" . emacs-mcp-start-server)
-     ("C-c g t k" . emacs-mcp-stop-server)
-     ("C-c g t r" . emacs-mcp-restart-server)
-     ("C-c g t ?" . emacs-mcp-server-status))
+    (("C-c g t i" . emacs-mcp-tool-install-stdio-script)
+     ("C-c g t s" . emacs-mcp-tool-start-server)
+     ("C-c g t k" . emacs-mcp-tool-stop-server)
+     ("C-c g t r" . emacs-mcp-tool-restart-server)
+     ("C-c g t ?" . emacs-mcp-tool-server-status))
     :config
     (require 'emacs-mcp-tool-server)
     (emacs-mcp-tool-start-server)
