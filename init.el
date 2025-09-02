@@ -402,6 +402,8 @@ between Emacs sessions.")
    (global-set-key (kbd "s-s") #'save-buffer)
    (global-set-key (kbd "s-z") #'undo)
    (global-set-key (kbd "s-v") #'yank)
+   (global-set-key (kbd "s-a") #'mark-whole-buffer)
+   (global-set-key (kbd "s-c") #'kill-ring-save)
    
    (defvar org-roam-directory "~/org")
    (defvar org-directory "~/org")
