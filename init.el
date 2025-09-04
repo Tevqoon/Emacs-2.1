@@ -1851,6 +1851,7 @@ Automatically expands the heading if it's folded."
   (add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
   
 ;;; -> org-roam -> Aesthetics
+  
   ;; Color roam links differently
   (defface org-roam-link
     '((t :foreground "orange" :underline t))
@@ -1858,6 +1859,56 @@ Automatically expands the heading if it's folded."
     :group 'org-roam-faces)
   
   (org-link-set-parameters "id" :face 'org-roam-link)
+
+  ;; Fonfify links in filetags
+  (defun js/org-activate-keyword-links (limit)
+    "Activate links within org keyword values up to LIMIT.
+This extends normal org link fontification to work inside keyword lines
+like #+CATEGORY:, #+FILETAGS:, etc., allowing all configured link types
+and faces to work normally."
+    (let ((case-fold-search t))
+      (when (re-search-forward "^[ \t]*#\\+\\w+:[ \t]*\\(.*\\)$" limit t)
+	(let ((keyword-value-start (match-beginning 1))
+              (keyword-value-end (match-end 1)))
+          (save-excursion
+            (goto-char keyword-value-start)
+            ;; Use org's built-in link activation within the keyword value
+            (let ((old-limit limit))
+              (org-activate-links keyword-value-end))))
+	;; Continue searching for more keywords
+	t)))
+
+  (defcustom js/org-keywords-with-links '("category" "filetags" "archive")
+    "list of org keywords that should have their values scanned for links."
+    :group 'org-appearance
+    :type '(repeat string))
+
+  (defun js/org-activate-specific-keyword-links (limit)
+    "activate links within specific org keyword values up to limit.
+only processes keywords listed in `js/org-keywords-with-links'."
+    (let ((case-fold-search t)
+          (keyword-regexp (concat "^[ \t]*#\\+\\("
+				  (mapconcat #'regexp-quote 
+                                             js/org-keywords-with-links "\\|")
+				  "\\):[ \t]*\\(.*\\)$")))
+      (when (re-search-forward keyword-regexp limit t)
+	(let ((keyword-value-start (match-beginning 2))
+              (keyword-value-end (match-end 2)))
+          (save-excursion
+            (goto-char keyword-value-start)
+            (org-activate-links keyword-value-end)))
+	t)))
+
+  (defun js/setup-specific-keyword-link-fontification ()
+    "add specific keyword link fontification to org-mode.
+only processes keywords listed in `js/org-keywords-with-links'."
+    (font-lock-add-keywords
+     nil
+     '((js/org-activate-specific-keyword-links))
+     'append))
+
+  (add-hook 'org-mode-hook #'js/setup-specific-keyword-link-fontification)
+ 
   ;; Folded backlink buffer
   (add-to-list 'magit-section-initial-visibility-alist (cons 'org-roam-node-section 'hide))
 
@@ -2434,6 +2485,8 @@ you can catch it with `condition-case'."
   ;; Exclude the relevant tags from inheritance
   (dolist (tag (cons "summary" tags/updating-tags))
     (add-to-list 'org-tags-exclude-from-inheritance tag))
+
+  (add-to-list 'org-tags-exclude-from-inheritance "interesting")
   
   (defvar tags/tag-added-hook nil
     "Hook run when a tag is added to a file.
