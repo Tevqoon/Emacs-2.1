@@ -1234,58 +1234,8 @@ exactly like the old ace-jump integration."
     :models '(gpt-5-mini
 	      o4-mini-deep-research))
 
-  ;; TODO: Replace GPTel doc tools with the MCP versions
-  (defvar gptel-tools-files `(,(expand-file-name "lisp/ai-tools-list.el" user-emacs-directory)
-			      )
-    "the list of all the files which contain gptel tools.")
 
-  ;; This macro runs before our tool file.
-  (defmacro my/gptel-tool-definer (&rest args)
-    "Define a gptel tool and save it to a variable named my/gptel-tool-tools--NAME.
-ARGS are passed directly to `gptel-make-tool`.
-The variable will be set to the tool structure created by `gptel-make-tool`.
-
-Example usage:
-  (my/gptel-tool-definer
-   :name \"get_weather\"
-   :function (lambda (location) ...)
-   :description \"Get the current weather\"
-   ...)"
-    (let* ((name-plist-pos (cl-position :name args))
-           (tool-name (and name-plist-pos (nth (1+ name-plist-pos) args)))
-           (var-name (and tool-name
-			  (intern (format "my/gptel-tool-tools--%s" tool-name)))))
-      (unless tool-name
-	(error "Tool name is required"))
-      `(progn
-	 ;; Define the gptel tool
-	 (gptel-make-tool ,@args)
-	 
-	 ;; Store the tool structure in the variable
-	 (defvar ,var-name nil
-           ,(format "The gptel tool named '%s'." tool-name))
-	 
-	 ;; Set the variable to the tool structure
-	 (setq ,var-name
-               (cdr (assoc ,tool-name
-                           (cdr (assoc (or (plist-get ',args :category) "misc")
-                                       gptel--known-tools)))))
-	 
-	 ;; Return the variable name for convenience
-	 ',var-name)))
-
-  (defun my/gptel--reload-tools ()
-    "reload the tools in `gptel-tools-files`."
-    (interactive)
-    (message "Reloading GPTel tools.")
-    (setq gptel--known-tools nil
-          gptel-tools nil)
-    (dolist (tool-file gptel-tools-files)
-      (load-file tool-file)))
-
-  ;; Load custom tools
-  (my/gptel--reload-tools)
-  
+  ;;; -> GPTel -> Tool use  
   ;; Tool results default to nil
   (setq-default gptel-include-tool-results nil)
 
@@ -1305,7 +1255,9 @@ If not set buffer-locally, starts with 'auto."
       (message "Gptel tool results inclusion set to %s locally" 
                (buffer-local-value 'gptel-include-tool-results (current-buffer)))))
 
-  ;; Vulpea interface
+  (require 'gptel-integrations)
+
+  ;;; -> GPTel -> Saving
   (defun org/enable-gptel-for-chatlog-buffer ()
     "Enable gptel-mode if the current buffer has the `chatlog' tag."
     (when (and (buffer-file-name)
@@ -1345,7 +1297,7 @@ If not set buffer-locally, starts with 'auto."
           (org-roam-dailies-autocapture-today "c" link)
           (message "Chat saved as '%s' and linked in today's journal." title)))))
 
-  ;;; -> GPTel -> rewrite utilities
+  ;;; -> GPTel -> Rewrite utilities
   (defun my/gptel-translate-to-english ()
     "Rewrite the current buffer's text to English while preserving Org IDs and links."
     (interactive)
@@ -1360,7 +1312,7 @@ If not set buffer-locally, starts with 'auto."
 
 ;;; End of GPTel package block
 
-;;; -> AI configuration -> Emacs MCP server
+;;; -> AI configuration -> Emacs MCP
 
 (use-package mcp-server-lib)
 
@@ -1376,8 +1328,22 @@ If not set buffer-locally, starts with 'auto."
      ("C-c g t ?" . emacs-mcp-tool-server-status))
     :config
     (require 'emacs-mcp-tool-server)
-    (emacs-mcp-tool-start-server)
     )
+
+(use-package mcp
+  :ensure t
+  :after gptel
+  :custom (mcp-hub-servers
+           `(
+	     ;; ("filesystem" . (:command "npx" :args ("-y" "@modelcontextprotocol/server-filesystem" "/home/lizqwer/MyProject/")))
+             ;; ("fetch" . (:command "uvx" :args ("mcp-server-fetch")))
+             ;; ("qdrant" . (:url "http://localhost:8000/sse"))
+	     ("emacs-mcp-tool-server" .
+	      (:command "/Users/jure/.emacs.d/emacs-mcp-stdio.sh"
+			:args ("--init-function=emacs-mcp-tool-start-server" "--stop-function=emacs-mcp-tool-stop-server")))
+             ))
+  :config (require 'mcp-hub)
+  :hook (after-init . mcp-hub-start-all-server))
 
 ;;; -> AI configuration -> aidermacs
 
