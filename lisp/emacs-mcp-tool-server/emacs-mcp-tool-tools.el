@@ -1,16 +1,44 @@
 ;;; emacs-mcp-tool-tools.el --- Tool definitions for Emacs MCP tool server -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2025
+;;; Copyright (C) 2025
 
-;; Author: Claude
-;; Version: 0.1.0
-;; Package-Requires: ((emacs "27.1") (mcp-server-lib "0.1.0"))
-;; Keywords: tools, mcp
+;;; Author: Jure Smolar
+;;; Version: 0.1.0
+;;; Package-Requires: ((emacs "27.1") (mcp-server-lib "0.1.0"))
+;;; Keywords: tools, mcp
 
 ;;; Commentary:
 
-;; Tool definitions for the Emacs MCP tool server.
-;; Synchronous tools for direct Emacs operations like buffer management and elisp evaluation.
+;;; Tool definitions for the Emacs MCP tool server.
+;;; Synchronous tools for direct Emacs operations like buffer management and elisp evaluation.
+;;;
+;;; MCP Tool State Isolation Principles (For agents writing new tools)
+;;;
+;;; CRITICAL: All MCP tools must preserve Emacs state completely.
+;;; Tools should never affect:
+;;; - Current buffer or point position
+;;; - Window configuration or selected window  
+;;; - Buffer restrictions (narrowing)
+;;; - Mark, region, or selection state
+;;; - Any global variables or settings
+;;;
+;;; Required patterns for all tools:
+;;; 1. save-current-buffer - preserve current buffer
+;;; 2. save-excursion - preserve point and mark
+;;; 3. save-window-excursion - preserve window layout
+;;; 4. save-restriction + widen - handle narrowed buffers
+;;; 
+;;; Example template:
+;;; (defun my-mcp-tool (args)
+;;;   (mcp-server-lib-with-error-handling
+;;;     (save-current-buffer
+;;;       (save-excursion
+;;;         (save-window-excursion
+;;;           (save-restriction
+;;;             ;; Tool implementation here
+;;;             ))))))
+;;;
+;;; This ensures tools are truly "read-only" from the user's perspective.
 
 ;;; Code:
 
@@ -122,71 +150,133 @@ MCP Parameters:
 MCP Parameters:
   variable_name - The exact name of the Emacs Lisp variable to inspect"
   (mcp-server-lib-with-error-handling
-    (message "Looking up variable: %s" variable_name)
-    (condition-case err
+   (message "Looking up variable: %s" variable_name)
+   (condition-case err
+       (save-window-excursion
+         (with-current-buffer (helpful-variable (intern variable_name))
+           (message "Found documentation for variable: %s" variable_name)
+           (buffer-substring-no-properties (point-min) (point-max))))
+     (error 
+      (message "Error looking up variable %s: %s" variable_name (error-message-string err))
+      (format "Could not find documentation for variable '%s'. Error: %s" 
+              variable_name (error-message-string err))))))
+
+(defun emacs-mcp-tool-get-buffer-contents (buffer_name)
+  "Get contents and metadata of a specific buffer by name.
+
+MCP Parameters:
+  buffer_name - The exact name of the buffer to retrieve"
+  (mcp-server-lib-with-error-handling
+   (if-let ((buf (get-buffer buffer_name)))
+     (save-current-buffer
+       (save-excursion
+         (with-current-buffer buf
+           (save-restriction
+             (widen)
+             (format "Buffer: %s\nMode: %s\nFile: %s\nSize: %d characters\nModified: %s\nRead-only: %s\n\n%s"
+                     (buffer-name)
+                     major-mode
+                     (or buffer-file-name "No file")
+                     (buffer-size)
+                     (if (buffer-modified-p) "Yes" "No")
+                     (if buffer-read-only "Yes" "No")
+                     (buffer-substring-no-properties (point-min) (point-max)))))))
+     (format "Buffer '%s' not found" buffer_name))))
+
+(defun emacs-mcp-tool-get-agenda-buffer ()
+  "Get the contents of the org-agenda buffer by generating a fresh view.
+All operations are performed without affecting current window configuration or buffer state.
+
+MCP Parameters: None"
+  (mcp-server-lib-with-error-handling
+    (save-current-buffer
+      (save-excursion
         (save-window-excursion
-          (with-current-buffer (helpful-variable (intern variable_name))
-            (message "Found documentation for variable: %s" variable_name)
-            (buffer-substring-no-properties (point-min) (point-max))))
-      (error 
-       (message "Error looking up variable %s: %s" variable_name (error-message-string err))
-       (format "Could not find documentation for variable '%s'. Error: %s" 
-               variable_name (error-message-string err))))))
+          (save-restriction
+            ;; Generate fresh agenda view using your custom function
+            (open-org-agenda)
+            
+            ;; Get the current agenda buffer (whatever it's named)
+            (let ((agenda-buffer (current-buffer)))
+              (with-current-buffer agenda-buffer
+                (save-restriction
+                  (widen)
+                  (format "Buffer: %s\nMode: %s\nSize: %d characters\nGenerated: %s\n\n%s"
+                          (buffer-name)
+                          major-mode
+                          (buffer-size)
+                          (format-time-string "%Y-%m-%d %H:%M:%S")
+                          (buffer-substring-no-properties (point-min) (point-max))))))))))))
 
 
 ;;; Built-in Tools
 
-;; Basic tools
+;; Primary documentation tools (use these first for understanding Emacs functionality)
 (emacs-mcp-register-tool
- '(:id "hello_world"
-   :description "Returns a hello world message from Emacs"
-   :handler emacs-mcp-tool-hello-world))
+ '(:id "find_symbols_by_name"
+   :description "Discover Emacs functions and variables by keyword. Essential for exploring Emacs functionality and finding relevant symbols. Use with helpful_function_inspect and helpful_variable_inspect for comprehensive Emacs introspection."
+   :handler emacs-mcp-tool-find-symbols-by-name))
+
+(emacs-mcp-register-tool
+ '(:id "helpful_function_inspect"
+   :description "Get comprehensive function documentation including signature, examples, source code, and usage details. Essential for understanding how Emacs functions work programmatically."
+   :handler emacs-mcp-tool-helpful-function-inspect))
+
+(emacs-mcp-register-tool
+ '(:id "helpful_variable_inspect"
+   :description "Get comprehensive variable documentation including current values, customization options, and detailed descriptions. Essential for understanding Emacs configuration and state."
+   :handler emacs-mcp-tool-helpful-variable-inspect))
+
+;; Code evaluation and system info
+(emacs-mcp-register-tool
+ '(:id "eval_elisp"
+   :description "Safely evaluate Emacs Lisp code"
+   :handler emacs-mcp-tool-eval-elisp))
 
 (emacs-mcp-register-tool
  '(:id "get_emacs_version"
    :description "Returns detailed Emacs version and configuration info"
    :handler emacs-mcp-tool-get-version))
 
-(emacs-mcp-register-tool
- '(:id "eval_elisp"
-   :description "Safely evaluate Emacs Lisp code"
-   :handler emacs-mcp-tool-eval-elisp))
-
-;; System tools
+;; Live buffer interaction (context-specific - only for current editing session)
 (emacs-mcp-register-tool
  '(:id "get_buffer_list"
-   :description "Get list of open buffers"
+   :description "CONTEXT-SPECIFIC: List currently open buffers with metadata. Only use when task specifically involves the user's current editing session, NOT for exploring Emacs functionality."
    :handler emacs-mcp-tool-get-buffer-list))
 
 (emacs-mcp-register-tool
  '(:id "search_buffers"
-   :description "Search content across open buffers"
+   :description "CONTEXT-SPECIFIC: Search text content in currently open buffers. Only use for finding content in the user's current work, NOT for exploring Emacs functionality or symbol definitions."
    :handler emacs-mcp-tool-search-buffers))
 
-;; Direct documentation tools
-(emacs-mcp-register-tool
- '(:id "find_symbols_by_name"
-   :description "Searches for Emacs Lisp symbols (functions and variables) by keyword."
-   :handler emacs-mcp-tool-find-symbols-by-name))
 
 (emacs-mcp-register-tool
- '(:id "helpful_function_inspect"
-   :description "Retrieves comprehensive documentation for any Emacs Lisp function."
-   :handler emacs-mcp-tool-helpful-function-inspect))
+ '(:id "get_buffer_contents"
+       :description "Get contents and metadata of a specific buffer by name. Use this only if explicitly asked or if obviously relevant."
+       :handler emacs-mcp-tool-get-buffer-contents))
 
+;; System management
 (emacs-mcp-register-tool
- '(:id "helpful_variable_inspect"
-   :description "Retrieves comprehensive documentation for any Emacs Lisp variable."
-   :handler emacs-mcp-tool-helpful-variable-inspect))
+ '(:id "hello_world"
+   :description "Returns a hello world message from Emacs"
+   :handler emacs-mcp-tool-hello-world))
 
 (emacs-mcp-register-tool
  '(:id "restart_server" 
    :description "Restart the MCP server to reload configurations and apply changes"
    :handler emacs-mcp-tool-restart-server-tool))
 
+;; Add these to your emacs-mcp-tool-tools.el file after the existing tool registrations
+
+(emacs-mcp-register-tool
+ '(:id "get_agenda_buffer"
+   :description "Get the contents of the org-agenda buffer, opening it if necessary. Uses your custom agenda view (daily agenda with TODOs) if available."
+   :handler emacs-mcp-tool-get-agenda-buffer))
+
 
 ;;; Built-in Resources
 
+;; TODO: Figure out a better way to use resources. Claude Code can't support templates yet, so not such a biggie, but still.
 (emacs-mcp-register-resource
  '(:uri "emacs://version"
    :name "Emacs Version"
@@ -222,10 +312,10 @@ MCP Parameters:
   (message "Reloading emacs-mcp-tool-tools.el...")
   (let ((tools-file (expand-file-name "emacs-mcp-tool-tools.el" 
                                       "~/.emacs.d/lisp/emacs-mcp-tool-server/")))
+    (setq emacs-mcp-tools nil)
+    (setq emacs-mcp-resources nil)
     (load-file tools-file))
-  (message "Restarting MCP server...")
-  (emacs-mcp-tool-restart-server)
-  (message "MCP server reloaded and restarted"))
+  (emacs-mcp-tool-restart-server))
 
 ;;; Tool Handlers
 

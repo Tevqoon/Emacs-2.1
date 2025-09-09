@@ -1219,16 +1219,23 @@ exactly like the old ace-jump integration."
   (defvar org-roam-chatlogs-directory "chatlogs/"
     "The directory to save gptel chatlogs in.")
 
-  (gptel-make-openai "OpenRouter"               
+  (gptel-make-openai "OpenRouter"
     :host "openrouter.ai"
     :endpoint "/api/v1/chat/completions"
     :stream t
     :key 'gptel-api-key-from-auth-source
     :models '(openai/gpt-oss-20b:online
 	      openai/gpt-oss-120b:online))
-  
+
+  (require 'gptel-responses)
+  (gptel-make-openai-responses "OAI Responses"
+    :stream t
+    :key 'gptel-api-key-from-auth-source
+    :models '(gpt-5-mini
+	      o4-mini-deep-research))
+
+  ;; TODO: Replace GPTel doc tools with the MCP versions
   (defvar gptel-tools-files `(,(expand-file-name "lisp/ai-tools-list.el" user-emacs-directory)
-			      ;;,(expand-file-name "lisp/gptel-subtask/gptel-subtask-tool.el" user-emacs-directory)
 			      )
     "the list of all the files which contain gptel tools.")
 
@@ -1351,46 +1358,11 @@ If not set buffer-locally, starts with 'auto."
   
   )
 
-;; (use-package gptel-subtask
-;;   :ensure nil
-;;   :load-path "~/.emacs.d/lisp/gptel-subtask/"
-;;   :after gptel
-;;   :requires gptel
-;;   )
-
 ;;; End of GPTel package block
 
-;;; -> AI configuration -> Claude Code
+;;; -> AI configuration -> Emacs MCP server
 
-;; add melp to package archives, as vterm is on melpa:
-
-;; TODO: install claude-code.el
-;; (use-package claude-code
-;;   :ensure t
-;;   :after vterm
-;;   :vc (:url "https://github.com/stevemolitor/claude-code.el" :rev :newest)
-;;   ;; :config (claude-code-mode)
-;;   ;; (defun my-claude-notify (title message)
-;;   ;;   "Display a macOS notification with sound."
-;;   ;;   (call-process "osascript" nil nil nil
-;;   ;;                 "-e" (format "display notification \"%s\" with title \"%s\" sound name \"Glass\""
-;;   ;;                              message title)))
-
-;;   ;; (setq claude-code-notification-function #'my-claude-notify)
-;;   ;; :bind-keymap ("C-c g d" . claude-code-command-map)
-;;   )
-
-;;; -> AI configuration -> Emacs MCP Server
-
-(use-package mcp-server-lib) ;; Great for sync tools
-
-;; (use-package mcp-server ;; For async
-;;   :ensure t
-;;   :demand t
-;;   :vc (:url "https://github.com/utsahi/mcp-server.el" :rev :newest)
-;;   )
-
-;;; -> AI configuration -> Agent MCP server
+(use-package mcp-server-lib)
 
 ;; Synchronous tool server for direct MCP tool calls
 (use-package emacs-mcp-tool-server
@@ -1406,13 +1378,6 @@ If not set buffer-locally, starts with 'auto."
     (require 'emacs-mcp-tool-server)
     (emacs-mcp-tool-start-server)
     )
-
-;; Asynchronous agent server for delegated AI tasks
-;; (use-package emacs-mcp-agent-server
-;;   :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
-;;   :after (mcp-server gptel)
-;;   )
-
 
 ;;; -> AI configuration -> aidermacs
 
