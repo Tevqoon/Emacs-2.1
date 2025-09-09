@@ -1190,6 +1190,9 @@ exactly like the old ace-jump integration."
 ;;; -> AI configuration -> GPTel
 
 (use-package gptel
+  :functions
+  org/enable-gptel-for-chatlog-buffer
+  my/gptel-enable-tool-results-in-org-mode
   :defer t
   :after org
   :bind
@@ -1205,15 +1208,14 @@ exactly like the old ace-jump integration."
    ("C-c g T" . my/gptel-translate-to-english)
    ("C-c g f" . my/gptel-finish)
    (:map gptel-mode-map
-	 ("C-c g t" . gptel-org-set-topic))
+	 ("C-c g t o" . gptel-org-set-topic))
    )
   :hook
-  (org-mode . my/gptel-enable-tool-results-in-org-mode)
   (org-mode . org/enable-gptel-for-chatlog-buffer)
   :custom
   (gptel-default-mode 'org-mode)
-  
-  :config
+    
+  :config   
   (setq gptel-model 'gpt-5-mini)
   (require 'gptel-org)
   (defvar org-roam-chatlogs-directory "chatlogs/"
@@ -1225,7 +1227,8 @@ exactly like the old ace-jump integration."
     :stream t
     :key 'gptel-api-key-from-auth-source
     :models '(openai/gpt-oss-20b:online
-	      openai/gpt-oss-120b:online))
+	      openai/gpt-oss-120b:online
+	      anthropic/claude-sonnet-4))
 
   (require 'gptel-responses)
   (gptel-make-openai-responses "OAI Responses"
@@ -1234,31 +1237,12 @@ exactly like the old ace-jump integration."
     :models '(gpt-5-mini
 	      o4-mini-deep-research))
 
-
-  ;;; -> GPTel -> Tool use  
+  ;;; -> GPTel -> Tool use
   ;; Don't include tool and reasoning blocks by default
   (setq-default gptel-include-reasoning nil)
   (setq-default gptel-include-tool-results nil)
 
-  ;; Org mode shows them - since they're minified
-  (defun my/gptel-enable-tool-results-in-org-mode ()
-    "Enable tool results locally in org-mode."
-    (setq-local gptel-include-tool-results t)
-    (setq-local gptel-include-reasoning 'ignore)
-    )
-  
-  (defun my/gptel-toggle-tool-results-local ()
-    "Toggle gptel tool results inclusion buffer-locally between 'auto and t.
-If not set buffer-locally, starts with 'auto."
-    (interactive)
-    (let* ((current-local-value (and (local-variable-p 'gptel-include-tool-results)
-                                     (buffer-local-value 'gptel-include-tool-results (current-buffer)))))
-      (set (make-local-variable 'gptel-include-tool-results)
-           (if (eq current-local-value t) 'auto t))
-      (message "Gptel tool results inclusion set to %s locally" 
-               (buffer-local-value 'gptel-include-tool-results (current-buffer)))))
-
-  (require 'gptel-integrations)
+  (require 'gptel-integrations) ; MCP
 
   ;;; -> GPTel -> Saving
   (defun org/enable-gptel-for-chatlog-buffer ()
@@ -1345,8 +1329,10 @@ If not set buffer-locally, starts with 'auto."
 	      (:command "/Users/jure/.emacs.d/emacs-mcp-stdio.sh"
 			:args ("--init-function=emacs-mcp-tool-start-server" "--stop-function=emacs-mcp-tool-stop-server")))
              ))
-  :config (require 'mcp-hub)
-  :hook (after-init . mcp-hub-start-all-server))
+  :config
+  (require 'mcp-hub)
+  (mcp-hub-start-all-server)
+  )
 
 ;;; -> AI configuration -> aidermacs
 
