@@ -351,10 +351,11 @@ between Emacs sessions.")
    (global-set-key (kbd "C-s-<tab>") #'ns-next-frame)
    (defvar yt-dlp-folder "~/Movies/Youtube"
      "Main directory for downloading videos using yt-dlp.")
-   ;; Registers ;;
+   ;; Macos Registers ;;
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
-   (set-register ?p `(file . ,(concat org-directory "/journals/Journelly.org")))
+   (set-register ?j `(file . ,(concat org-directory "/journals/Journelly.org")))
+   (set-register ?p `(file . ,(concat org-directory "/20250823160311-software.org")))
    )
   ;;; Android configuration
   ('android
@@ -363,7 +364,7 @@ between Emacs sessions.")
    (defvar yt-dlp-folder "~/Movies/Youtube"
      "Main directory for downloading videos using yt-dlp.")
    (defvar elfeed-db-directory "~/Documents/elfeed")
-   ;; Registers ;;
+   ;; Android Registers ;;
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
 
