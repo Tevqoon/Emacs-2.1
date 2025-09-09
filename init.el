@@ -1236,13 +1236,16 @@ exactly like the old ace-jump integration."
 
 
   ;;; -> GPTel -> Tool use  
-  ;; Tool results default to nil
+  ;; Don't include tool and reasoning blocks by default
+  (setq-default gptel-include-reasoning nil)
   (setq-default gptel-include-tool-results nil)
 
-  ;; Org mode shows tool results (since they're minified)
+  ;; Org mode shows them - since they're minified
   (defun my/gptel-enable-tool-results-in-org-mode ()
     "Enable tool results locally in org-mode."
-    (setq-local gptel-include-tool-results t))
+    (setq-local gptel-include-tool-results t)
+    (setq-local gptel-include-reasoning 'ignore)
+    )
   
   (defun my/gptel-toggle-tool-results-local ()
     "Toggle gptel tool results inclusion buffer-locally between 'auto and t.

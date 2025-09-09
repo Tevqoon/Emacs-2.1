@@ -34,31 +34,58 @@
                        nil nil #'equal)
                   backend))))
 
+;; (defun gptel-openai-response--process-output (output-item info)
+;;   ;; both streams output_item.done.item and the output-item in response are the same.
+;;   (pcase (plist-get output-item :type)
+;;     ("function_call"
+;;      (gptel--inject-prompt        ; First add the tool call to the prompts list
+;;       (plist-get info :backend)
+;;       (plist-get info :data)
+;;       (copy-sequence output-item)) ;; copying to avoid following changes effect output-item
+;;      (ignore-errors (plist-put output-item :args
+;;                                (gptel--json-read-string
+;;                                 (plist-get output-item :arguments))))
+;;      (plist-put output-item :arguments nil)
+;;      (plist-put info :tool-use
+;;                 (append
+;;                  (plist-get info :tool-use)
+;;                  (list output-item))))
+;;     ("reasoning"
+;;      (gptel--inject-prompt        ; responses expects the reasoning blocks
+;;       (plist-get info :backend) (plist-get info :data) output-item)
+;;      (plist-put info :reasoning
+;;                 (append
+;;                  (plist-get info :reasoning)
+;;                  (list (map-nested-elt output-item '(:summary :text))))))
+;;     (_ ;; TODO handle others
+;;      )))
+
 (defun gptel-openai-response--process-output (output-item info)
-  ;; both streams output_item.done.item and the output-item in response are the same.
   (pcase (plist-get output-item :type)
     ("function_call"
-     (gptel--inject-prompt        ; First add the tool call to the prompts list
-      (plist-get info :backend)
-      (plist-get info :data)
-      (copy-sequence output-item)) ;; copying to avoid following changes effect output-item
+     ;; keep existing behavior
+     (gptel--inject-prompt (plist-get info :backend) (plist-get info :data)
+                           (copy-sequence output-item))
      (ignore-errors (plist-put output-item :args
                                (gptel--json-read-string
                                 (plist-get output-item :arguments))))
      (plist-put output-item :arguments nil)
      (plist-put info :tool-use
-                (append
-                 (plist-get info :tool-use)
-                 (list output-item))))
+                (append (plist-get info :tool-use) (list output-item)))
+     ;; return a human-friendly textual record
+     (format "[Tool call: %s id=%s args=%s]"
+             (plist-get output-item :tool)
+             (plist-get output-item :call_id)
+             (or (plist-get output-item :args)
+                 (plist-get output-item :arguments))))
     ("reasoning"
-     (gptel--inject-prompt        ; responses expects the reasoning blocks
-      (plist-get info :backend) (plist-get info :data) output-item)
-     (plist-put info :reasoning
-                (append
-                 (plist-get info :reasoning)
-                 (list (map-nested-elt output-item '(:summary :text))))))
-    (_ ;; TODO handle others
-     )))
+     (gptel--inject-prompt (plist-get info :backend) (plist-get info :data) output-item)
+     (let ((summary (map-nested-elt output-item '(:summary :text))))
+       (plist-put info :reasoning
+                  (append (plist-get info :reasoning) (list summary)))
+       ;; return the reasoning text so it can be displayed
+       (format "[Reasoning]\n%s\n" summary)))
+    (_ nil)))
 
 (defun gptel-openai-response--process-annotation (annotation info)
   "Returns string that can be added to content or nil."
