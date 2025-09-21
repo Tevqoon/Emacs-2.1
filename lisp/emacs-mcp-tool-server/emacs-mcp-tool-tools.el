@@ -17,7 +17,7 @@
 ;;; CRITICAL: All MCP tools must preserve Emacs state completely.
 ;;; Tools should never affect:
 ;;; - Current buffer or point position
-;;; - Window configuration or selected window  
+;;; - Window configuration or selected window
 ;;; - Buffer restrictions (narrowing)
 ;;; - Mark, region, or selection state
 ;;; - Any global variables or settings
@@ -227,73 +227,23 @@ MCP Parameters: None"
    :description "Get comprehensive variable documentation including current values, customization options, and detailed descriptions. Essential for understanding Emacs configuration and state."
    :handler emacs-mcp-tool-helpful-variable-inspect))
 
-;; Code evaluation and system info
-(emacs-mcp-register-tool
- '(:id "eval_elisp"
-   :description "Safely evaluate Emacs Lisp code"
-   :handler emacs-mcp-tool-eval-elisp))
-
-(emacs-mcp-register-tool
- '(:id "get_emacs_version"
-   :description "Returns detailed Emacs version and configuration info"
-   :handler emacs-mcp-tool-get-version))
-
 ;; Live buffer interaction (context-specific - only for current editing session)
-(emacs-mcp-register-tool
- '(:id "get_buffer_list"
-   :description "CONTEXT-SPECIFIC: List currently open buffers with metadata. Only use when task specifically involves the user's current editing session, NOT for exploring Emacs functionality."
-   :handler emacs-mcp-tool-get-buffer-list))
-
-(emacs-mcp-register-tool
- '(:id "search_buffers"
-   :description "CONTEXT-SPECIFIC: Search text content in currently open buffers. Only use for finding content in the user's current work, NOT for exploring Emacs functionality or symbol definitions."
-   :handler emacs-mcp-tool-search-buffers))
-
-
-(emacs-mcp-register-tool
- '(:id "get_buffer_contents"
-       :description "Get contents and metadata of a specific buffer by name. Use this only if explicitly asked or if obviously relevant."
-       :handler emacs-mcp-tool-get-buffer-contents))
-
-;; System management
-(emacs-mcp-register-tool
- '(:id "hello_world"
-   :description "Returns a hello world message from Emacs"
-   :handler emacs-mcp-tool-hello-world))
-
-(emacs-mcp-register-tool
- '(:id "restart_server" 
-   :description "Restart the MCP server to reload configurations and apply changes"
-   :handler emacs-mcp-tool-restart-server-tool))
-
-;; Add these to your emacs-mcp-tool-tools.el file after the existing tool registrations
-
+;; These are better as resource (templates) but claude desktop does not yet support them.
 (emacs-mcp-register-tool
  '(:id "get_agenda_buffer"
    :description "Get the contents of the org-agenda buffer, opening it if necessary. Uses your custom agenda view (daily agenda with TODOs) if available."
    :handler emacs-mcp-tool-get-agenda-buffer))
 
-
 ;;; Built-in Resources
 
-;; TODO: Figure out a better way to use resources. Claude Code can't support templates yet, so not such a biggie, but still.
 (emacs-mcp-register-resource
- '(:uri "emacs://version"
-   :name "Emacs Version"
-   :title "Emacs Configuration and Version Information"
-   :description "Detailed Emacs version, build info, features, and configuration"
+ '(:uri "emacs://buffers"
+   :name "Buffer List"
+   :title "Buffer List"
+   :description "A list of all the open emacs buffers"
    :mimeType "text/plain"
-   :handler emacs-mcp-resource-version
-   :annotations (:audience ("assistant" "user") :priority 0.7)))
-
-(emacs-mcp-register-resource
- '(:uri "emacs://buffer/current"
-   :name "Current Buffer"
-   :title "Current Active Buffer Contents"
-   :description "Contents and metadata of the currently active Emacs buffer"
-   :mimeType "text/plain"
-   :handler emacs-mcp-resource-current-buffer
-   :annotations (:audience ("assistant") :priority 0.9)))
+   :handler emacs-mcp-resource-buffer-list
+   :annotations (:audience ("assistant") :priority 0.8)))
 
 (emacs-mcp-register-resource
  '(:uri "emacs://buffer/{name}"
@@ -305,7 +255,6 @@ MCP Parameters: None"
    :annotations (:audience ("assistant") :priority 0.8)))
 
 ;;; Development Helper
-
 (defun emacs-mcp-tool-reload-and-restart ()
   "Reload tool definitions and restart MCP server for development."
   (interactive)
@@ -317,33 +266,9 @@ MCP Parameters: None"
     (load-file tools-file))
   (emacs-mcp-tool-restart-server))
 
-;;; Tool Handlers
-
-(defun emacs-mcp-tool-hello-world ()
-  "Return hello world message."
-  "Hello World from Emacs MCP Agent Server!")
-
-(defun emacs-mcp-tool-get-version ()
-  "Return detailed Emacs version information."
-  (format "Emacs version: %s\nSystem: %s\nBuild time: %s\nFeatures: %s" 
-          emacs-version
-          system-configuration
-          emacs-build-time
-          (mapconcat #'symbol-name features " ")))
-
-(defun emacs-mcp-tool-eval-elisp (code)
-  "Evaluate Emacs Lisp CODE safely.
-
-MCP Parameters:
-  code - The Emacs Lisp code to evaluate"
-  (mcp-server-lib-with-error-handling
-    (condition-case err
-        (let ((result (eval (read code))))
-          (format "Result: %S" result))
-      (error (format "Error: %s" (error-message-string err))))))
-
-(defun emacs-mcp-tool-get-buffer-list ()
-  "Get list of open buffers with metadata."
+;;; Resource Handlers
+(defun emacs-mcp-resource-buffer-list ()
+  "Return list of open buffers with metadata as a resource handler."
   (let ((buffers (buffer-list)))
     (mapconcat
      (lambda (buf)
@@ -356,55 +281,6 @@ MCP Parameters:
                    "[no file]")
                  (if (buffer-modified-p) "[modified]" ""))))
      buffers "\n")))
-
-(defun emacs-mcp-tool-search-buffers (pattern)
-  "Search for PATTERN across open buffers.
-
-MCP Parameters:
-  pattern - The text pattern to search for"
-  (let ((results '()))
-    (dolist (buf (buffer-list))
-      (with-current-buffer buf
-        (save-excursion
-          (goto-char (point-min))
-          (while (search-forward pattern nil t)
-            (push (format "%s:%d: %s"
-                          (buffer-name)
-                          (line-number-at-pos)
-                          (string-trim (thing-at-point 'line)))
-                  results)))))
-    (if results
-        (mapconcat #'identity (reverse results) "\n")
-      (format "No matches found for '%s'" pattern))))
-
-(defun emacs-mcp-tool-restart-server-tool ()
-  "Restart the MCP server to reload configurations and apply changes.
-
-MCP Parameters: None"
-  (mcp-server-lib-with-error-handling
-    (emacs-mcp-tool-restart-server)
-    "MCP server restarted successfully"))
-
-;;; Resource Handlers
-
-(defun emacs-mcp-resource-version ()
-  "Return detailed Emacs version information."
-  (format "Emacs Version: %s\nSystem: %s\nBuild time: %s\nFeatures: %s\nLoad path: %s"
-          emacs-version
-          system-configuration
-          emacs-build-time
-          (mapconcat #'symbol-name features " ")
-          (mapconcat #'identity load-path "\n")))
-
-(defun emacs-mcp-resource-current-buffer ()
-  "Return current buffer contents and metadata."
-  (format "Buffer: %s\nMode: %s\nFile: %s\nSize: %d\nModified: %s\n\nContents:\n%s"
-          (buffer-name)
-          major-mode
-          (or buffer-file-name "No file")
-          (buffer-size)
-          (if (buffer-modified-p) "Yes" "No")
-          (buffer-string)))
 
 (defun emacs-mcp-resource-buffer-by-name (params)
   "Return buffer contents by name.
