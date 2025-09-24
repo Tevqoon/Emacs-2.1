@@ -1615,6 +1615,38 @@ Automatically expands the heading if it's folded."
     (org-previous-visible-heading 1)
     (my/org-narrow-to-heading-content))
 
+  ;;; -> Org mode -> Heading autosorting
+
+  ;; Inspired by
+  ;; https://christiantietze.de/posts/2025/04/keep-org-mode-items-sorted-alphabetically/
+  ;; https://edoput.it/2025/04/16/emacs-paradigm-shift.html
+
+  (defvar js/org-sort-priority-headings
+    '("Processing" "Web" "Elfeed" "Processed today" "Archived today")
+    "List of heading titles in priority order. Unlisted headings sort first.")
+
+  (defun js/org-priority-sort-key (priority-list)
+    "Return sort key for current heading based on PRIORITY-LIST."
+    (let* ((title (org-get-heading t t t t))
+           (position (cl-position title priority-list :test #'string=)))
+      (if position (+ 1000 position) 0)))
+
+  (defun js/org-sort-by-priority (&optional priority-list)
+    "Sort all top-level org entries with unlisted headings first, then PRIORITY-LIST order.
+PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
+    (interactive)
+    (let ((headings (or priority-list js/org-sort-priority-headings)))
+      (save-excursion
+	(save-restriction
+          (widen)
+          (goto-char (point-min))
+          (org-sort-entries 
+           nil ?f
+           (lambda () (js/org-priority-sort-key headings))
+           #'<)))))
+
+  (put 'js/org-sort-by-priority 'safe-local-eval-function t)
+
   )
 ;;; End of org-mode package block
 
