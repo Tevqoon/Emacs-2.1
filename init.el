@@ -1231,6 +1231,8 @@ exactly like the old ace-jump integration."
 	      anthropic/claude-sonnet-4))
 
   (require 'gptel-responses)
+  (setq gptel-openai-responses--tools (list '(:type "web_search_preview")))
+  
   (gptel-make-openai-responses "OAI Responses"
     :stream t
     :key 'gptel-api-key-from-auth-source
@@ -1488,6 +1490,7 @@ This function is expected to be hooked in org-mode."
           (org-link-make-string url title)
 	(org-link-make-string url))))  ; Just create a plain link if no title
 
+  ;; https://xenodium.com/emacs-dwim-do-what-i-mean/
   (defun ar/org-insert-link-dwim ()
     "Like `org-insert-link' but with personal dwim preferences."
     (interactive)
@@ -2932,6 +2935,7 @@ All other subheadings will be ignored."
   (org-enforce-todo-dependencies t)
   (org-agenda-window-setup 'current-window)
   (org-agenda-sticky t)
+  (org-priority-default ?C)
   
   :bind (("C-c a" . open-org-agenda)
 	 :map org-agenda-mode-map
@@ -3018,10 +3022,17 @@ All other subheadings will be ignored."
                      (org-agenda-skip-entry-if (quote scheduled) (quote deadline)
                                                (quote regexp) "\n]+>")))
 		  (org-agenda-overriding-header "* Unscheduled TODO entries: ")))
+		("p" "Process Items"
+		 ((todo "PROCESS" ((org-agenda-overriding-header "* Items to Process:")))))
+
+		
 		("d" "Daily agenda and all TODOs"
 		 ((tags "PRIORITY=\"A\""
 			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
-			 (org-agenda-overriding-header "* High-priority unfinished tasks:")))
+			 (org-agenda-overriding-header "* High-priority:")))
+		  (tags "PRIORITY=\"B\""
+			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
+			 (org-agenda-overriding-header "* Lower-priority:")))
 		  (todo "COURSE" ((org-agenda-overriding-header "* Active courses: ")))
 		  (todo "EXAM" ((org-agenda-overriding-header "* Looming exams: ")
 				(org-agenda-sorting-strategy '(deadline-up))))
@@ -3029,6 +3040,7 @@ All other subheadings will be ignored."
 				  (org-agenda-sorting-strategy '(deadline-up))))
 		  (todo "PROJECT" ((org-agenda-overriding-header "* Projects: ")))
 		  (todo "NEXT" ((org-agenda-skip-function '(or (air-org-skip-subtree-if-priority ?A)
+							       (air-org-skip-subtree-if-priority ?B)
 							       (air-org-skip-if-blocked)
 							       (air-org-skip-subtree-if-ancestor-is-hold)))
 				(org-agenda-overriding-header "* Up next: ")))
@@ -3040,6 +3052,7 @@ All other subheadings will be ignored."
 		  (alltodo "" ((org-agenda-skip-function
 				'(or (air-org-skip-subtree-if-habit)
 				     (air-org-skip-subtree-if-priority ?A)
+				     (air-org-skip-subtree-if-priority ?B)
                                      (air-org-skip-if-blocked)
 				     (org-agenda-skip-if nil '(scheduled deadline))
 				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM"))
@@ -3065,6 +3078,8 @@ All other subheadings will be ignored."
     (org-agenda-with-point-at-orig-entry nil
       (end-of-line)
       (call-interactively #'js/roamify-url-at-point)))
+
+  
 )
 
 ;;; End of org agenda package block
