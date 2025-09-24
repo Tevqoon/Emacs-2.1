@@ -1645,8 +1645,6 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
            (lambda () (js/org-priority-sort-key headings))
            #'<)))))
 
-  (put 'js/org-sort-by-priority 'safe-local-eval-function t)
-
   )
 ;;; End of org-mode package block
 
