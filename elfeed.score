@@ -1,17 +1,20 @@
 ;;; Elfeed score file                                     -*- lisp -*-
 ((version 10)
  ("title"
-  (:text "🔴\\|🚨🚨\\|ACTUALLY LIVE ASMR\\|livestream" :value -1000 :type r :comment "Livestreams")
-  (:text "#shorts\\|#fyp\\|#asmr" :value -1000 :type r :comment "Shorts")
-  (:text "OPEN THREAD" :value -1000 :type s))
+  (:text "🔴\\|🚨🚨\\|ACTUALLY LIVE ASMR\\|livestream\\|study with me live pomodoro" :value -1000 :type r :comment "Livestreams")
+  (:text "OPEN THREAD" :value -1000 :type s)
+  )
  ("content")
  ("title-or-content")
  ("tag"
   (:tags (t . (papers)) :value -500 :comment "Papers should be read by default."))
  ("authors")
  ("feed"
-  (:text "emacs-news – sacha chua" :value 350 :type S :attr t :comment "Essential!"))
- ("link")
+  (:text "emacs-news – sacha chua" :value 350 :type S :attr t :comment "Essential!")
+  )
+ ("link"
+  (:text "youtube\\.com/shorts/\\|/shorts/" :value -1000 :type r :comment "Shorts URLs")
+  )
  ("udf")
  (mark -300)
  ("adjust-tags"

@@ -56,7 +56,7 @@
   (cursor-type 'bar)
   (echo-keystrokes .01)
   (confirm-kill-emacs #'y-or-n-p)
-  (make-backup-files nil)
+  ;; (make-backup-files nil)
   (global-auto-revert-non-file-buffers t)
   (delete-by-moving-to-trash t)
   (sentence-end-double-space nil)
@@ -87,6 +87,15 @@
   (set-terminal-coding-system 'utf-8)
   (set-keyboard-coding-system 'utf-8)
 
+  ;; Backups
+  ;; (setq backup-directory-alist '(("\\.env$" . nil)
+  ;; 				 ;; ("." . "~/.config/emacs/backups")))
+  (with-eval-after-load 'tramp
+    (setq tramp-backup-directory-alist nil))
+  (setq delete-old-versions -1)
+  (setq version-control t)
+  (setq auto-save-file-name-transforms '((".*" "~/.config/emacs/auto-save-list/" t)))
+
   (define-advice keyboard-quit
       (:around (quit) quit-current-context)
     "Quit the current context.
@@ -114,6 +123,14 @@ are defining or executing a macro."
   (add-hook 'after-init-hook 'benchmark-init/deactivate))
 
 (use-package emacs-everywhere)
+
+(use-package backup-walker
+  :vc (:url "https://github.com/lewang/backup-walker")
+  :commands backup-walker-start
+  :init
+  (defalias 'string-to-int 'string-to-number)  ; removed in 26.1
+  (defalias 'display-buffer-other-window 'display-buffer))
+
 
 ;;; -> Initialization -> Browser Integration
 
@@ -1750,7 +1767,7 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
 	(org-todo "DONE"))))
   )
 
-;;; -> Org mode -> Org roam
+;;; -> Org mode -> Org-roam
 
 (use-package org-roam
   :functions
@@ -1769,6 +1786,7 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
 	 ("C-c n o" . open-urls-at-point-or-region)
 	 ("C-c n r" . js/roamify-url-at-point)
 	 ("C-c n t" . org-roam-tag-add)
+	 ("C-c n s" . org-roam-db-sync)
 
          :map org-mode-map
          ("C-M-i" . completion-at-point)

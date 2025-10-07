@@ -3,24 +3,24 @@
 	  #s(hash-table test equal data
 			(#s(elfeed-score-adjust-tags-rule
 			    (nil . -1000) (t trash) nil)
-			   #s(elfeed-score-rule-stats 944
-						      1754207815.02352)
+			   #s(elfeed-score-rule-stats 2038
+						      1759869115.971605)
 			   #s(elfeed-score-title-rule "OPEN THREAD"
 						      -1000 s nil nil
 						      nil)
-			   #s(elfeed-score-rule-stats 159
-						      1753944996.037308)
-			   #s(elfeed-score-title-rule
-			      "🔴\\|🚨🚨\\|ACTUALLY LIVE ASMR\\|livestream"
-			      -1000 r nil nil "Livestreams")
-			   #s(elfeed-score-rule-stats 805
-						      1754207815.023505)
+			   #s(elfeed-score-rule-stats 177
+						      1759752348.573366)
 			   #s(elfeed-score-tag-rule (t papers) -500
 						    "Papers should be read by default.")
-			   #s(elfeed-score-rule-stats 5387
-						      1754028541.291086)
+			   #s(elfeed-score-rule-stats 24661
+						      1759815117.571233)
+			   #s(elfeed-score-link-rule
+			      "youtube\\.com/shorts/\\|/shorts/" -1000
+			      r nil nil "Shorts URLs")
+			   #s(elfeed-score-rule-stats 1066
+						      1759854286.113212)
 			   #s(elfeed-score-title-rule
-			      "#shorts\\|#fyp\\|#asmr" -1000 r nil nil
-			      "Shorts")
-			   #s(elfeed-score-rule-stats 102
-						      1754207814.596578))))
+			      "🔴\\|🚨🚨\\|ACTUALLY LIVE ASMR\\|livestream\\|study with me live pomodoro"
+			      -1000 r nil nil "Livestreams")
+			   #s(elfeed-score-rule-stats 58
+						      1759869115.971587))))

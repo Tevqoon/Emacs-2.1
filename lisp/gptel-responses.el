@@ -34,58 +34,31 @@
                        nil nil #'equal)
                   backend))))
 
-;; (defun gptel-openai-response--process-output (output-item info)
-;;   ;; both streams output_item.done.item and the output-item in response are the same.
-;;   (pcase (plist-get output-item :type)
-;;     ("function_call"
-;;      (gptel--inject-prompt        ; First add the tool call to the prompts list
-;;       (plist-get info :backend)
-;;       (plist-get info :data)
-;;       (copy-sequence output-item)) ;; copying to avoid following changes effect output-item
-;;      (ignore-errors (plist-put output-item :args
-;;                                (gptel--json-read-string
-;;                                 (plist-get output-item :arguments))))
-;;      (plist-put output-item :arguments nil)
-;;      (plist-put info :tool-use
-;;                 (append
-;;                  (plist-get info :tool-use)
-;;                  (list output-item))))
-;;     ("reasoning"
-;;      (gptel--inject-prompt        ; responses expects the reasoning blocks
-;;       (plist-get info :backend) (plist-get info :data) output-item)
-;;      (plist-put info :reasoning
-;;                 (append
-;;                  (plist-get info :reasoning)
-;;                  (list (map-nested-elt output-item '(:summary :text))))))
-;;     (_ ;; TODO handle others
-;;      )))
-
 (defun gptel-openai-response--process-output (output-item info)
+  ;; both streams output_item.done.item and the output-item in response are the same.
   (pcase (plist-get output-item :type)
     ("function_call"
-     ;; keep existing behavior
-     (gptel--inject-prompt (plist-get info :backend) (plist-get info :data)
-                           (copy-sequence output-item))
+     (gptel--inject-prompt        ; First add the tool call to the prompts list
+      (plist-get info :backend)
+      (plist-get info :data)
+      (copy-sequence output-item)) ;; copying to avoid following changes effect output-item
      (ignore-errors (plist-put output-item :args
                                (gptel--json-read-string
                                 (plist-get output-item :arguments))))
      (plist-put output-item :arguments nil)
      (plist-put info :tool-use
-                (append (plist-get info :tool-use) (list output-item)))
-     ;; return a human-friendly textual record
-     (format "[Tool call: %s id=%s args=%s]"
-             (plist-get output-item :tool)
-             (plist-get output-item :call_id)
-             (or (plist-get output-item :args)
-                 (plist-get output-item :arguments))))
+                (append
+                 (plist-get info :tool-use)
+                 (list output-item))))
     ("reasoning"
-     (gptel--inject-prompt (plist-get info :backend) (plist-get info :data) output-item)
-     (let ((summary (map-nested-elt output-item '(:summary :text))))
-       (plist-put info :reasoning
-                  (append (plist-get info :reasoning) (list summary)))
-       ;; return the reasoning text so it can be displayed
-       (format "[Reasoning]\n%s\n" summary)))
-    (_ nil)))
+     (gptel--inject-prompt        ; responses expects the reasoning blocks
+      (plist-get info :backend) (plist-get info :data) output-item)
+     (plist-put info :reasoning
+                (append
+                 (plist-get info :reasoning)
+                 (list (map-nested-elt output-item '(:summary :text))))))
+    (_ ;; TODO handle others
+     )))
 
 (defun gptel-openai-response--process-annotation (annotation info)
   "Returns string that can be added to content or nil."
@@ -183,76 +156,5 @@ Mutate state INFO with response metadata."
       :call_id (plist-get tool-call :call_id)
       :output (plist-get tool-call :result)))
    tool-use))
-
-;; (defclass my/add-to-list-switch (transient-variable)
-;;   ((target-value :initarg :target-value)
-;;    (target-list  :initarg :target-list)
-;;    (format       :initarg :format      :initform " %k %d")
-;;    ))
-
-;; (cl-defmethod transient-infix-read ((obj my/add-to-list-switch))
-;;   ;;Do nothing
-;;   )
-
-;; (cl-defmethod transient-infix-set ((obj my/add-to-list-switch) _)
-;;   (if (member (oref obj target-value) (symbol-value (oref obj target-list)))
-;;       (set (oref obj target-list)
-;;            (delete (oref obj target-value) (symbol-value (oref obj target-list))))
-;;     (set (oref obj target-list)
-;;          (append (symbol-value (oref obj target-list))
-;;                  (list (oref obj target-value)))))
-;;   (transient-setup))
-
-;; (cl-defmethod transient-format-description ((obj my/add-to-list-switch))
-;;   (propertize (transient--get-description obj) 'face
-;;               (if (member (oref obj target-value) (symbol-value (oref obj target-list)))
-;;                   'transient-value
-;;                 'transient-inactive-value)))
-
-(defvar gptel-openai-responses--tools (list '(:type "web_search_preview")))
-
-;; (transient-define-prefix gptel-openai-response-built-in-tools ()
-;;   [["Built in tools"
-;;     ("wl" "web search (low context)" ""
-;;      :class my/add-to-list-switch
-;;      :target-value (:type "web_search_preview" :search-context-size "low")
-;;      :target-list gptel-openai-responses--tools)
-;;     ("wm" "web search (medium context)" ""
-;;      :class my/add-to-list-switch
-;;      :target-value (:type "web_search_preview" :search-context-size "medium")
-;;      :target-list gptel-openai-responses--tools)
-;;     ("wh" "web search (high context)" ""
-;;      :class my/add-to-list-switch
-;;      :target-value (:type "web_search_preview" :search-context-size "high")
-;;      :target-list gptel-openai-responses--tools)
-;;     ;; ("fo" "File search (org)" ""
-;;     ;;  :class my/add-to-list-switch
-;;     ;;  :target-value (:type "file_search"
-;;     ;;                       :vector_store_ids ["vs_XXXXX"] ;; vector store id from dasboard
-;;     ;;  :target-list gptel-openai-responses--tools))
-;;     ""
-;;     ("DEL" "Remove all" (lambda ()
-;;                           (interactive)
-;;                           (setq gptel-openai-responses--tools nil)
-;;                           (transient-setup))
-;;      :transient t
-;;      :if (lambda () gptel-openai-responses--tools))
-;;     ("RET" "Done" transient-quit-one)
-;;     ]])
-
-;; (transient-append-suffix 'gptel-menu '(0 -1)
-;;   [:if (lambda () (gptel-openai-responses-p gptel-backend))
-;;    ""
-;;    (:info
-;;     (lambda ()
-;;       (concat
-;;        "Built-in tools"
-;;        (and gptel-openai-responses--tools
-;;             (concat " (" (propertize (format "%d"
-;;                                              (length gptel-openai-responses--tools))
-;;                                      'face 'warning)
-;;                     ")"))))
-;;     :format "%d" :face transient-heading)
-;;    (gptel-openai-response-built-in-tools :key "T" :description "Select")])
 
 (provide 'gptel-responses)
