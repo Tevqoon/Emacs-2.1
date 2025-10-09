@@ -1269,7 +1269,7 @@ exactly like the old ace-jump integration."
     (when (and (buffer-file-name)
                (member "chatlog" (vulpea-buffer-tags-get)))
       (gptel-mode 1)))
-  
+
   (defun org/save-gptel-chat-as-node ()
     "Save the current gptel chat buffer as an org-roam node and link it in today's journal."
     (interactive)
@@ -1281,24 +1281,24 @@ exactly like the old ace-jump integration."
       
       (if existing-id
           (save-buffer)
-        
-        (unless (file-directory-p chatlog-dir)
+	
+	(unless (file-directory-p chatlog-dir)
           (make-directory chatlog-dir t))
-        
-        (write-file full-path)
-        
-        (goto-char (point-min))
-        (org-id-get-create)
-        (unless (save-excursion (re-search-forward "^#\\+title:" nil t))
+	
+	(write-file full-path)
+	
+	(goto-char (point-min))
+	(org-id-get-create)
+	(unless (save-excursion (re-search-forward "^#\\+title:" nil t))
           (goto-char (point-min))
-          (re-search-forward "^:END:$")
-          (forward-line 1)
-          (insert (format "#+title: %s\n" title)))
-        
-        (save-buffer)
-        (org-roam-db-sync)
-        
-        (let* ((node-id (org-id-get))
+          (when (re-search-forward "^:END:$" nil t)
+            (forward-line 1)
+            (insert (format "#+title: %s\n" title))))
+	
+	(save-buffer)
+	(org-roam-db-sync)
+	
+	(let* ((node-id (org-id-get))
                (link (org-roam-link-make-string node-id title)))
           (org-roam-dailies-autocapture-today "c" link)
           (message "Chat saved as '%s' and linked in today's journal." title)))))
@@ -3936,7 +3936,7 @@ This is attached directly to database modification functions."
          ;; ("r" . my/elfeed-force-reload)
          ("?" . my/elfeed-sync-status)
          ("D" . my/elfeed-toggle-debug)
-  )
+	 )
   )
 
 (use-package cuckoo-search
@@ -4894,4 +4894,3 @@ If more than 100 hours remain, shows days + hours instead."
 ;;;
 ;;; End of configuration file.
 ;;; init.el ends here
-
