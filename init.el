@@ -94,7 +94,7 @@
     (setq tramp-backup-directory-alist nil))
   (setq delete-old-versions -1)
   (setq version-control t)
-  (setq auto-save-file-name-transforms '((".*" "~/.config/emacs/auto-save-list/" t)))
+  (setq auto-save-file-name-transforms '((".*" "~/.emacs.d/auto-save-list/" t)))
 
   (define-advice keyboard-quit
       (:around (quit) quit-current-context)
