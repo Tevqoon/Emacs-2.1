@@ -4073,8 +4073,28 @@ If a key is provided, use it instead of the default capture template."
   (defvar yt-dlp-priority-tags '(asmr chess osrs gaming essays)
     "List of tags to prioritize when determining download subfolder.
      The first matching tag in this list determines the subfolder.")
-  
-  (defun open-youtube-in-iina ()
+
+  ;; Old version with combined streaming downloaded behavior
+  ;; (defun open-youtube-in-iina ()
+  ;;   "Create a playlist with selected elfeed entries and open it in IINA."
+  ;;   (interactive)
+  ;;   (let* ((entries (elfeed-search-selected))
+  ;;          (iina-command "open -a IINA")
+  ;;          (playlist-file (make-temp-file "emacs-iina-playlist" nil ".m3u8")))
+  ;;     (with-temp-file playlist-file
+  ;; 	(dolist (entry entries)
+  ;;         (if (member 'downloaded (elfeed-entry-tags entry))
+  ;;             (let* ((relative-filename (elfeed-meta entry :filename))
+  ;;                    (filename (expand-file-name relative-filename yt-dlp-folder)))
+  ;; 		(if (and filename (file-exists-p filename))
+  ;;                   (insert filename)
+  ;;                 (insert (elfeed-entry-link entry))
+  ;;                 (elfeed-untag entry 'downloaded))
+  ;; 		(insert "\n")))))
+  ;;     (start-process-shell-command "iina" nil (concat iina-command " \"" playlist-file "\""))
+  ;;     (message "Opening YouTube playlist in IINA...")))
+
+  (defun open-youtube-in-iina (&optional _arg)
     "Create a playlist with selected elfeed entries and open it in IINA."
     (interactive)
     (let* ((entries (elfeed-search-selected))
@@ -4082,14 +4102,8 @@ If a key is provided, use it instead of the default capture template."
            (playlist-file (make-temp-file "emacs-iina-playlist" nil ".m3u8")))
       (with-temp-file playlist-file
 	(dolist (entry entries)
-          (if (member 'downloaded (elfeed-entry-tags entry))
-              (let* ((relative-filename (elfeed-meta entry :filename))
-                     (filename (expand-file-name relative-filename yt-dlp-folder)))
-		(if (and filename (file-exists-p filename))
-                    (insert filename)
-                  (insert (elfeed-entry-link entry))
-                  (elfeed-untag entry 'downloaded))
-		(insert "\n")))))
+          (insert (elfeed-entry-link entry))
+          (insert "\n")))
       (start-process-shell-command "iina" nil (concat iina-command " \"" playlist-file "\""))
       (message "Opening YouTube playlist in IINA...")))
 
