@@ -2604,6 +2604,7 @@ Each function is called with two arguments: the tag and the buffer.")
 ;;; -> Org mode -> Anki
 
 (use-package anki-editor
+  :if (eq system-type 'android)
   :bind
   (:map org-mode-map
 	("C-c n p" . my/anki-flashcard-push-current-buffer)
