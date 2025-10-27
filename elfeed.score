@@ -1,7 +1,7 @@
 ;;; Elfeed score file                                     -*- lisp -*-
 ((version 10)
  ("title"
-  (:text "🔴\\|🚨🚨\\|ACTUALLY LIVE ASMR\\|livestream\\|study with me live pomodoro" :value -1000 :type r :comment "Livestreams")
+  (:text "🔴\\|🚨🚨\\|ACTUALLY LIVE ASMR\\|livestream\\|study with me live pomodoro\\|!whatsthis" :value -1000 :type r :comment "Livestreams")
   (:text "OPEN THREAD" :value -1000 :type s)
   )
  ("content")

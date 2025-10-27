@@ -125,9 +125,11 @@
 	ivy-wgrep-change-to-wgrep-mode
 	kill-region
 	lsp-ui-doc--handle-mouse-movement
+	mark-whole-buffer
 	mouse-drag-mode-line
 	mouse-set-region
 	ns-copy-including-secondary
+	org-open-at-mouse
 	org-save-all-org-buffers
 	pixel-scroll-precision
 	swiper

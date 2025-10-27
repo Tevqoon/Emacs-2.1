@@ -56,7 +56,6 @@
   (cursor-type 'bar)
   (echo-keystrokes .01)
   (confirm-kill-emacs #'y-or-n-p)
-  ;; (make-backup-files nil)
   (global-auto-revert-non-file-buffers t)
   (delete-by-moving-to-trash t)
   (sentence-end-double-space nil)
@@ -87,15 +86,6 @@
   (set-terminal-coding-system 'utf-8)
   (set-keyboard-coding-system 'utf-8)
 
-  ;; Backups
-  ;; (setq backup-directory-alist '(("\\.env$" . nil)
-  ;; 				 ;; ("." . "~/.config/emacs/backups")))
-  (with-eval-after-load 'tramp
-    (setq tramp-backup-directory-alist nil))
-  (setq delete-old-versions -1)
-  (setq version-control t)
-  (setq auto-save-file-name-transforms '((".*" "~/.emacs.d/auto-save-list/" t)))
-
   (define-advice keyboard-quit
       (:around (quit) quit-current-context)
     "Quit the current context.
@@ -116,6 +106,41 @@ are defining or executing a macro."
   (server-start)
 
   )
+
+(use-package files
+  :ensure nil
+  :custom
+  ;; Backup settings
+  (make-backup-files t)
+  (backup-inhibited nil)
+  (vc-make-backup-files t) ; Even for files in git!
+  (backup-by-copying t)
+  (version-control t)
+  (delete-old-versions -1)
+  (kept-new-versions 20)
+  (kept-old-versions 10)
+  (backup-directory-alist
+   `((".*" . ,(expand-file-name "backups/" user-emacs-directory))))
+  
+  ;; Auto-save settings
+  (auto-save-default t)
+  (auto-save-interval 50)           ; Every 50 keystrokes
+  (auto-save-timeout 10)            ; Every 10 seconds
+  (auto-save-file-name-transforms
+   `((".*" ,(expand-file-name "auto-saves/" user-emacs-directory) t)))
+  
+  ;; Create the directories if they don't exist
+  :config
+  (make-directory (expand-file-name "backups/" user-emacs-directory) t)
+  (make-directory (expand-file-name "auto-saves/" user-emacs-directory) t)
+
+  (setq-default backup-inhibited nil)
+
+  ;; Auto-save visited files
+  (auto-save-visited-mode 1)
+  (setq auto-save-visited-interval 30)  ; Save every 30 seconds
+  )
+
 
 (use-package benchmark-init
   :config
@@ -460,9 +485,9 @@ between Emacs sessions.")
 ;; ===================================
 
 (pcase system-type
-;; ===================================
-;; macOS Configuration
-;; ===================================
+  ;; ===================================
+  ;; macOS Configuration
+  ;; ===================================
   ('darwin
    ;; Define fallback fonts for macOS
    (defvar fallback-font-families
@@ -553,37 +578,37 @@ between Emacs sessions.")
    (dolist (font fallback-font-families)
      (set-fontset-font t nil (font-spec :family (car font)) nil 'append))
 
-  (custom-set-faces
-   `(fixed-pitch ((t (:family ,fixed-pitch-font))))
-   '(org-block ((t (:inherit fixed-pitch))))
-   '(org-code ((t (:inherit (shadow fixed-pitch)))))
-   '(org-document-info ((t (:foreground "dark orange"))))
-   '(org-document-info-keyword ((t (:inherit (shadow fixed-pitch)))))
-   `(org-document-title ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.5 :underline nil))))
-   '(org-indent ((t (:inherit (org-hide fixed-pitch)))))
-   `(org-level-1 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.5))))
-   `(org-level-2 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.25))))
-   `(org-level-3 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.1))))
-   `(org-level-4 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.1))))
-   `(org-level-5 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
-   `(org-level-6 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
-   `(org-level-7 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
-   `(org-level-8 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
-   '(org-link ((t (:foreground "royal blue" :underline t))))
-   '(org-meta-line ((t (:inherit (font-lock-comment-face fixed-pitch)))))
-   '(org-property-value ((t (:inherit fixed-pitch))))
-   '(org-special-keyword ((t (:inherit (font-lock-comment-face fixed-pitch)))))
-   '(org-table ((t (:inherit fixed-pitch :foreground "#83a598"))))
-   '(org-tag ((t (:inherit (shadow fixed-pitch) :weight bold :height 0.8))))
-   '(org-verbatim ((t (:inherit (shadow fixed-pitch)))))
-   `(variable-pitch ((t (:family ,variable-pitch-font)))))
+   (custom-set-faces
+    `(fixed-pitch ((t (:family ,fixed-pitch-font))))
+    '(org-block ((t (:inherit fixed-pitch))))
+    '(org-code ((t (:inherit (shadow fixed-pitch)))))
+    '(org-document-info ((t (:foreground "dark orange"))))
+    '(org-document-info-keyword ((t (:inherit (shadow fixed-pitch)))))
+    `(org-document-title ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.5 :underline nil))))
+    '(org-indent ((t (:inherit (org-hide fixed-pitch)))))
+    `(org-level-1 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.5))))
+    `(org-level-2 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.25))))
+    `(org-level-3 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.1))))
+    `(org-level-4 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.1))))
+    `(org-level-5 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
+    `(org-level-6 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
+    `(org-level-7 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
+    `(org-level-8 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
+    '(org-link ((t (:foreground "royal blue" :underline t))))
+    '(org-meta-line ((t (:inherit (font-lock-comment-face fixed-pitch)))))
+    '(org-property-value ((t (:inherit fixed-pitch))))
+    '(org-special-keyword ((t (:inherit (font-lock-comment-face fixed-pitch)))))
+    '(org-table ((t (:inherit fixed-pitch :foreground "#83a598"))))
+    '(org-tag ((t (:inherit (shadow fixed-pitch) :weight bold :height 0.8))))
+    '(org-verbatim ((t (:inherit (shadow fixed-pitch)))))
+    `(variable-pitch ((t (:family ,variable-pitch-font)))))
 
-  ;; Android-specific mixed-pitch setup
-  (use-package mixed-pitch
-    :init
-    (set-face-attribute 'default nil :family fixed-pitch-font)
-    (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
-    :hook text-mode))
+   ;; Android-specific mixed-pitch setup
+   (use-package mixed-pitch
+     :init
+     (set-face-attribute 'default nil :family fixed-pitch-font)
+     (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
+     :hook text-mode))
 
   ;; ===================================
   ;; Linux Font Configuration
@@ -602,39 +627,39 @@ between Emacs sessions.")
    (dolist (font fallback-font-families)
      (set-fontset-font t nil (font-spec :family (car font)) nil 'append))
 
-  (custom-set-faces
-   `(fixed-pitch ((t (:family ,fixed-pitch-font))))
-   '(org-block ((t (:inherit fixed-pitch))))
-   '(org-code ((t (:inherit (shadow fixed-pitch)))))
-   '(org-document-info ((t (:foreground "dark orange"))))
-   '(org-document-info-keyword ((t (:inherit (shadow fixed-pitch)))))
-   `(org-document-title ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.5 :underline nil))))
-   '(org-indent ((t (:inherit (org-hide fixed-pitch)))))
-   `(org-level-1 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.5))))
-   `(org-level-2 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.25))))
-   `(org-level-3 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.1))))
-   `(org-level-4 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.1))))
-   `(org-level-5 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
-   `(org-level-6 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
-   `(org-level-7 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
-   `(org-level-8 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
-   '(org-link ((t (:foreground "royal blue" :underline t))))
-   '(org-meta-line ((t (:inherit (font-lock-comment-face fixed-pitch)))))
-   '(org-property-value ((t (:inherit fixed-pitch))))
-   '(org-special-keyword ((t (:inherit (font-lock-comment-face fixed-pitch)))))
-   '(org-table ((t (:inherit fixed-pitch :foreground "#83a598"))))
-   '(org-tag ((t (:inherit (shadow fixed-pitch) :weight bold :height 0.8))))
-   '(org-verbatim ((t (:inherit (shadow fixed-pitch)))))
-   `(variable-pitch ((t (:family ,variable-pitch-font)))))
+   (custom-set-faces
+    `(fixed-pitch ((t (:family ,fixed-pitch-font))))
+    '(org-block ((t (:inherit fixed-pitch))))
+    '(org-code ((t (:inherit (shadow fixed-pitch)))))
+    '(org-document-info ((t (:foreground "dark orange"))))
+    '(org-document-info-keyword ((t (:inherit (shadow fixed-pitch)))))
+    `(org-document-title ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.5 :underline nil))))
+    '(org-indent ((t (:inherit (org-hide fixed-pitch)))))
+    `(org-level-1 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.5))))
+    `(org-level-2 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.25))))
+    `(org-level-3 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.1))))
+    `(org-level-4 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.1))))
+    `(org-level-5 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
+    `(org-level-6 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
+    `(org-level-7 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
+    `(org-level-8 ((t (:inherit default :weight bold :foreground "#556b72" :font ,org-heading-font :height 1.0))))
+    '(org-link ((t (:foreground "royal blue" :underline t))))
+    '(org-meta-line ((t (:inherit (font-lock-comment-face fixed-pitch)))))
+    '(org-property-value ((t (:inherit fixed-pitch))))
+    '(org-special-keyword ((t (:inherit (font-lock-comment-face fixed-pitch)))))
+    '(org-table ((t (:inherit fixed-pitch :foreground "#83a598"))))
+    '(org-tag ((t (:inherit (shadow fixed-pitch) :weight bold :height 0.8))))
+    '(org-verbatim ((t (:inherit (shadow fixed-pitch)))))
+    `(variable-pitch ((t (:family ,variable-pitch-font)))))
 
-  ;; Linux-specific mixed-pitch setup
-  (use-package mixed-pitch
-    :init
-    (set-face-attribute 'default nil :family fixed-pitch-font)
-    (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
-    :hook text-mode
-    )
-  (set-face-attribute 'default nil :height 165))
+   ;; Linux-specific mixed-pitch setup
+   (use-package mixed-pitch
+     :init
+     (set-face-attribute 'default nil :family fixed-pitch-font)
+     (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
+     :hook text-mode
+     )
+   (set-face-attribute 'default nil :height 165))
 
   )
 
@@ -759,7 +784,7 @@ between Emacs sessions.")
   :defines
   deadgrep-mode-map
   org-roam-dailie
-s-directory
+  s-directory
   deadgrep-project-root-function
   org-roam-directory
   :functions
@@ -1031,7 +1056,7 @@ exactly like the old ace-jump integration."
     '(0 2 0)
     '("h" "Multiple-cursors" ar/mc-mark-all-symbol-overlays))
   
-;; Adapted from https://lmno.lol/alvaro/its-all-up-for-grabs-and-it-compounds
+  ;; Adapted from https://lmno.lol/alvaro/its-all-up-for-grabs-and-it-compounds
   (defun ar/mc-mark-all-symbol-overlays ()
     "Mark all symbol overlays using multiple cursors."
     (interactive)
@@ -1231,7 +1256,7 @@ exactly like the old ace-jump integration."
   (org-mode . org/enable-gptel-for-chatlog-buffer)
   :custom
   (gptel-default-mode 'org-mode)
-    
+  
   :config   
   (setq gptel-model 'gpt-5-mini)
   (require 'gptel-org)
@@ -1324,17 +1349,17 @@ exactly like the old ace-jump integration."
 
 ;; Synchronous tool server for direct MCP tool calls
 (use-package emacs-mcp-tool-server
-    :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
-    :ensure mcp-server-lib
-    :bind
-    (("C-c g t i" . emacs-mcp-tool-install-stdio-script)
-     ("C-c g t s" . emacs-mcp-tool-start-server)
-     ("C-c g t k" . emacs-mcp-tool-stop-server)
-     ("C-c g t r" . emacs-mcp-tool-restart-server)
-     ("C-c g t ?" . emacs-mcp-tool-server-status))
-    :config
-    (require 'emacs-mcp-tool-server)
-    )
+  :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
+  :ensure mcp-server-lib
+  :bind
+  (("C-c g t i" . emacs-mcp-tool-install-stdio-script)
+   ("C-c g t s" . emacs-mcp-tool-start-server)
+   ("C-c g t k" . emacs-mcp-tool-stop-server)
+   ("C-c g t r" . emacs-mcp-tool-restart-server)
+   ("C-c g t ?" . emacs-mcp-tool-server-status))
+  :config
+  (require 'emacs-mcp-tool-server)
+  )
 
 (use-package mcp
   :ensure t
@@ -1375,10 +1400,10 @@ exactly like the old ace-jump integration."
 ;;; End of aidermacs package block
 ;;; End of AI configuration block
 
-;;; --> Org mode
+;;; --> Org-mode
 
 (defvar-local js/org-rename-buffer-enabled nil
-    "Buffer-local variable to enable/disable tag updating.")
+  "Buffer-local variable to enable/disable tag updating.")
 
 (use-package org
   :functions
@@ -1424,6 +1449,12 @@ exactly like the old ace-jump integration."
      ("c" "Capture" entry (file ,org-default-notes-file)
       ("* %?\n" :empty-lines 1))
      ))
+
+  ;; Org-refile customization
+  (org-refile-use-outline-path t)
+  ;; (org-refile-allow-creating-parent-nodes ')
+  (org-refile-targets '((nil :maxlevel . 5)))
+  (org-outline-path-complete-in-steps nil)
 
   :hook
   (org-mode . js/org-rename-buffer-to-title-enable)
@@ -1497,7 +1528,7 @@ This function is expected to be hooked in org-mode."
             (if author
 		(format "%s - %s" title author)
               title)))))
-    
+     
      (t nil)))  ; Return nil for unrecognized URL types
 
   (defun js/format-link (url)
@@ -1717,7 +1748,7 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
      ("convert -density %D -trim -antialias %f -quality 100 %O")))
 
   (plist-put org-format-latex-options :scale 1.6)
-)
+  )
 
 (use-package org-appear
   :hook org-mode)
@@ -1759,7 +1790,7 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
 	  ((equal org-last-state "PROCESS")
 	   (js/org-log-processed-today))))
 
-   ;; Automatically complete the parent with a statistics cookie when all children are complete
+  ;; Automatically complete the parent with a statistics cookie when all children are complete
   (defun org-summary-todo (_n-done n-not-done)
     "Switch entry to DONE when all subentries are done"
     (let (org-log-done org-todo-log-states) ; turn off logging
@@ -1882,7 +1913,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
      'append))
 
   (add-hook 'org-mode-hook #'js/setup-specific-keyword-link-fontification)
- 
+  
   ;; Folded backlink buffer
   (add-to-list 'magit-section-initial-visibility-alist (cons 'org-roam-node-section 'hide))
 
@@ -1894,11 +1925,11 @@ only processes keywords listed in `js/org-keywords-with-links'."
     "Variable to pass content to capture templates.")
   
   (setq org-roam-capture-templates
-      '(("d" "default" plain
-         "%?"
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+startup: content")
-         :unnarrowed t)
-        ))
+	'(("d" "default" plain
+           "%?"
+           :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+startup: content")
+           :unnarrowed t)
+          ))
 
   (defvar org-roam-autocapture-templates
     '(("r" "reference" plain "%?"
@@ -1917,15 +1948,15 @@ only processes keywords listed in `js/org-keywords-with-links'."
     (interactive)
     "A function to automatically capture content into a daily template."
     (let (;(org-roam-directory (expand-file-name org-roam-dailies-directory org-roam-directory))
-	  ;(org-roam-dailies-directory "./")
-	  ;(org-roam-capture-content contents)
+					;(org-roam-dailies-directory "./")
+					;(org-roam-capture-content contents)
 	  )
       (org-roam-capture- :keys "t"
 			 :node (org-roam-node-create)
 			 :templates '(("t" "task" entry "** TODO %?"
 				       :target (node "C6C9881B-7EF4-4DAF-A502-84D396372A68")
 				       :unnarrowed nil))
-			 ;:props (list :override-default-time (current-time))
+					;:props (list :override-default-time (current-time))
 			 )
       ))
 
@@ -2085,7 +2116,7 @@ For emacsclient:
 	;; Apply each requested target
 	(dolist (target targets)
           (when-let* ((handler-fn (cdr (assq target js/url-targets)))
-                       (result (funcall handler-fn url-source)))
+                      (result (funcall handler-fn url-source)))
             (push result results)))
 	
 	;; Alert based on actions taken
@@ -2125,12 +2156,12 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 	(`(link ,_)
 	 ;; Check if ref already exists first - this takes precedence
 	 (if-let ((existing-ref-node (org-roam-node-from-ref url)))
-           ;; Ref already exists - just replace link, no capture
-           (let ((existing-id (org-roam-node-id existing-ref-node))
-                 (existing-title (org-roam-node-title existing-ref-node)))
-             (delete-region beg end)
-             (insert (org-roam-link-make-string existing-id working-title))
-             (message "Using existing node with this ref: %s" existing-title))
+             ;; Ref already exists - just replace link, no capture
+             (let ((existing-id (org-roam-node-id existing-ref-node))
+                   (existing-title (org-roam-node-title existing-ref-node)))
+               (delete-region beg end)
+               (insert (org-roam-link-make-string existing-id working-title))
+               (message "Using existing node with this ref: %s" existing-title))
            ;; No existing ref - proceed with capture logic
            (pcase node-id
              (`nil
@@ -2533,12 +2564,17 @@ Each function is called with two arguments: the tag and the buffer.")
   (defvar-local tags/update-tags-enabled nil
     "Buffer-local variable to enable/disable tag updating.")
 
+  (defvar tags/tag-pause nil
+    "Global flag to pause tag updating during certain operations.")
+  
   (defun tags/maybe-update-tags ()
     "Update tags if enabled for the current buffer."
     (when (and tags/update-tags-enabled
+	       (not tags/tag-pause)
                (not (member (buffer-name) prune/ignored-files))
                (not (active-minibuffer-window))
                (vulpea-buffer-p))
+      (message "Updating tags!")
       (tags/org-update-all-tags)
       ))
 
@@ -2548,6 +2584,17 @@ Each function is called with two arguments: the tag and the buffer.")
     (add-hook 'before-save-hook #'tags/maybe-update-tags nil t)
     (tags/maybe-update-tags))
 
+  ;; Fixes weird tag insertion on extracting heading with `TODO' subheadings
+  (defun tags/extract-subtree-with-tag-pause (orig-fun &rest args)
+    "Pause tag updating during extraction, then update tags after."
+    (let ((tags/tag-pause t))
+      (apply orig-fun args))
+    ;; Now we're in the new buffer, tags/tag-pause is nil again
+    (message (concat "The current value is: " tags/tag-pause))
+    (save-buffer))
+
+  (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
+  
   :hook
   (org-mode . tags/enable-tag-updating)
 
@@ -3078,6 +3125,11 @@ All other subheadings will be ignored."
 		 ((tags "PRIORITY=\"A\""
 			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
 			 (org-agenda-overriding-header "* High-priority:")))
+		  (todo "NEXT" ((org-agenda-skip-function '(or (air-org-skip-subtree-if-priority ?A)
+							       (air-org-skip-subtree-if-priority ?B)
+							       (air-org-skip-if-blocked)
+							       (air-org-skip-subtree-if-ancestor-is-hold)))
+				(org-agenda-overriding-header "* Up next: ")))
 		  (tags "PRIORITY=\"B\""
 			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
 			 (org-agenda-overriding-header "* Lower-priority:")))
@@ -3087,11 +3139,7 @@ All other subheadings will be ignored."
 		  (todo "ACTIVE" ((org-agenda-overriding-header "* Active projects: ")
 				  (org-agenda-sorting-strategy '(deadline-up))))
 		  (todo "PROJECT" ((org-agenda-overriding-header "* Projects: ")))
-		  (todo "NEXT" ((org-agenda-skip-function '(or (air-org-skip-subtree-if-priority ?A)
-							       (air-org-skip-subtree-if-priority ?B)
-							       (air-org-skip-if-blocked)
-							       (air-org-skip-subtree-if-ancestor-is-hold)))
-				(org-agenda-overriding-header "* Up next: ")))
+		  
 		  ;; (agenda "" ((org-agenda-span 'week)))
 		  (agenda "" ((org-agenda-span 'week)
 			      (org-agenda-skip-function
@@ -3128,7 +3176,7 @@ All other subheadings will be ignored."
       (call-interactively #'js/roamify-url-at-point)))
 
   
-)
+  )
 
 ;;; End of org agenda package block
 
@@ -3197,7 +3245,7 @@ All other subheadings will be ignored."
   ;;  ;; Main export functions
   ;;  ;; ("C-c C-e c"   . js/checklist-export-buffer)       ; Export current buffer
   ;;  ;; ("C-c C-e C-c" . js/checklist-export-with-preview) ; Preview then export
-   
+  
   ;;  ;; Additional utility functions
   ;;  ;; ("C-c C-e C-p" . js/checklist-show-filtered-content) ; Preview filtered content only
   ;;  ;; ("C-c C-e C-f" . js/checklist-export-file)         ; Export specific file
@@ -3546,8 +3594,8 @@ Example configuration:
     (member 'asmr (elfeed-entry-tags entry)))
   
   (setq my/elfeed-podcastify-feed-rules
-    '(("asmr" . my/elfeed-entry-has-asmr-tag-p)
-      ))
+	'(("asmr" . my/elfeed-entry-has-asmr-tag-p)
+	  ))
   
 
   (defun my/podcastify-determine-feed (entry)
@@ -3558,13 +3606,13 @@ Returns the feed name, defaulting to 'default' if no rules match."
                  return feed-name)
         "default"))
 
-;;   (defun my/elfeed-entry-from-channel-p (entry channel-patterns)
-;;     "Return t if elfeed ENTRY is from a channel matching any of CHANNEL-PATTERNS.
-;; CHANNEL-PATTERNS should be a list of strings or regexps to match against feed title."
-;;     (let ((feed-title (elfeed-feed-title (elfeed-entry-feed entry))))
-;;       (cl-some (lambda (pattern)
-;;                  (string-match-p pattern (or feed-title "")))
-;;                channel-patterns)))
+  ;;   (defun my/elfeed-entry-from-channel-p (entry channel-patterns)
+  ;;     "Return t if elfeed ENTRY is from a channel matching any of CHANNEL-PATTERNS.
+  ;; CHANNEL-PATTERNS should be a list of strings or regexps to match against feed title."
+  ;;     (let ((feed-title (elfeed-feed-title (elfeed-entry-feed entry))))
+  ;;       (cl-some (lambda (pattern)
+  ;;                  (string-match-p pattern (or feed-title "")))
+  ;;                channel-patterns)))
 
   (defun js/elfeed-entries-to-podcastify (&optional prompt-for-feed entries feed-name)
     "Send elfeed entries to podcastify and mark as read.
@@ -3585,8 +3633,8 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
                   (prompt-for-feed
                    (let* ((rule-feeds (mapcar 'car my/elfeed-podcastify-feed-rules))
                           (all-feeds (cl-remove-duplicates 
-                                     (append rule-feeds '("default")) 
-                                     :test 'string=)))
+                                      (append rule-feeds '("default")) 
+                                      :test 'string=)))
                      (completing-read "Podcastify feed: " all-feeds nil nil nil nil "default")))
                   ;; If feed-name was explicitly provided, use it
                   (feed-name feed-name)
@@ -3650,8 +3698,8 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
     (let* ((url (read-string "Enter URL to add to podcastify: "))
            (rule-feeds (mapcar 'car my/elfeed-podcastify-feed-rules))
            (all-feeds (cl-remove-duplicates 
-                      (append rule-feeds '("default")) 
-                      :test 'string=))
+                       (append rule-feeds '("default")) 
+                       :test 'string=))
            (feed (completing-read "Podcastify feed: " all-feeds nil nil nil nil "default")))
       
       (if (string-empty-p url)
@@ -3913,7 +3961,7 @@ This is attached directly to database modification functions."
              (if my/elfeed-debug "enabled" "disabled")))
 
 
-) ;;; End of elfeed use-package block
+  ) ;;; End of elfeed use-package block
 
 ;;; The abstracted out package has some weird issues
 (use-package elfeed-sync
@@ -3932,11 +3980,11 @@ This is attached directly to database modification functions."
   
   ;; Optional: Add keybindings for the utility functions
   :bind (:map elfeed-search-mode-map
-         ;; ("s" . my/elfeed-manual-save)
-         ;; ("r" . my/elfeed-force-reload)
-         ("?" . my/elfeed-sync-status)
-         ("D" . my/elfeed-toggle-debug)
-	 )
+              ;; ("s" . my/elfeed-manual-save)
+              ;; ("r" . my/elfeed-force-reload)
+              ("?" . my/elfeed-sync-status)
+              ("D" . my/elfeed-toggle-debug)
+	      )
   )
 
 (use-package cuckoo-search
@@ -3944,13 +3992,13 @@ This is attached directly to database modification functions."
   :after (elfeed)
   :bind
   (:map elfeed-search-mode-map
-	      ("C" . cuckoo-search)
-	      ;; ("x" . cuckoo-search-saved-searches)
-	      ))
+	("C" . cuckoo-search)
+	;; ("x" . cuckoo-search-saved-searches)
+	))
 
 (use-package elfeed-org
-  :after elfeed
   :defer nil
+  :after elfeed
   :custom
   (rmh-elfeed-org-files (list (concat org-roam-directory "/elfeed.org")))
   
@@ -4059,6 +4107,7 @@ If a key is provided, use it instead of the default capture template."
 ;;; TODO: Rewrite the elfeed downloader
 
 (use-package elfeed-tube
+  :defer nil
   :after elfeed
   :bind
   (:map elfeed-show-mode-map
@@ -4102,6 +4151,7 @@ If a key is provided, use it instead of the default capture template."
            (playlist-file (make-temp-file "emacs-iina-playlist" nil ".m3u8")))
       (with-temp-file playlist-file
 	(dolist (entry entries)
+	  (elfeed-untag entry 'unread)
           (insert (elfeed-entry-link entry))
           (insert "\n")))
       (start-process-shell-command "iina" nil (concat iina-command " \"" playlist-file "\""))
@@ -4370,37 +4420,37 @@ If a key is provided, use it instead of the default capture template."
 		 " ")))
 
   (defun wallabag-add-entry (&optional url tags)
-  "Add a new entry by URL and TAGS."
-  (interactive)
-  (let* ((url (pcase major-mode
-                ('elfeed-show-mode
-                 (if (and (boundp 'elfeed-show-entry)
-                          (fboundp 'elfeed-entry-link))
-                     (elfeed-entry-link elfeed-show-entry) ""))
-                ('eaf-mode
-                 (if (boundp 'eaf--buffer-url) (abbreviate-file-name eaf--buffer-url) ""))
-                ('eww-mode
-                 (if (boundp 'eww-data) (plist-get eww-data :url) ""))
-                (_ (if url url (read-from-minibuffer "What URL do you want to add? ")))))
-         ;; FIXME if no tags pull before, it will return empty string
-         (tags (or tags (wallabag-get-tag-name)))
-         (host (wallabag-host))
-         (token (or wallabag-token (wallabag-request-token))))
-    (request (format "%s/api/entries.json" host)
-      :parser 'json-read
-      :type "POST"
-      :data `(("url" . ,url)
-              ("archive" . 0)
-              ("starred" . 0)
-              ("tags" . ,tags)
-              ("access_token" . ,token))
-      :headers `(("User-Agent" . "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36"))
-      :error
-      (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
-                     (message "Wallaget request error: %S" error-thrown)))
-      :status-code `((401 . ,(wallabag-request-token-retry #'wallabag-add-entry url)))
-      :success (cl-function
-                (lambda (&key data &allow-other-keys)
+    "Add a new entry by URL and TAGS."
+    (interactive)
+    (let* ((url (pcase major-mode
+                  ('elfeed-show-mode
+                   (if (and (boundp 'elfeed-show-entry)
+                            (fboundp 'elfeed-entry-link))
+                       (elfeed-entry-link elfeed-show-entry) ""))
+                  ('eaf-mode
+                   (if (boundp 'eaf--buffer-url) (abbreviate-file-name eaf--buffer-url) ""))
+                  ('eww-mode
+                   (if (boundp 'eww-data) (plist-get eww-data :url) ""))
+                  (_ (if url url (read-from-minibuffer "What URL do you want to add? ")))))
+           ;; FIXME if no tags pull before, it will return empty string
+           (tags (or tags (wallabag-get-tag-name)))
+           (host (wallabag-host))
+           (token (or wallabag-token (wallabag-request-token))))
+      (request (format "%s/api/entries.json" host)
+	:parser 'json-read
+	:type "POST"
+	:data `(("url" . ,url)
+		("archive" . 0)
+		("starred" . 0)
+		("tags" . ,tags)
+		("access_token" . ,token))
+	:headers `(("User-Agent" . "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36"))
+	:error
+	(cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
+                       (message "Wallaget request error: %S" error-thrown)))
+	:status-code `((401 . ,(wallabag-request-token-retry #'wallabag-add-entry url)))
+	:success (cl-function
+                  (lambda (&key data &allow-other-keys)
                     ;; convert tags array to tag comma seperated string
                     (setq data
                           (progn
@@ -4415,7 +4465,7 @@ If a key is provided, use it instead of the default capture template."
                       ;; check id exists or not
                       (if (eq 1 (caar (wallabag-db-sql
                                        `[:select :exists
-                                         [:select id :from items :where (= id ,id)]])))
+						 [:select id :from items :where (= id ,id)]])))
                           (progn
                             (message "Entry Already Exists")
                             (goto-char (wallabag-find-candidate-location id))
@@ -4498,7 +4548,7 @@ If a key is provided, use it instead of the default capture template."
 ;;      (json-mode . json-ts-mode)
 ;;      (rust-mode . rust-ts-mode)
 ;;      (bash-mode . bash-ts-mode)))
-  
+
 ;;   :config
 ;;   (customize-set-variable 'treesit-font-lock-level 4)
 ;;   )
@@ -4798,7 +4848,7 @@ When pressed twice, make the sub/superscript roman."
     (if filename
         (if (y-or-n-p (concat "Do you really want to delete file " filename " ?"))
             (progn
-              (delete-file filename)
+              (move-file-to-trash filename)
               (message "Deleted file %s." filename)
               (kill-buffer)))
       (message "Not a file visiting buffer!"))))

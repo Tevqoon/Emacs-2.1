@@ -32,3 +32,4 @@
 /defaults/auto/
 /variables.el
 /xenops/
+lisp/anki-flashcard-queue.el
