@@ -1696,6 +1696,8 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
   )
 ;;; End of org-mode package block
 
+(use-package org-download)
+
 (use-package org-mac-link
   :if (eq system-type 'darwin)
   :ensure org)
@@ -3207,6 +3209,7 @@ All other subheadings will be ignored."
      (haskell . t)
      (octave . t)
      (awk . t)
+     (shell .t)
      ))
 
 
