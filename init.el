@@ -1700,7 +1700,7 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
 
 (use-package org-mac-link
   :if (eq system-type 'darwin)
-  :ensure org)
+  :ensure t)
 
 (use-package xenops
   :after org
@@ -4254,6 +4254,37 @@ If a key is provided, use it instead of the default capture template."
 
 ;;; -> Elfeed -> End
 
+;;; --> Readwise
+
+;; (use-package org-readwise
+;;   :vc (:url "https://github.com/Tevqoon/org-readwise" :rev :newest)
+;;   :custom
+;;   ;; Output location - single file in readwise subfolder
+;;   (org-readwise-output-directory 
+;;    (expand-file-name "readwise" org-roam-directory))
+  
+;;   ;; Sync both classic Readwise highlights and Reader documents
+;;   (org-readwise-sync-highlights t)
+;;   (org-readwise-sync-reader t)
+  
+;;   ;; Track last sync time
+;;   (org-readwise-last-sync-time-file 
+;;    (expand-file-name ".org-readwise-last-sync" user-emacs-directory))
+  
+;;   ;; Debug level (set to 0 once working)
+;;   (org-readwise-debug-level 1)
+  
+;;   :config
+;;   ;; Ensure the readwise subdirectory exists
+;;     (unless (file-exists-p org-readwise-output-directory)
+;;       (make-directory org-readwise-output-directory t)))
+
+;;; --> Wallabag annotation importer
+
+;; (use-package org-roam-annotation-import
+;;   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
+;;   )
+
 ;;; --> Wallabag
 
 (use-package request
@@ -4862,7 +4893,7 @@ When pressed twice, make the sub/superscript roman."
 Calling with single prefix ARG (C-u) enables debugging.
 Calling with double prefix ARG (C-u C-u) runs Emacs with -Q."
   (interactive "P")
-  (let* ((emacs-path "/opt/homebrew/Cellar/emacs-plus@30/30.1/Emacs.app/Contents/MacOS/Emacs")
+  (let* ((emacs-path "/opt/homebrew/Cellar/emacs-plus@30/30.2/Emacs.app/Contents/MacOS/Emacs")
          (current-dir (if buffer-file-name
                           (file-name-directory buffer-file-name)
                         default-directory))
