@@ -309,7 +309,9 @@ between Emacs sessions.")
          :map help-map
          ("p" . helpful-at-point)
 	 :map helpful-mode-map
-	 ("q" . quit-window--and-kill)))
+	 ("q" . quit-window--and-kill))
+  :custom
+  (helpful-switch-buffer-function #'switch-to-buffer))
 
 ;;; -> Look and feel -> Tabs, frames, windows
 
@@ -783,7 +785,7 @@ between Emacs sessions.")
 (use-package deadgrep
   :defines
   deadgrep-mode-map
-  org-roam-dailie
+  org-roam-dailies
   s-directory
   deadgrep-project-root-function
   org-roam-directory
@@ -1803,6 +1805,7 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
 ;;; -> Org mode -> Org-roam
 
 (use-package org-roam
+  :ensure t
   :functions
   org-roam-node-from-ref
   :bind (("C-c n b " . org-roam-buffer-toggle)
@@ -1832,6 +1835,7 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
   :hook (org-roam-mode . visual-line-mode)
   
   :custom
+  (org-id-link-to-org-use-id 'nil)
   (org-roam-mode-section-functions
    (list (lambda (node) (org-roam-backlinks-section
 			 node
@@ -1927,8 +1931,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
     "Variable to pass content to capture templates.")
   
   (setq org-roam-capture-templates
-	'(("d" "default" plain
-           "%?"
+	'(("d" "default" plain "%?"
            :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+startup: content")
            :unnarrowed t)
           ))
@@ -1941,7 +1944,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
     )
 
   (setq org-roam-dailies-capture-templates
-	`(("d" "default" entry "* %?"
+	`(("d" "default" plain "* %?"
 	   :target (file+head "%<%Y-%m-%d>.org"
 			      "#+title: %<%Y-%m-%d>\n#+startup: content"))
 	  ))
@@ -1955,7 +1958,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
 	  )
       (org-roam-capture- :keys "t"
 			 :node (org-roam-node-create)
-			 :templates '(("t" "task" entry "** TODO %?"
+			 :templates '(("t" "task" plain "** TODO %?"
 				       :target (node "C6C9881B-7EF4-4DAF-A502-84D396372A68")
 				       :unnarrowed nil))
 					;:props (list :override-default-time (current-time))
@@ -2002,10 +2005,11 @@ only processes keywords listed in `js/org-keywords-with-links'."
   
   (defun org-roam-dailies-autocapture-today (keys &optional contents)
     "A function to automatically capture content into a daily template."
-    (let ((org-roam-directory (expand-file-name org-roam-dailies-directory org-roam-directory))
-          (org-roam-dailies-directory "./")
-	  (org-roam-capture-content (or contents org-roam-capture-content))
-	  )
+    (let* ((org-roam-directory (expand-file-name org-roam-dailies-directory org-roam-directory))
+           (org-roam-dailies-directory "./")
+	   (org-roam-capture-content (or contents org-roam-capture-content))
+	   (daily-node nil)
+	   )
       (org-roam-capture- :keys keys
 			 :node (org-roam-node-create)
 			 :templates org-roam-dailies-autocapture-templates
@@ -4284,9 +4288,9 @@ If a key is provided, use it instead of the default capture template."
 
 ;;; --> Wallabag annotation importer
 
-;; (use-package org-roam-annotation-import
-;;   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
-;;   )
+(use-package org-roam-annotation-import
+  :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
+  )
 
 ;;; --> Wallabag
 
@@ -4297,7 +4301,6 @@ If a key is provided, use it instead of the default capture template."
 
 (use-package wallabag
   :defer t
-  ;; :load-path "~/.emacs.d/lisp/wallabag/"
   :after request emacsql
   :bind (("C-x W" . wallabag)
          :map wallabag-search-mode-map
