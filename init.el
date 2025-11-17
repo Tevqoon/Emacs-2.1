@@ -1968,30 +1968,33 @@ only processes keywords listed in `js/org-keywords-with-links'."
     "Variable to pass current browser to capture templates.")
   
   ;;; TODO: Simplify the autocapture templates
+  ;;; https://github.com/org-roam/org-roam/commit/ed94524964a0b03538a84ae03c89ec61527ffe7d
+  ;;; These fucks added non-disablable ids to my fucking entries
+  ;;; Hence the plain + insertion directly into the OLP. What will you do lol.
   (defvar org-roam-dailies-autocapture-templates
-    '(("w" "url capture" entry "* %(eval org-roam-capture-content)"
+    '(("w" "url capture" plain ""
        :target (file+head+olp "%<%Y-%m-%d>.org"
-                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Web"))
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Web" "%(eval (concat org-roam-capture-content))"))
        :immediate-finish t)
-      ("r" "url reading capture" entry "* PROCESS %(eval org-roam-capture-content)"
+      ("r" "url reading capture" plain ""
        :target (file+head+olp "%<%Y-%m-%d>.org"
-                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing"))
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing" "%(eval (concat \"PROCESS \" org-roam-capture-content))"))
        :immediate-finish t)
-      ("e" "elfeed link capture" entry "* %(eval org-roam-capture-content)"
+      ("e" "elfeed link capture" plain ""
        :target (file+head+olp "%<%Y-%m-%d>.org"
-                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Elfeed"))
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Elfeed" "%(eval (concat org-roam-capture-content))"))
        :immediate-finish t)
-      ("p" "process capture" entry "* PROCESS %(eval org-roam-capture-content)"
+      ("p" "process capture" plain ""
        :target (file+head+olp "%<%Y-%m-%d>.org"
-                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing"))
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing" "%(eval (concat \"PROCESS \" org-roam-capture-content))"))
        :immediate-finish t)
-      ("c" "chatlog capture" entry "* %(eval org-roam-capture-content)"
+      ("c" "chatlog capture" plain ""
        :target (file+head+olp "%<%Y-%m-%d>.org"
-                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Chats"))
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Chats" "%(eval (concat org-roam-capture-content))"))
        :immediate-finish t)
-      ("x" "processed log" entry "* DONE %(eval org-roam-capture-content)"
+      ("x" "processed log" plain ""
        :target (file+head+olp "%<%Y-%m-%d>.org"
-                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processed today"))
+                              "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processed today" "%(eval (concat \"DONE \" org-roam-capture-content))"))
        :immediate-finish t)
       )
     "A list of templates to use for automatic daily capture."
