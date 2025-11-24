@@ -4290,6 +4290,8 @@ If a key is provided, use it instead of the default capture template."
 
 (use-package org-roam-annotation-import
   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
+  :init
+  (require 'wallabag-backend)
   )
 
 ;;; --> Wallabag
