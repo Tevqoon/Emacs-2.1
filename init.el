@@ -1568,51 +1568,55 @@ Otherwise, open the URL at point.
 With prefix ARG, use secondary browser."
     (interactive "P")
     (let ((browse-url-browser-function (if arg
-					   browse-url-secondary-browser-function
+                                           browse-url-secondary-browser-function
 					 browse-url-browser-function)))
       (if (use-region-p)
-	  ;; If we have a region, try extracting all of the links.
+          ;; If we have a region, extract ALL links regardless of format
           (let ((text (buffer-substring-no-properties (region-beginning) (region-end)))
-		(count 0))
+		(urls '()))
             (with-temp-buffer
               (insert text)
-              (goto-char (point-min))
               
-              ;; 1. Try org-mode links [[url][description]]
-              (while (re-search-forward "\\[\\[\\([^]]+\\)\\]\\[" nil t)
+              ;; 1. Collect org-mode links [[url][description]] and mark them
+              (goto-char (point-min))
+              (while (re-search-forward "\\[\\[\\([^]]+\\)\\]\\[[^]]*\\]\\]" nil t)
 		(let ((url (match-string 1)))
                   (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
-                    (browse-url url)
-                    (setq count (1+ count)))))
+                    (push url urls))
+                  ;; Replace the entire org link with a placeholder to avoid re-matching
+                  (replace-match "" nil nil)))
               
-              ;; 2. Try Markdown links [description](url)
+              ;; 2. Collect Markdown links [description](url)
               (goto-char (point-min))
               (while (re-search-forward "\\[.*?\\](\\([^)]*\\))" nil t)
 		(let ((url (match-string 1)))
                   (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
-                    (browse-url url)
-                    (setq count (1+ count)))))
+                    (push url urls))
+                  (replace-match "" nil nil)))
               
-              ;; 3. Try HTML href attributes
+              ;; 3. Collect HTML href attributes
               (goto-char (point-min))
               (while (re-search-forward "href=[\"']\\([^\"']+\\)[\"']" nil t)
 		(let ((url (match-string 1)))
                   (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
-                    (browse-url url)
-                    (setq count (1+ count)))))
+                    (push url urls))
+                  (replace-match "" nil nil)))
               
-              ;; 4. Try plain text URLs if nothing else found
-              (when (= count 0)
-		(goto-char (point-min))
-		(while (re-search-forward "\\(https?://\\|www\\.\\)[^\s\n\"]+" nil t)
-                  (let ((url (match-string 0)))
-                    (when (string-match "^www\\." url)
-                      (setq url (concat "https://" url)))
-                    (when (string-match "\\([.,:;\"']+\\)$" url)
-                      (setq url (substring url 0 (match-beginning 1))))
-                    (browse-url url)
-                    (setq count (1+ count))))))
-            (message "Opened %d URLs in browser" count))
+              ;; 4. Collect plain text URLs (now that structured links are removed)
+              (goto-char (point-min))
+              (while (re-search-forward "\\(https?://\\|www\\.\\)[^\s\n\"]+" nil t)
+		(let ((url (match-string 0)))
+                  (when (string-match "^www\\." url)
+                    (setq url (concat "https://" url)))
+                  (when (string-match "\\([.,:;\"']+\\)$" url)
+                    (setq url (substring url 0 (match-beginning 1))))
+                  (push url urls))))
+            
+            ;; Remove duplicates and open all collected URLs
+            (setq urls (delete-dups (nreverse urls)))
+            (dolist (url urls)
+              (browse-url url))
+            (message "Opened %d URLs in browser" (length urls)))
 	
 	;; Otherwise just use the built-in browse-url for single URL
 	(save-excursion
