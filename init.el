@@ -1560,7 +1560,6 @@ This function is expected to be hooked in org-mode."
 
   ;; Browser integration
   
-
   (defun open-urls-at-point-or-region (&optional arg)
     "Open links in region or at point using configured browsers.
 If region is active, extract and open all URLs found in the region.
@@ -3193,7 +3192,6 @@ All other subheadings will be ignored."
     (org-agenda-with-point-at-orig-entry nil
       (end-of-line)
       (call-interactively #'js/roamify-url-at-point)))
-
   
   )
 
@@ -4578,6 +4576,10 @@ If a key is provided, use it instead of the default capture template."
 	      ("M-l" . flymake-show-buffer-diagnostics))
   )
 
+
+(use-package aggressive-indent
+  :diminish aggressive-indent-mode)
+
 ;;; -> Programming -> Tree-sitter
 
 ;; (use-package treesit
@@ -4813,6 +4815,25 @@ When pressed twice, make the sub/superscript roman."
 
 (use-package racket-mode
   :defer t)
+
+;;; -> Programming -> Lisp -> Clojure
+
+(use-package clojure-mode
+  :custom
+  (clojure-indent-style 'always-indent)
+  (clojure-indent-keyword-style 'always-indent)
+  (clojure-enable-indent-specs nil)
+  (clojure-align-forms-automatically t)
+  :hook
+  (clojure-mode . aggressive-indent-mode))
+
+(use-package cider
+  :custom (cider-edit-jack-in-command t))
+
+(use-package clj-refactor
+  :hook (clojure-mode . clj-refactor-mode)
+  :config
+  (cljr-add-keybindings-with-prefix "C-c C-m"))
 
 ;;; -> Programming -> Haskell
 
