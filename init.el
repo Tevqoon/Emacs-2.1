@@ -3045,6 +3045,11 @@ All other subheadings will be ignored."
   (org-agenda-window-setup 'current-window)
   (org-agenda-sticky t)
   (org-priority-default ?C)
+  (org-agenda-prefix-format
+      '((agenda . " %i %-12:c%?-12t% s")
+        (todo . " %i %-12:c")
+        (tags . " %i %-12:c")
+        (search . " %i %-12:c")))
   
   :bind (("C-c a" . open-org-agenda)
 	 :map org-agenda-mode-map
