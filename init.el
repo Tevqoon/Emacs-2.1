@@ -3116,15 +3116,18 @@ All other subheadings will be ignored."
 	  next-headline
 	nil)))
 
-  (defun air-org-skip-subtree-if-ancestor-is-hold ()
-    "Skip subtree if any ancestor has HOLD todo state."
+  (defvar js/org-ancestor-block-states '("HOLD" "CANCELLED" "FAILED")
+    "TODO states that hide their descendants from agenda views.")
+
+  (defun js/org-skip-if-ancestor-blocked ()
+    "Skip subtree if any ancestor has a state in `js/org-ancestor-block-states'."
     (let ((subtree-end (save-excursion (org-end-of-subtree t))))
       (save-excursion
 	(while (and (not (bobp))
                     (not (org-at-heading-p)))
           (outline-previous-heading))
 	(if (cl-loop while (and (not (bobp)) (org-up-heading-safe))
-                     thereis (equal "HOLD" (org-get-todo-state)))
+                     thereis (member (org-get-todo-state) js/org-ancestor-block-states))
             subtree-end
           nil))))
 
@@ -3146,7 +3149,7 @@ All other subheadings will be ignored."
 		  (todo "NEXT" ((org-agenda-skip-function '(or (air-org-skip-subtree-if-priority ?A)
 							       (air-org-skip-subtree-if-priority ?B)
 							       (air-org-skip-if-blocked)
-							       (air-org-skip-subtree-if-ancestor-is-hold)))
+							       (js/org-skip-if-ancestor-blocked)))
 				(org-agenda-overriding-header "* Up next: ")))
 		  (tags "PRIORITY=\"B\""
 			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
@@ -3170,7 +3173,7 @@ All other subheadings will be ignored."
                                      (air-org-skip-if-blocked)
 				     (org-agenda-skip-if nil '(scheduled deadline))
 				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM"))
-				     (air-org-skip-subtree-if-ancestor-is-hold)))
+				     (js/org-skip-if-ancestor-blocked)))
 			       (org-agenda-overriding-header "* All normal priority tasks:")))
 		  (todo "HOLD" ((org-agenda-overriding-header "* Currently on hold: ")))
 		  (todo "EXPLORE" ((org-agenda-overriding-header "* Things to explore: ")))
