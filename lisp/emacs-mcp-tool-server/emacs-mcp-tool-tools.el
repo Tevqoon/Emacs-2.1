@@ -79,7 +79,7 @@ RESOURCE-DEF should be a plist with :uri, :name, :description, :handler, and opt
   "Get all registered resources."
   emacs-mcp-resources)
 
-;;; Documentation Tool Implementations
+;;; -> Tools -> Functions
 
 (defun emacs-mcp-tool-find-symbols-by-name (keyword)
   "Search for Emacs Lisp symbols matching KEYWORD.
@@ -193,10 +193,14 @@ MCP Parameters: None"
       (save-excursion
         (save-window-excursion
           (save-restriction
-            ;; Generate fresh agenda view using your custom function
+            ;; Generate agenda view
             (open-org-agenda)
             
-            ;; Get the current agenda buffer (whatever it's named)
+            ;; Refresh: update files list and rebuild
+            (roam-agenda-files-update)
+            (org-agenda-redo)
+            
+            ;; Get the current agenda buffer
             (let ((agenda-buffer (current-buffer)))
               (with-current-buffer agenda-buffer
                 (save-restriction
@@ -208,8 +212,32 @@ MCP Parameters: None"
                           (format-time-string "%Y-%m-%d %H:%M:%S")
                           (buffer-substring-no-properties (point-min) (point-max))))))))))))
 
+(defun emacs-mcp-tool-add-to-processing (item)
+  "Add an item to today's Processing section in org-roam dailies.
 
-;;; Built-in Tools
+MCP Parameters:
+  item - The text/topic to add to processing (e.g. 'look into algebraic effects for error handling')"
+  (mcp-server-lib-with-error-handling
+    (let ((org-roam-capture-content item))
+      (org-roam-dailies-autocapture-today "p")
+      (format "Added to Processing: %s" item))))
+
+(defun emacs-mcp-tool-search-org-roam-dailies (query)
+  "Search org-roam daily journal files for QUERY using ripgrep.
+
+MCP Parameters:
+  query - The search term to find in daily journals"
+  (mcp-server-lib-with-error-handling
+    (let* ((default-directory (expand-file-name org-roam-dailies-directory org-roam-directory))
+           (output (shell-command-to-string
+                    (format "rg --line-number --with-filename --max-count=5 --type org -i %s"
+			    (shell-quote-argument query)))))
+      (if (string-empty-p output)
+          (format "No results found for '%s' in dailies" query)
+        (format "Search results for '%s' in dailies:\n\n%s" query output)))))
+
+
+;;; -> Tools -> Registration
 
 ;; Primary documentation tools (use these first for understanding Emacs functionality)
 (emacs-mcp-register-tool
@@ -233,6 +261,17 @@ MCP Parameters: None"
  '(:id "get_agenda_buffer"
    :description "Get the contents of the org-agenda buffer, opening it if necessary. Uses your custom agenda view (daily agenda with TODOs) if available."
    :handler emacs-mcp-tool-get-agenda-buffer))
+
+(emacs-mcp-register-tool
+ '(:id "add_to_processing"
+   :description "Add an item to today's Processing queue in the daily journal. Use this when discussing something the user might want to remember, act on, or explore later - ideas, topics to research, things to try, etc."
+   :handler emacs-mcp-tool-add-to-processing))
+
+(emacs-mcp-register-tool
+ '(:id "search_org_roam_dailies"
+   :description "Search org-roam daily journal entries for a term. Returns matching lines with dates and line numbers. Use for finding when something was discussed or logged."
+   :handler emacs-mcp-tool-search-org-roam-dailies))
+
 
 ;;; Built-in Resources
 
