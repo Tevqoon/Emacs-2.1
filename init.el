@@ -281,10 +281,15 @@ between Emacs sessions.")
   (electric-pair-mode 1)
   (show-paren-mode 1)
   :config
-  (add-function :before-until electric-pair-inhibit-predicate
-		(lambda (c) (eq c ?<)))
+  (defun js/fix-angle-bracket-syntax ()
+    "Make < and > punctuation instead of paired delimiters."
+    (modify-syntax-entry ?< ".")
+    (modify-syntax-entry ?> "."))
   :custom
-  (show-paren-delay 0))
+  (show-paren-delay 0)
+  :hook
+  (LaTeX-mode . js/fix-angle-bracket-syntax)
+  (org-mode . js/fix-angle-bracket-syntax))
 
 (use-package rainbow-delimiters
   :defer t
@@ -1402,6 +1407,13 @@ exactly like the old ace-jump integration."
 ;;; End of aidermacs package block
 ;;; End of AI configuration block
 
+
+;;; --> Markdown
+
+(use-package markdown-mode
+  :ensure t
+  :mode ("\\.md\\'" . markdown-mode))
+
 ;;; --> Org-mode
 
 (defvar-local js/org-rename-buffer-enabled nil
@@ -2085,7 +2097,8 @@ Using the org-mac-link, this comes pre-formatted with the url title."
            (url (when url-parts (car url-parts))))
       (when url
 	(message "Adding to wallabag: %s" url)
-	(run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)
+	;; (run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)
+	(run-with-timer 2 nil #'wallabag-request-token)
 	(wallabag-add-entry url "")
 	;; Sync wallabag changes to server
 	"added to wallabag")))
@@ -2488,16 +2501,30 @@ you can catch it with `condition-case'."
       nil 'first-match))
 
   (defun org/has-anki-flashcards-p ()
-    "Return non-nil if current buffer has ANKI-related properties."
-    (save-excursion
-      (goto-char (point-min))
-      (re-search-forward ":ANKI_\\(NOTE_TYPE\\|DECK\\|NOTE_ID\\|TAGS\\):" nil t)))
+    "Return non-nil if current buffer has ANKI-related properties in actual drawers."
+    (org-element-map
+	(org-element-parse-buffer 'headline)
+	'headline
+      (lambda (h)
+	(let ((node-props (org-element-property :ANKI_NOTE_TYPE h)))
+          ;; Check for any of the ANKI properties
+          (or node-props
+              (org-element-property :ANKI_DECK h)
+              (org-element-property :ANKI_NOTE_ID h)
+              (org-element-property :ANKI_TAGS h))))
+      nil 'first-match))
 
   (defun org/has-gptel-chatlog-p ()
-    "Return non-nil if current buffer has GPTEL-related properties."
-    (save-excursion
-      (goto-char (point-min))
-      (re-search-forward ":GPTEL_\\(TOPIC\\|MESSAGES\\|MODEL\\|CONTEXT\\):" nil t)))
+    "Return non-nil if current buffer has GPTEL-related properties in actual drawers."
+    (org-element-map
+	(org-element-parse-buffer 'headline)
+	'headline
+      (lambda (h)
+	(or (org-element-property :GPTEL_TOPIC h)
+            (org-element-property :GPTEL_MESSAGES h)
+            (org-element-property :GPTEL_MODEL h)
+            (org-element-property :GPTEL_CONTEXT h)))
+      nil 'first-match))
 
   ;; Exclude the relevant tags from inheritance
   (dolist (tag (cons "summary" tags/updating-tags))
@@ -3226,7 +3253,8 @@ All other subheadings will be ignored."
      (haskell . t)
      (octave . t)
      (awk . t)
-     (shell .t)
+     (shell . t)
+     ;; (markdown . t)
      ))
 
 
@@ -3235,6 +3263,7 @@ All other subheadings will be ignored."
   (add-to-list 'org-structure-template-alist '("hl" . "src haskell"))
   (add-to-list 'org-structure-template-alist '("py" . "src python :results output"))
   (add-to-list 'org-structure-template-alist '("cs" . "src C"))
+  (add-to-list 'org-structure-template-alist '("md" . "src markdown"))
   (add-to-list 'org-structure-template-alist '("def" . "definicija"))
   (add-to-list 'org-structure-template-alist '("izr" . "izrek"))
   (add-to-list 'org-structure-template-alist '("thm" . "theorem"))
@@ -3460,7 +3489,7 @@ All other subheadings will be ignored."
 
   (defun elfeed-filter-trash ()
     (interactive)
-    (elfeed-filter-maker "+trash" "Showing trashed."))
+    (elfeed-filter-maker "+trash @7-days-ago" "Showing trashed."))
 
   (defun elfeed-search-trash ()
     "Tags the selection as trash in search mode."
@@ -3575,7 +3604,8 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
             ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
             (t (user-error "Not in an Elfeed buffer or no entries provided"))))
           (added-count 0))
-      
+      (when entries
+	(wallabag-request-token))
       ;; Process each entry
       (dolist (entry entries)
 	(let ((url (elfeed-entry-link entry))
@@ -4137,7 +4167,7 @@ If a key is provided, use it instead of the default capture template."
 	:map elfeed-search-mode-map
 	("F" . elfeed-tube-fetch)
 	([remap save-buffer] . elfeed-tube-save))
-  :custom (elfeed-tube-auto-save-p t)
+  :custom (elfeed-tube-auto-save-p nil)
   :config
   (elfeed-tube-setup)
   (defvar yt-dlp-priority-tags '(asmr chess osrs gaming essays)
