@@ -393,7 +393,11 @@ between Emacs sessions.")
 
    ;;(setq ns-right-command-modifier 'hyper) ;; <- Currently unused, enough modifiers atm
    (add-hook 'ns-system-appearance-change-functions #'my/apply-theme)
+
    (defvar org-roam-directory "~/Documents/org")
+   ;;; MacOS Autocommit:
+   ;;; launchctl load ~/Library/LaunchAgents/com.jure.org-git-autocommit.plist
+
    (defvar org-directory "~/Documents/org")
    (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
    (setq ring-bell-function 'ignore)
@@ -1984,33 +1988,36 @@ only processes keywords listed in `js/org-keywords-with-links'."
 
   (defvar org-roam-capture--browser nil
     "Variable to pass current browser to capture templates.")
+
+  (defvar org-roam-capture-body nil
+  "Variable to pass body content to capture templates.")
   
   ;;; TODO: Simplify the autocapture templates
   ;;; https://github.com/org-roam/org-roam/commit/ed94524964a0b03538a84ae03c89ec61527ffe7d
   ;;; These fucks added non-disablable ids to my fucking entries
   ;;; Hence the plain + insertion directly into the OLP. What will you do lol.
   (defvar org-roam-dailies-autocapture-templates
-    '(("w" "url capture" plain ""
+    '(("w" "url capture" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
                               "#+title: %<%Y-%m-%d>\n#+startup: content" ("Web" "%(eval (concat org-roam-capture-content))"))
        :immediate-finish t)
-      ("r" "url reading capture" plain ""
+      ("r" "url reading capture" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
                               "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing" "%(eval (concat \"PROCESS \" org-roam-capture-content))"))
        :immediate-finish t)
-      ("e" "elfeed link capture" plain ""
+      ("e" "elfeed link capture" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
                               "#+title: %<%Y-%m-%d>\n#+startup: content" ("Elfeed" "%(eval (concat org-roam-capture-content))"))
        :immediate-finish t)
-      ("p" "process capture" plain ""
+      ("p" "process capture" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
                               "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing" "%(eval (concat \"PROCESS \" org-roam-capture-content))"))
        :immediate-finish t)
-      ("c" "chatlog capture" plain ""
+      ("c" "chatlog capture" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
                               "#+title: %<%Y-%m-%d>\n#+startup: content" ("Chats" "%(eval (concat org-roam-capture-content))"))
        :immediate-finish t)
-      ("x" "processed log" plain ""
+      ("x" "processed log" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
                               "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processed today" "%(eval (concat \"DONE \" org-roam-capture-content))"))
        :immediate-finish t)
@@ -2018,12 +2025,13 @@ only processes keywords listed in `js/org-keywords-with-links'."
     "A list of templates to use for automatic daily capture."
     )
   
-  (defun org-roam-dailies-autocapture-today (keys &optional contents)
+  (defun org-roam-dailies-autocapture-today (keys &optional contents body)
     "A function to automatically capture content into a daily template."
     (let* ((org-roam-directory (expand-file-name org-roam-dailies-directory org-roam-directory))
            (org-roam-dailies-directory "./")
 	   (org-roam-capture-content (or contents org-roam-capture-content))
 	   (daily-node nil)
+	   (org-roam-capture-body (or body org-roam-capture-body))
 	   )
       (org-roam-capture- :keys keys
 			 :node (org-roam-node-create)
@@ -2501,14 +2509,18 @@ you can catch it with `condition-case'."
       nil 'first-match))
 
   (defun org/has-anki-flashcards-p ()
-    "Return non-nil if current buffer has ANKI-related properties in actual drawers."
+    "Return non-nil if current buffer has ANKI-related properties in actual drawers.
+Ignores headlines under ARCHIVE-tagged ancestors."
     (org-element-map
 	(org-element-parse-buffer 'headline)
 	'headline
       (lambda (h)
-	(let ((node-props (org-element-property :ANKI_NOTE_TYPE h)))
-          ;; Check for any of the ANKI properties
-          (or node-props
+	;; Skip if this headline or any ancestor has :ARCHIVE: tag
+	(unless (org-element-lineage-map h
+                    (lambda (ancestor)
+                      (member "ARCHIVE" (org-element-property :tags ancestor)))
+                  'headline 'with-self 'first-match)
+          (or (org-element-property :ANKI_NOTE_TYPE h)
               (org-element-property :ANKI_DECK h)
               (org-element-property :ANKI_NOTE_ID h)
               (org-element-property :ANKI_TAGS h))))
@@ -3143,7 +3155,7 @@ All other subheadings will be ignored."
 	  next-headline
 	nil)))
 
-  (defvar js/org-ancestor-block-states '("HOLD" "CANCELLED" "FAILED")
+  (defvar js/org-ancestor-block-states '("HOLD" "CANCELLED" "FAILED" "PROCESS")
     "TODO states that hide their descendants from agenda views.")
 
   (defun js/org-skip-if-ancestor-blocked ()
