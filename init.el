@@ -2274,23 +2274,43 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 
   ;; https://freerangebits.com/posts/2024/01/archiving-in-org-mode/
   (defun pjones:org-archive-subtree-to-daily (&optional _find-done)
-    "Arhive the current subtree to the roam daily file."
+    "Archive the current subtree to the roam daily file."
     (interactive "P")
     (require 'org-roam)
-    (when-let* ((today (save-window-excursion
-			 (org-roam-dailies-goto-today "d")
-			 (buffer-file-name)))
-		(org-archive-location
-		 (concat today "::* Archived today :ARCHIVE:"))
-		(heading (org-get-heading t t t t))
-		;; Take note of the originating org id
-		(file-id (save-excursion
-			   (goto-char (point-min))
-			   (org-roam-id-at-point))))
-      (when file-id ;; Add a source node property if we started out in a place with an id
+    (require 'org-archive)
+    (let* ((daily-file (expand-file-name 
+			(format-time-string "%Y-%m-%d.org")
+			(expand-file-name org-roam-dailies-directory org-roam-directory)))
+           (today (if (string= (buffer-file-name) daily-file)
+                      daily-file
+                    (save-window-excursion
+                      (save-excursion
+			(org-roam-dailies-goto-today "d")
+			(buffer-file-name)))))
+           (org-archive-location (concat today "::* Archived today :ARCHIVE:"))
+           (file-id (save-excursion
+                      (goto-char (point-min))
+                      (org-roam-id-at-point)))
+           (heading-title (org-get-heading t t t t)))
+      (when file-id
 	(org-set-property "ARCHIVE_NODE" (org-roam-link-make-string file-id)))
-      (org-archive-subtree 0))
-    (save-buffer))
+      (org-archive-subtree 0)
+      ;; Set TODO state to CANCELLED in the archived entry
+      (with-current-buffer (find-file-noselect today)
+	(save-excursion
+          (goto-char (point-min))
+          ;; Find the "Archived today" heading
+          (when (re-search-forward "^\\* Archived today" nil t)
+            (let ((archive-end (save-excursion (org-end-of-subtree t t))))
+              ;; Search for our heading within this subtree
+              (when (re-search-forward 
+                     (format "^\\*\\* .*%s" (regexp-quote heading-title)) 
+                     archive-end t)
+		(org-back-to-heading t)
+		(when (org-get-todo-state)
+                  (org-todo "CANCELLED"))))))
+	(save-buffer))
+      (save-buffer)))
 
   (custom-set-variables
    '(org-archive-default-command #'pjones:org-archive-subtree-to-daily))
@@ -2299,7 +2319,8 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 
   (defun js/org-unarchive-subtree-from-daily ()
     "Unarchive the current subtree back to its original location.
-Uses ARCHIVE_NODE and ARCHIVE_OLPATH properties to restore the entry."
+Uses ARCHIVE_NODE and ARCHIVE_OLPATH properties to restore the entry.
+Restores the original TODO state from ARCHIVE_TODO."
     (interactive)
     (require 'org-roam)
     
@@ -2308,17 +2329,14 @@ Uses ARCHIVE_NODE and ARCHIVE_OLPATH properties to restore the entry."
       (org-back-to-heading t))
     
     ;; Verify we're in an archive section
-    (let ((archive-tag (member "ARCHIVE" (org-get-tags))))
-      (unless archive-tag
-	(user-error "Current heading doesn't appear to be in an archive section")))
+    (unless (member "ARCHIVE" (org-get-tags))
+      (user-error "Current heading doesn't appear to be in an archive section"))
     
     ;; Get archive metadata
     (let* ((archive-node-link (org-entry-get nil "ARCHIVE_NODE"))
            (archive-file (org-entry-get nil "ARCHIVE_FILE"))
            (archive-olpath (org-entry-get nil "ARCHIVE_OLPATH"))
-           (archive-time (org-entry-get nil "ARCHIVE_TIME"))
-           (archive-category (org-entry-get nil "ARCHIVE_CATEGORY"))
-           (archive-itags (org-entry-get nil "ARCHIVE_ITAGS")))
+           (archive-todo (org-entry-get nil "ARCHIVE_TODO")))
       
       (unless archive-node-link
 	(user-error "No ARCHIVE_NODE property found. This doesn't appear to be an archived entry"))
@@ -2328,7 +2346,7 @@ Uses ARCHIVE_NODE and ARCHIVE_OLPATH properties to restore the entry."
 			(match-string 1 archive-node-link)))
              (target-node (when node-id (org-roam-node-from-id node-id)))
              (target-file (or (when target-node (org-roam-node-file target-node))
-                              archive-file))) ; Fallback to ARCHIVE_FILE if node lookup fails
+                              archive-file)))
 	
 	(unless target-file
           (user-error "Could not determine target file from node %s or archive file %s" 
@@ -2346,7 +2364,7 @@ Uses ARCHIVE_NODE and ARCHIVE_OLPATH properties to restore the entry."
           (org-copy-subtree 1 nil)
           
           ;; Navigate to target and paste
-          (save-window-excursion  ; This ensures we stay in the same window
+          (save-window-excursion
             (with-current-buffer (find-file-noselect target-file)
               (save-excursion
 		(goto-char (point-min))
@@ -2354,16 +2372,13 @@ Uses ARCHIVE_NODE and ARCHIVE_OLPATH properties to restore the entry."
 		;; Navigate to the correct location
 		(if (and node-id (org-roam-id-find node-id))
                     (progn
-                      ;; Go to the node
                       (org-id-goto node-id)
-                      (setq paste-level 1) ; Start at level 1 under the node
+                      (setq paste-level 1)
                       
                       ;; If we have an OLPATH, navigate through it
                       (when (and archive-olpath (not (string-empty-p archive-olpath)))
 			(let ((path-components (split-string archive-olpath "/")))
-                          ;; Use org-roam-capture-find-or-create-olp to handle the path
                           (goto-char (org-roam-capture-find-or-create-olp path-components))
-                          ;; Calculate the paste level based on the path depth
                           (setq paste-level (+ 1 (length path-components))))))
                   ;; Fallback: if no node ID, try to use file and OLPATH
                   (when (and archive-olpath (not (string-empty-p archive-olpath)))
@@ -2377,22 +2392,28 @@ Uses ARCHIVE_NODE and ARCHIVE_OLPATH properties to restore the entry."
 		;; Paste the subtree at the correct level
 		(org-paste-subtree paste-level)
 		
-		;; Move to the pasted subtree and clean up properties
+		;; Move to the pasted subtree and clean up
 		(org-back-to-heading t)
+		
+		;; Restore TODO state before deleting properties
+		(when archive-todo
+                  (org-todo archive-todo))
+		
+		;; Delete archive properties
 		(mapc #'org-delete-property 
                       '("ARCHIVE_NODE" "ARCHIVE_TIME" "ARCHIVE_FILE" 
-			"ARCHIVE_OLPATH" "ARCHIVE_CATEGORY" "ARCHIVE_ITAGS"))
+			"ARCHIVE_OLPATH" "ARCHIVE_CATEGORY" "ARCHIVE_ITAGS"
+			"ARCHIVE_TODO"))
 		
 		(save-buffer))))
           
           ;; Now remove the original from archive buffer
           (goto-char archive-point)
           (org-back-to-heading t)
-          ;; Use org-cut-subtree with explicit count
           (org-cut-subtree 1)
           (save-buffer)
           
-          ;; Stay in the archive buffer with a success message
+          ;; Success message
           (message "Unarchived subtree to %s%s" 
                    target-file
                    (if archive-olpath 
@@ -2498,14 +2519,20 @@ you can catch it with `condition-case'."
 
   :commands (tags/make-db-searcher)
   :config
+
   (defun org/project-p ()
-    "Return non-nil if current buffer has a todo entry."
+    "Return non-nil if current buffer has a todo entry.
+Ignores headlines under ARCHIVE-tagged ancestors."
     (org-element-map
-        (org-element-parse-buffer 'headline)
-        'headline
+	(org-element-parse-buffer 'headline)
+	'headline
       (lambda (h)
-        (eq (org-element-property :todo-type h)
-            'todo))
+	;; Skip if this headline or any ancestor has :ARCHIVE: tag
+	(unless (org-element-lineage-map h
+                    (lambda (ancestor)
+                      (member "ARCHIVE" (org-element-property :tags ancestor)))
+                  'headline 'with-self 'first-match)
+          (eq (org-element-property :todo-type h) 'todo)))
       nil 'first-match))
 
   (defun org/has-anki-flashcards-p ()

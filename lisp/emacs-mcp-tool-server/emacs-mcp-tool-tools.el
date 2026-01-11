@@ -212,15 +212,16 @@ MCP Parameters: None"
                           (format-time-string "%Y-%m-%d %H:%M:%S")
                           (buffer-substring-no-properties (point-min) (point-max))))))))))))
 
-(defun emacs-mcp-tool-add-to-processing (item)
+(defun emacs-mcp-tool-add-to-processing (item &optional body)
   "Add an item to today's Processing section in org-roam dailies.
 
 MCP Parameters:
-  item - The text/topic to add to processing (e.g. 'look into algebraic effects for error handling')"
+  item - The text/topic to add to processing (e.g. 'look into algebraic effects for error handling')
+  body - Optional body/summary content for the entry"
+  
   (mcp-server-lib-with-error-handling
-    (let ((org-roam-capture-content item))
-      (org-roam-dailies-autocapture-today "p")
-      (format "Added to Processing: %s" item))))
+   (org-roam-dailies-autocapture-today "p" item body)
+   (format "Added to Processing: %s" item)))
 
 (defun emacs-mcp-tool-search-org-roam-dailies (query)
   "Search org-roam daily journal files for QUERY using ripgrep.
