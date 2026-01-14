@@ -1828,9 +1828,8 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
   :functions
   org-roam-node-from-ref
   :bind (("C-c n b " . org-roam-buffer-toggle)
-         ("C-c n f" . org-roam-node-find)
-         ("C-c n i" . org-roam-node-insert)
-	 ("C-c n n i" . org-roam-node-insert-from-url)
+         ("C-c n f" . js/org-roam-node-find)
+         ("C-c n i" . js/org-roam-node-insert)
          ("C-c n d" . org-roam-dailies-map)
          ("C-c n n r" . org-roam-refile)
          ("C-c n n g" . org-id-get-create)
@@ -1854,6 +1853,34 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
   :hook (org-roam-mode . visual-line-mode)
   
   :custom
+  
+  (org-roam-completion-everywhere t)
+  (org-roam-dailies-directory "journals/")
+  (org-roam-node-display-template
+   (concat "${title:*} " (propertize "${tags:40}" 'face 'org-tag)))
+
+  (org-archive-file-header-format nil)
+
+  :config
+  (defun js/org-roam-node-not-archived-p (node)
+    "Return non-nil if NODE should be shown.
+Filters out nodes with ARCHIVE tag."
+    (not (member "ARCHIVE" (org-roam-node-tags node))))
+
+  (defun js/org-roam-node-find (&optional arg)
+    "Find and open an Org-roam node, hiding archived by default.
+With C-u prefix, show all nodes including archived."
+    (interactive "P")
+    (let ((filter-fn (if arg nil #'js/org-roam-node-not-archived-p)))
+      (org-roam-node-find nil nil filter-fn)))
+
+  (defun js/org-roam-node-insert (&optional arg)
+    "Insert a link to an Org-roam node, hiding archived by default.
+With C-u prefix, show all nodes including archived."
+    (interactive "P")
+    (let ((filter-fn (if arg nil #'js/org-roam-node-not-archived-p)))
+      (org-roam-node-insert filter-fn)))
+  
   (org-id-link-to-org-use-id 'nil)
   (org-roam-mode-section-functions
    (list (lambda (node) (org-roam-backlinks-section
@@ -1870,14 +1897,6 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
 			 :section-heading "Archived backlinks: "))
 	 ))
 
-  (org-roam-completion-everywhere t)
-  (org-roam-dailies-directory "journals/")
-  (org-roam-node-display-template
-   (concat "${title:*} " (propertize "${tags:40}" 'face 'org-tag)))
-
-  (org-archive-file-header-format nil)
-
-  :config
   (add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
   
 ;;; -> org-roam -> Aesthetics
@@ -3182,7 +3201,7 @@ All other subheadings will be ignored."
 	  next-headline
 	nil)))
 
-  (defvar js/org-ancestor-block-states '("HOLD" "CANCELLED" "FAILED" "PROCESS")
+  (defvar js/org-ancestor-block-states '("HOLD" "CANCELLED" "FAILED" "PROCESS" "EXPLORE")
     "TODO states that hide their descendants from agenda views.")
 
   (defun js/org-skip-if-ancestor-blocked ()
@@ -3254,6 +3273,31 @@ All other subheadings will be ignored."
       (org-agenda-with-point-at-orig-entry nil
 	(org-roam-refile dest-node)))
     (next-line))
+
+  (defun js/agenda-refile ()
+    "Refile marked entries or the entry at point into the selected org-roam node.
+  
+If there are marked entries, refile all of them. Otherwise, refile
+the current entry at point and move to the next line."
+    (interactive)
+    ;; If no marks exist, mark the current entry for single-entry refile
+    (if (not org-agenda-bulk-marked-entries)
+	(save-excursion (org-agenda-bulk-mark)))
+    
+    (let ((dest-node (org-roam-node-read nil nil nil 'require-match)))
+      (dolist (marker (reverse org-agenda-bulk-marked-entries))
+	;; Navigate to each marked entry and refile it
+	(when (and (markerp marker)
+                   (marker-buffer marker)
+                   (buffer-live-p (marker-buffer marker))
+                   (marker-position marker))
+          (with-current-buffer (marker-buffer marker)
+            (goto-char (marker-position marker))
+            (org-roam-refile dest-node)))))
+    
+    ;; Clear marks and move cursor
+    (org-agenda-bulk-unmark-all)
+    (next-line))
   
   (defun js/agenda-roamify ()
     "Roamify URL at point from agenda."
@@ -3276,8 +3320,6 @@ All other subheadings will be ignored."
   (org-src-fontify-natively t)
   (org-src-tab-acts-natively t)
   (org-src-preserve-indentation t)
-  
-
   :config
   (require 'org-tempo)
   (require 'ob-haskell)
@@ -4601,6 +4643,69 @@ If a key is provided, use it instead of the default capture template."
                         (message "Add Entry: %s" id)
                         (if wallabag-show-entry-after-creation
                             (wallabag-show-entry (car (wallabag-db-select :id id))) ))))))))
+
+  (defun js/wallabag-roamify-entry ()
+    "Convert current wallabag entry into an org-roam node.
+Creates a new node with:
+- Wallabag link as a ref (wallabag:ID)
+- Source URL as a ref
+- Ready for note-taking
+
+In search mode, operates on the entry at point.
+In entry mode, operates on the current entry."
+    (interactive)
+    
+    ;; Get the current entry depending on the mode
+    (let ((entry
+           (pcase major-mode
+             ('wallabag-entry-mode
+              ;; In entry mode, get the entry from the title's text property
+              (get-text-property (point-min) 'wallabag-entry))
+             ('wallabag-search-mode
+              ;; In search mode, get the entry at point
+              (wallabag-find-candidate-at-point))
+             (_ (user-error "Not in a wallabag buffer")))))
+      
+      (unless entry
+	(user-error "No wallabag entry found"))
+      
+      (let* ((id (alist-get 'id entry))
+             (title (alist-get 'title entry))
+             (source-url (alist-get 'url entry))
+             (domain (alist-get 'domain_name entry))
+             
+             ;; Create the wallabag link with ID format
+             (wallabag-link (format "wallabag:%s" id))
+             
+             ;; Create descriptive title with domain if available
+             (working-title (if domain 
+				(format "%s (%s)" title domain)
+                              title))
+             
+             ;; Create a new node
+             (capture-node (org-roam-node-create :title working-title)))
+	
+	;; Define the finalizer function
+	(defun wallabag-roamify-finalizer ()
+          "Add both wallabag link and source URL as refs after capture."
+          (let ((node (org-roam-node-at-point)))
+            (when node
+              (let ((node-file (org-roam-node-file node)))
+		;; Add both refs to the created node
+		(with-current-buffer (find-file-noselect node-file)
+                  (goto-char (org-roam-node-point node))
+                  ;; Add wallabag reference
+                  (org-roam-ref-add wallabag-link)
+                  ;; Add source URL as reference
+                  (org-roam-ref-add source-url)
+                  (save-buffer)
+                  (message "Created node: %s" working-title))))))
+	
+	;; Create the node via org-roam-capture
+	(org-roam-capture-
+	 :keys "d"
+	 :node capture-node
+	 :props (list :finalize #'wallabag-roamify-finalizer)))))
   )
 
 ;;; -> Verb for HTTP Requests
