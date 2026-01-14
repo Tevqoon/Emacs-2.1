@@ -4454,6 +4454,7 @@ If a key is provided, use it instead of the default capture template."
 	 ("R" . wallabag-search-synchronize-and-clear-filter)
 	 ("Y" . wallabag-full-update)
          ("r" . wallabag-update-entry-archive)
+	 ("R" . js/wallabag-roamify-entry)
          
          :map wallabag-entry-mode-map
          ;; Entry mode keys (same as before)
@@ -4473,7 +4474,8 @@ If a key is provided, use it instead of the default capture template."
          ("y" . wallabag-org-link-copy)               
          ("f" . wallabag-update-entry-starred)        
          ("x" . wallabag-update-entry-archive)
-	 ("r" . wallabag-update-entry-archive))
+	 ("r" . wallabag-update-entry-archive)
+	 ("R" . js/wallabag-roamify-entry))
   :init
   ;; contains the wallabag info
   (load "~/.emacs.d/private-config.el")
