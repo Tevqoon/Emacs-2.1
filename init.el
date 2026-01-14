@@ -1861,6 +1861,24 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
 
   (org-archive-file-header-format nil)
 
+  (org-id-link-to-org-use-id 'nil)
+  (org-roam-mode-section-functions
+   (list (lambda (node) (org-roam-backlinks-section
+			 node
+			 :show-backlink-p (lambda (backlink) ; Add the negation of all refinements
+					    (and (not (archived-backlink-p backlink))
+						 ))
+			 :section-heading "Backlinks: "))
+         #'org-roam-reflinks-section
+         ;; #'org-roam-unlinked-references-section
+	 (lambda (node) (org-roam-backlinks-section
+			 node
+			 :show-backlink-p #'archived-backlink-p
+			 :section-heading "Archived backlinks: "))
+	 ))
+
+  (add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
+
   :config
   (defun js/org-roam-node-not-archived-p (node)
     "Return non-nil if NODE should be shown.
@@ -1881,23 +1899,6 @@ With C-u prefix, show all nodes including archived."
     (let ((filter-fn (if arg nil #'js/org-roam-node-not-archived-p)))
       (org-roam-node-insert filter-fn)))
   
-  (org-id-link-to-org-use-id 'nil)
-  (org-roam-mode-section-functions
-   (list (lambda (node) (org-roam-backlinks-section
-			 node
-			 :show-backlink-p (lambda (backlink) ; Add the negation of all refinements
-					    (and (not (archived-backlink-p backlink))
-						 ))
-			 :section-heading "Backlinks: "))
-         #'org-roam-reflinks-section
-         ;; #'org-roam-unlinked-references-section
-	 (lambda (node) (org-roam-backlinks-section
-			 node
-			 :show-backlink-p #'archived-backlink-p
-			 :section-heading "Archived backlinks: "))
-	 ))
-
-  (add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
   
 ;;; -> org-roam -> Aesthetics
   
