@@ -3335,7 +3335,6 @@ the current entry at point and move to the next line."
      (octave . t)
      (awk . t)
      (shell . t)
-     ;; (markdown . t)
      ))
 
 
@@ -3460,21 +3459,25 @@ the current entry at point and move to the next line."
 	 ("t" . elfeed-search-trash)
          ("T" . elfeed-filter-trash)
 	 ("A" . elfeed-filter-asmr)
+	 ("P" . elfeed-filter-papers)
          ("i" . open-youtube-in-iina)
          ("I" . download-selected-youtube-videos)
          ("D" . elfeed-filter-downloaded)
 	 ("s" . my/elfeed-show-default)
-	 ("P" . js/log-elfeed-process)
+	 ("U" . js/log-elfeed-process)
 	 ("B" . elfeed-browse-with-secondary-browser)
 	 ("W" . js/elfeed-entries-to-wallabag)
 	 ("O" . js/elfeed-entries-to-podcastify)
 	 ("<wheel-up>" . previous-line)
 	 ("<wheel-down>" . next-line)
+
+	 ("V" . elpapers-ingest-full)
+	 ("K" . elpapers-semantic-search)
 	 
          :map elfeed-show-mode-map
          ("SPC" . elfeed-scroll-up-command)
          ("S-SPC" . elfeed-scroll-down-command)
-	 ("P" . js/log-elfeed-process)
+	 ("U" . js/log-elfeed-process)
          ;; If called with C-u then bring up the capture buffer
 	 ("t" . elfeed-show-trash)
          ("i" . open-youtube-in-iina)
@@ -3482,6 +3485,7 @@ the current entry at point and move to the next line."
 	 ("B" . elfeed-browse-with-secondary-browser)
 	 ("W" . js/elfeed-entries-to-wallabag)
 	 ("O" . js/elfeed-entries-to-podcastify)
+	 ("V" . elpapers-ingest-full)
          )
   :hook
   (elfeed-show-mode . mixed-pitch-mode)
@@ -3588,6 +3592,11 @@ the current entry at point and move to the next line."
     "Open up the asmr tagged feed."
     (interactive)
     (elfeed-filter-maker "-trash +asmr @1-months-ago" "Showing ASMR."))
+
+  (defun elfeed-filter-papers ()
+    "Open up the papers tagged feed."
+    (interactive)
+    (elfeed-filter-maker "+papers" "Showing papers."))
 
   ;;; Modified so we can search both by feed name and author.
   (defun elfeed-search-compile-filter (filter)
@@ -4248,7 +4257,7 @@ If a key is provided, use it instead of the default capture template."
 	:map elfeed-search-mode-map
 	("F" . elfeed-tube-fetch)
 	([remap save-buffer] . elfeed-tube-save))
-  :custom (elfeed-tube-auto-save-p nil)
+  :custom (elfeed-tube-auto-save-p t)
   :config
   (elfeed-tube-setup)
   (defvar yt-dlp-priority-tags '(asmr chess osrs gaming essays)
@@ -4379,6 +4388,16 @@ If a key is provided, use it instead of the default capture template."
     (define-key elfeed-search-mode-map "=" elfeed-score-map))
 
   )
+
+;;; -> Elfeed -> Elpapers
+
+;;; Works for Emacs 30+
+(use-package elpapers
+  :demand t
+  :load-path "~/Documents/repos/elpapers/lisp/"
+  :init
+  ;; Explicitly load the API module since it's a separate file
+  (require 'elpapers))
 
 ;;; -> Elfeed -> End
 
