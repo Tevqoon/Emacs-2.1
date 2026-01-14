@@ -5071,6 +5071,33 @@ When pressed twice, make the sub/superscript roman."
   ;;             (setq comment-add 0)))
   )
 
+;;; --> Programming -> Restclient
+
+(use-package restclient
+  :ensure t
+  :mode (("\\.http\\'" . restclient-mode))
+  :bind (:map restclient-mode-map
+              ("C-c C-c" . restclient-http-send-current)
+              ("C-c C-v" . restclient-http-send-current-stay-in-window)
+              ("C-c C-r" . restclient-http-send-current-raw))
+  :config
+  (setq restclient-log-request t
+        restclient-same-buffer-response t
+        restclient-same-buffer-response-name "*HTTP Response*"))
+
+;;; --> Programming -> Docker
+
+(use-package dockerfile-mode
+  :ensure t)
+
+(use-package yaml-mode
+  :ensure t
+  :mode ("\\.ya?ml\\'"))
+
+(use-package docker
+  :ensure t
+  :bind ("M-s d" . docker))
+
 ;;; --> Video Trimmer
 (use-package video-trimmer
   :load-path "~/.emacs.d/lisp/"
