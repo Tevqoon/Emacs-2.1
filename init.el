@@ -2780,6 +2780,7 @@ CONTENTS is nil. INFO is a plist holding contextual information."
     "Make a note struct from current entry with modified field handling.
 The front of the note will be the heading unless a '** Front' subheading exists.
 The back field will be only the content before any subheadings unless a '** Back' subheading exists.
+The hint field will be empty unless a '** Hint' subheading exists.
 All other subheadings will be ignored."
     (let* ((deck (org-entry-get-with-inheritance anki-editor-prop-deck))
            (note-id (org-entry-get nil anki-editor-prop-note-id))
@@ -2793,9 +2794,10 @@ All other subheadings will be ignored."
            (content-before-subheading (anki-editor--note-contents-before-subheading))
            (front-field nil)
            (back-field nil)
+           (hint-field nil)
            (fields '()))
       
-      ;; Look for Front and Back subheadings
+      ;; Look for Front, Back, and Hint subheadings
       (save-excursion
 	(when (org-goto-first-child)
           (cl-loop
@@ -2811,6 +2813,8 @@ All other subheadings will be ignored."
            do (setq front-field content)
            when (string= subheading "Back")
            do (setq back-field content)
+           when (string= subheading "Hint")
+           do (setq hint-field content)
            while (org-get-next-sibling))))
       
       ;; If Front/Back not explicitly defined, use defaults
@@ -2819,19 +2823,12 @@ All other subheadings will be ignored."
       (unless back-field
 	(setq back-field content-before-subheading))
       
-      ;; Build fields alist based on note type
-      (cond
-       ;; For Basic note type
-       ((string= note-type "Basic")
-	(setq fields (list (cons "Front" front-field)
-                           (cons "Back" back-field))))
-       
-       ;; For other note types, you might need to customize further
-       (t
-	(setq fields (list (cons "Front" front-field)
-                           (cons "Back" back-field)))))
+      ;; Build fields alist for Basic note type with Hint
+      (setq fields (list (cons "Front" front-field)
+			 (cons "Back" back-field)
+			 (cons "Hint" (or hint-field ""))))
       
-      ;; Sort fields (as in the original function)
+      ;; Sort fields
       (setq fields (sort fields (lambda (a b) (string< (car a) (car b)))))
       
       (unless deck (user-error "Missing deck"))
