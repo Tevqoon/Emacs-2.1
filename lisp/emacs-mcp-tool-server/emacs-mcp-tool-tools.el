@@ -213,10 +213,12 @@ MCP Parameters: None"
                           (buffer-substring-no-properties (point-min) (point-max))))))))))))
 
 (defun emacs-mcp-tool-add-to-processing (item &optional body)
-  "Add an item to today's Processing section in org-roam dailies.
+  "Add an item to today's Processing queue in the daily journal.
+Use this when discussing something the user might want to remember,
+act on, or explore later - ideas, topics to research, things to try, etc.
 
 MCP Parameters:
-  item - The text/topic to add to processing (e.g. 'look into algebraic effects for error handling')
+  item - The text/topic to add to processing
   body - Optional body/summary content for the entry"
   
   (mcp-server-lib-with-error-handling
@@ -265,7 +267,7 @@ MCP Parameters:
 
 (emacs-mcp-register-tool
  '(:id "add_to_processing"
-   :description "Add an item to today's Processing queue in the daily journal. Use this when discussing something the user might want to remember, act on, or explore later - ideas, topics to research, things to try, etc."
+   :description "Add an item to today's Processing queue in the daily journal. Use this when discussing something the user might want to remember, act on, or explore later - ideas, topics to research, things to try, etc. Always read the org-processing skill before using this tool."
    :handler emacs-mcp-tool-add-to-processing))
 
 (emacs-mcp-register-tool

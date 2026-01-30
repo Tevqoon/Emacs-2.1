@@ -26,6 +26,7 @@
 ;; Comment/uncomment this line to enable MELPA Stable if desired.  See `package-archive-priorities`
 ;; and `package-pinned-packages`. Most users will not need or want to do this.
 ;;(add-to-list 'package-archives '("melpa-stable" . "https://stable.melpa.org/packages/") t)
+
 (package-initialize)
 
 (setq use-package-always-ensure t)
@@ -318,6 +319,10 @@ between Emacs sessions.")
   :custom
   (helpful-switch-buffer-function #'switch-to-buffer))
 
+(use-package devdocs
+  :bind
+  (("<f1> D" . devdocs-lookup)))
+
 ;;; -> Look and feel -> Tabs, frames, windows
 
 (use-package tab-bar
@@ -327,7 +332,7 @@ between Emacs sessions.")
   (tab-bar-format '(tab-bar-format-tabs tab-bar-separator))
   (tab-bar-close-last-tab-choice 'delete-frame)
   (tab-bar-auto-width nil)
-  (tab-bar-select-tab-modifiers '(super))
+  (tab-bar-select-tab-modifiers '(hyper))
 
   :bind (("s-t" . tab-bar-new-tab)
 	 ("s-T" . tab-undo)
@@ -391,7 +396,7 @@ between Emacs sessions.")
    (setq ns-control-modifier 'control)
    (define-key key-translation-map (kbd "ESC") (kbd "C-g")) ; works in gui only
 
-   ;;(setq ns-right-command-modifier 'hyper) ;; <- Currently unused, enough modifiers atm
+   (setq ns-control-modifier 'hyper)
    (add-hook 'ns-system-appearance-change-functions #'my/apply-theme)
 
    (defvar org-roam-directory "~/Documents/org")
@@ -409,6 +414,20 @@ between Emacs sessions.")
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
    (set-register ?j `(file . ,(concat org-directory "/journals/Journelly.org")))
    (set-register ?p `(file . ,(concat org-directory "/20250823160311-software.org")))
+
+   ;;; https://www.reddit.com/r/emacs/comments/1qlnde7/comment/o1fq5lj/
+   (defun start-process@use-pipe (fn &rest args)
+     ;; checkdoc-params: (fn args)
+     "Advice to ensure that `start-process' uses a pipe rather than
+a pty for the compilation command. This increases performance on OSX
+by a factor of 10, as the default pty size is a pitiful 1024 bytes."
+     (let ((process-connection-type nil))
+       (apply fn args)))
+
+   
+
+;;; NOTE: Might work as well: https://github.com/d12frosted/homebrew-emacs-plus/tree/master/community/patches/aggressive-read-buffering
+
    )
   ;;; Android configuration
   ('android
@@ -981,8 +1000,6 @@ exactly like the old ace-jump integration."
 
 (use-package crux
   :bind (([remap kill-line] . crux-smart-kill-line)
-  ;;; TODO: Figure out a better key
-	 ;; ("C-c e" . crux-eval-and-replace)
 	 ([remap move-beginning-of-line] . crux-move-beginning-of-line))
   )
 
@@ -1143,8 +1160,6 @@ exactly like the old ace-jump integration."
          ("M-j" . org-agenda-clock-goto) ; optional
          ("J" . bookmark-jump))) ; optional
 
-;;; TODO: Wgrep for deadgrep
-
 ;;; -> Searching and navigation -> Lookuppers
 
 (use-package wiki-summary
@@ -1279,18 +1294,12 @@ exactly like the old ace-jump integration."
     :endpoint "/api/v1/chat/completions"
     :stream t
     :key 'gptel-api-key-from-auth-source
-    :models '(openai/gpt-oss-20b:online
-	      openai/gpt-oss-120b:online
-	      anthropic/claude-sonnet-4))
-
-  (require 'gptel-responses)
-  (setq gptel-openai-responses--tools (list '(:type "web_search_preview")))
-  
-  (gptel-make-openai-responses "OAI Responses"
-    :stream t
-    :key 'gptel-api-key-from-auth-source
-    :models '(gpt-5-mini
-	      o4-mini-deep-research))
+    :models '(openai/gpt-4o
+	      openai/gpt-5-mini
+	      openai/o4-mini-deep-research
+	      anthropic/claude-sonnet-4)
+    ;; :request-params '(:provider (:only ["openai"]))
+    )
 
   ;;; -> GPTel -> Tool use
   ;; Don't include tool and reasoning blocks by default
@@ -1828,8 +1837,8 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
   :functions
   org-roam-node-from-ref
   :bind (("C-c n b " . org-roam-buffer-toggle)
-         ("C-c n f" . js/org-roam-node-find)
-         ("C-c n i" . js/org-roam-node-insert)
+         ;; ("C-c n f" . js/org-roam-node-find)
+         ;; ("C-c n i" . js/org-roam-node-insert)
          ("C-c n d" . org-roam-dailies-map)
          ("C-c n n r" . org-roam-refile)
          ("C-c n n g" . org-id-get-create)
@@ -1877,7 +1886,7 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
 			 :section-heading "Archived backlinks: "))
 	 ))
 
-  (add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
+  
 
   :config
   (defun js/org-roam-node-not-archived-p (node)
@@ -1898,7 +1907,8 @@ With C-u prefix, show all nodes including archived."
     (interactive "P")
     (let ((filter-fn (if arg nil #'js/org-roam-node-not-archived-p)))
       (org-roam-node-insert filter-fn)))
-  
+
+  (add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
   
 ;;; -> org-roam -> Aesthetics
   
@@ -2506,6 +2516,80 @@ you can catch it with `condition-case'."
   ) ;;
 ;;; End of org-roam package block
 
+;;; -> org-roam -> org-transclusion
+
+(use-package org-transclusion
+  :defer
+  :ensure t
+  :bind
+  (("<f12>" . org-transclusion-add)
+   ("s-<f12>" . org-transclusion-deactivate))
+  :custom
+  (org-transclusion-include-first-section nil))
+
+;;; -> Org-roam -> org-node
+
+(use-package org-mem
+  :defer
+  :custom
+  (org-mem-do-sync-with-org-id t)
+  :config
+  (org-mem-updater-mode))
+
+(use-package org-node
+  :after org-roam
+  :bind
+  (("C-c n f" . js/org-node-find)
+   ("C-c n i" . js/org-node-insert))
+  
+  :custom
+  (org-node-alter-candidates t) ; OLP support
+
+  ;; Performance tuning
+  (org-node-perf-keep-file-name-handlers nil)  ; Max speed
+
+  ;; Org-roam compatibility
+  (org-node-creation-fn #'org-node-new-via-roam-capture)
+  (org-node-file-slug-fn #'org-node-slugify-like-roam-default)
+  (org-node-file-timestamp-format "%Y%m%d%H%M%S-")
+  
+  ;; Directory configuration
+  (org-id-locations-file-relative t)
+  (org-node-extra-id-dirs 
+   (list org-roam-directory
+         (expand-file-name org-roam-dailies-directory org-roam-directory)))
+  
+  :config
+  ;; Your custom filtering logic
+  (defun js/org-node-not-archived-p (node)
+    "Return non-nil if NODE should be shown (not archived)."
+    (not (member "ARCHIVE" (org-node-get-tags node))))
+  
+  (defun js/org-node-find (&optional arg)
+    "Find and open an org-node, hiding archived by default.
+With C-u prefix, show all nodes including archived."
+    (interactive "P")
+    (let ((org-node-filter-fn 
+           (if arg nil #'js/org-node-not-archived-p)))
+      (org-node-find)))
+  
+  (defun js/org-node-insert (&optional arg)
+    "Insert a link to an org-node, hiding archived by default.
+With C-u prefix, insert a transclusion instead."
+    (interactive "P")
+    (if arg
+	(org-node-insert-transclusion)
+      (let ((org-node-filter-fn #'js/org-node-not-archived-p))
+	(org-node-insert-link))))
+  
+  ;; Initialize the cache
+  (org-node-cache-mode)
+  (org-node-cache-ensure)
+  (org-node-roam-accelerator-mode t)
+  )
+
+;;; -> Org-roam -> org-roam-ui
+
 (use-package org-roam-ui
   :after org-roam
   :custom
@@ -3110,7 +3194,7 @@ All other subheadings will be ignored."
   :defer t
   :custom
   (org-todo-keywords
-   '((sequence "TODO(t)" "NEXT(n)" "PROCESS(p)" "PROJECT(P)" "ACTIVE(a)" "EXPLORE(e)" "HOLD(h)" "COURSE(C)" "EXAM(E)"
+   '((sequence "TODO(t)" "NEXT(n)" "PROCESS(p)" "PROJECT(P)" "ACTIVE(a)" "EXPLORE(e)" "HOLD(h)" "COURSE(C)" "EXAM(E)" "IDEA(I)"
 	       "|" "DONE(d)" "CANCELLED(c)" "FAILED(F)" "NAREDU(N)")))
 
   (org-agenda-start-with-log-mode t)
@@ -3255,9 +3339,10 @@ All other subheadings will be ignored."
 				     (air-org-skip-subtree-if-priority ?B)
                                      (air-org-skip-if-blocked)
 				     (org-agenda-skip-if nil '(scheduled deadline))
-				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM"))
+				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA"))
 				     (js/org-skip-if-ancestor-blocked)))
 			       (org-agenda-overriding-header "* All normal priority tasks:")))
+		  (todo "IDEA" ((org-agenda-overriding-header "* Ideas: ")))
 		  (todo "HOLD" ((org-agenda-overriding-header "* Currently on hold: ")))
 		  (todo "EXPLORE" ((org-agenda-overriding-header "* Things to explore: ")))
 		  )))))
@@ -3594,7 +3679,7 @@ the current entry at point and move to the next line."
   (defun elfeed-filter-papers ()
     "Open up the papers tagged feed."
     (interactive)
-    (elfeed-filter-maker "+papers" "Showing papers."))
+    (elfeed-filter-maker "-trash +papers @1-months-ago" "Showing papers."))
 
   ;;; Modified so we can search both by feed name and author.
   (defun elfeed-search-compile-filter (filter)
@@ -4395,7 +4480,9 @@ If a key is provided, use it instead of the default capture template."
   :load-path "~/Documents/repos/elpapers/lisp/"
   :init
   ;; Explicitly load the API module since it's a separate file
-  (require 'elpapers))
+  (require 'elpapers)
+  :config
+  (elpapers-enable-auto-ingest))
 
 ;;; -> Elfeed -> End
 
@@ -4740,10 +4827,14 @@ In entry mode, operates on the current entry."
   :bind ("C-x g" . magit-status)
   :custom
   (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1)
+  (magit-process-connection-type nil)
   :config
   (when (eq system-type 'darwin)
     (setq magit-git-executable "/opt/homebrew/bin/git"))
   )
+
+(use-package magit-delta
+  :hook (magit-mode . magit-delta-mode))
 
 (use-package hl-todo
   :config
@@ -4756,10 +4847,36 @@ In entry mode, operates on the current entry."
 
 (use-package crdt)
 
+(use-package quickrun
+  :bind (("C-c C-r" . js/quickrun-dwim))
+  :config
+  (quickrun-add-command "python"
+    '((:command . "python3")
+      (:compile-only . "pyflakes %s")
+      (:description . "Run Python script"))
+    :override t)
+
+  (defun js/quickrun-dwim ()
+    "Run quickrun on region if active, otherwise on buffer."
+    (interactive)
+    (if (region-active-p)
+        (call-interactively #'quickrun-region)
+      (call-interactively #'quickrun)))
+  )
+
 (use-package git-timemachine
   :defer t)
 
+(use-package dumb-jump
+  :custom
+  (dumb-jump-force-searcher 'rg)
+  (dumb-jump-prefer-searcher 'rg)
+  (xref-show-definitions-function #'xref-show-definitions-completing-read)
+  :config
+  (add-hook 'xref-backend-functions #'dumb-jump-xref-activate))
+
 (use-package flymake
+  :defer t
   :ensure nil  ; built-in package
   :hook
   (prog-mode . flymake-mode)
@@ -4769,9 +4886,60 @@ In entry mode, operates on the current entry."
   :bind (:map flymake-mode-map
               ("M-n" . flymake-goto-next-error)
               ("M-p" . flymake-goto-prev-error)
-	      ("M-l" . flymake-show-buffer-diagnostics))
-  )
+	      ("M-l" . flymake-show-buffer-diagnostics)
+	      ))
 
+(use-package flyover
+  :ensure t
+  :hook ((flycheck-mode . flyover-mode)
+         (flymake-mode . flyover-mode))
+  :custom
+  ;; Checker settings
+  (flyover-checkers '(flycheck flymake))
+  (flyover-levels '(error))
+
+  ;; Appearance
+  (flyover-use-theme-colors t)
+  (flyover-background-lightness 45)
+
+  ;; Text tinting
+  (flyover-text-tint 'lighter)
+  (flyover-text-tint-percent 50)
+
+  ;; Icon tinting (foreground and background)
+  (flyover-icon-tint 'lighter)
+  (flyover-icon-tint-percent 50)
+  (flyover-icon-background-tint 'darker)
+  (flyover-icon-background-tint-percent 50)
+
+  ;; Icons
+  (flyover-info-icon " ")
+  (flyover-warning-icon " ")
+  (flyover-error-icon " ")
+
+  ;; Border styles: none, pill, arrow, slant, slant-inv, flames, pixels
+  (flyover-border-style 'pill)
+  (flyover-border-match-icon t)
+
+  ;; Display settings
+  (flyover-hide-checker-name t)
+  (flyover-show-virtual-line t)
+  (flyover-virtual-line-type 'curved-dotted-arrow)
+  (flyover-line-position-offset 1)
+
+  ;; Message wrapping
+  (flyover-wrap-messages t)
+  (flyover-max-line-length 80)
+
+  ;; Performance
+  (flyover-debounce-interval 0.2)
+  (flyover-cursor-debounce-interval 0.3)
+
+  ;; Display mode (controls cursor-based visibility)
+  (flyover-display-mode 'always)
+
+  ;; Completion integration
+  (flyover-hide-during-completion t))
 
 (use-package aggressive-indent
   :diminish aggressive-indent-mode)
@@ -4919,6 +5087,7 @@ When pressed twice, make the sub/superscript roman."
      ("imb" "Implied" "\\impliedby" nil nil nil t)
      ("le" "leq" "\\leq" nil nil nil t)
      ("ge" "geq" "\\geq" nil nil nil t)
+     ("int" "int" "\\int" nil nil nil t)
 
      ("or" "text or in math" "\\text{ or }" nil nil nil t)
      ("and" "text and in math" "\\text{ and }" nil nil nil t)
