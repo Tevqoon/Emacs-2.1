@@ -1501,8 +1501,11 @@ exactly like the old ace-jump integration."
   (defun js/org-rename-buffer-to-title ()
     "Rename buffer to value of #+TITLE:."
     (interactive)
-    (let ((title (cadar (org-collect-keywords '("title")))))
-      (when title (rename-buffer title))))
+    ;; Don't rename temp/hidden buffers (those starting with space)
+    (unless (string-prefix-p " " (buffer-name))
+      (let ((title (cadar (org-collect-keywords '("title")))))
+	(when title (rename-buffer title)))))
+
   
   (defun js/org-rename-buffer-to-title-enable ()
     "Enable buffer renaming for the current buffer.
@@ -2563,7 +2566,7 @@ you can catch it with `condition-case'."
   ;; Your custom filtering logic
   (defun js/org-node-not-archived-p (node)
     "Return non-nil if NODE should be shown (not archived)."
-    (not (member "ARCHIVE" (org-node-get-tags node))))
+    (not (member "ARCHIVE" (org-mem-tags node))))
   
   (defun js/org-node-find (&optional arg)
     "Find and open an org-node, hiding archived by default.
@@ -2580,7 +2583,7 @@ With C-u prefix, insert a transclusion instead."
     (if arg
 	(org-node-insert-transclusion)
       (let ((org-node-filter-fn #'js/org-node-not-archived-p))
-	(org-node-insert-link))))
+	(org-node-insert-link*))))
   
   ;; Initialize the cache
   (org-node-cache-mode)
@@ -3482,6 +3485,210 @@ the current entry at point and move to the next line."
   ;;             (when (member "checklist" (org-get-tags))
   ;;               (local-set-key (kbd "C-c C-c") #'js/checklist-export-buffer))))
   )
+
+;;; -> Org Mode -> org-static-blog
+;;; Blog + Personal website configuration
+
+(use-package htmlize
+  :ensure t
+  :custom
+  (org-html-htmlize-output-type 'css))
+
+(use-package org-static-blog
+  :after org-roam
+  :custom
+  (org-static-blog-publish-title "My Blog")
+  (org-static-blog-publish-url "https://www.jure-smolar.com/")
+  (org-static-blog-publish-directory "~/Documents/blog/")
+  (org-static-blog-posts-directory org-roam-directory)
+  (org-static-blog-drafts-directory org-roam-directory)
+  (org-static-blog-enable-tags t)
+  (org-export-with-toc nil)
+  (org-export-with-section-numbers nil)
+  (org-static-blog-use-preview t)
+  (org-static-blog-enable-tag-rss t)
+  (org-static-blog-enable-og-tags t)
+  
+  (org-static-blog-page-header
+ "<meta name=\"author\" content=\"Jure Smolar\">
+<meta name=\"referrer\" content=\"no-referrer\">
+<meta name=\"viewport\" content=\"initial-scale=1,width=device-width,minimum-scale=1\">
+<link href=\"static/sakura.css\" rel=\"stylesheet\" type=\"text/css\" />
+<link href=\"static/custom.css\" rel=\"stylesheet\" type=\"text/css\" />
+<link rel=\"icon\" href=\"static/favicon.ico\">
+<script src=\"static/mathjax-config.js\"></script>
+<script id=\"MathJax-script\" async src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\"></script>
+")
+
+  (org-static-blog-page-preamble
+   "<nav class=\"header\">
+  <div class=\"header-left\">
+    <a href=\"/\">Home</a>
+    <a href=\"/archive.html\">Archive</a>
+    <a href=\"/tags.html\">Tags</a>
+    <a href=\"/rss.xml\">RSS</a>
+  </div>
+  <div class=\"header-right\">
+    <a href=\"/about.html\">About</a>
+  </div>
+</nav>")
+
+  (org-static-blog-page-postamble ;; End of <body> on every page
+	nil )
+
+  ;; This HTML code is inserted into the index page between the preamble and
+  ;;   the blog posts
+  (org-static-blog-index-front-matter ;; Between preamble and blog posts on index page
+	"<h1> Welcome to my blog </h1>\n")
+  
+  :config
+  (defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page")
+    "Tags used for file management that shouldn't appear on the blog.")
+
+  ;; These tags should not be inherited to facilitate future subtree publishing
+  (add-to-list 'org-tags-exclude-from-inheritance "blog")
+  (add-to-list 'org-tags-exclude-from-inheritance "note")
+  
+  ;; Override to use org-roam query instead of subfolders
+  (defun org-static-blog-get-post-filenames ()
+    "Get blog posts from org-roam :blog: tag."
+    (mapcar #'car
+            (org-roam-db-query
+             [:select [nodes:file]
+              :from nodes
+              :inner-join tags
+              :on (= tags:node-id nodes:id)
+              :where (= tags:tag "blog")])))
+  
+  (defun org-static-blog-get-draft-filenames ()
+  "Get static pages from org-roam :page: tag."
+  (mapcar #'car
+          (org-roam-db-query
+           [:select [nodes:file]
+            :from nodes
+            :inner-join tags
+            :on (= tags:node-id nodes:id)
+            :where (= tags:tag "blog-static-page")])))
+  
+  (defun org-static-blog-get-tags (post-filename)
+    "Extract tags from POST-FILENAME, excluding management tags."
+    (let ((case-fold-search t)
+          (all-tags nil))
+      (with-temp-buffer
+        (insert-file-contents post-filename)
+        (goto-char (point-min))
+        (when (or (search-forward-regexp "^\\#\\+filetags:[ ]*:\\(.*\\):$" nil t)
+                  (search-forward-regexp "^\\#\\+filetags:[ ]*\\(.+\\)$" nil t))
+          (setq all-tags (if (match-string 1)
+                            (split-string (match-string 1) ":")
+                          (split-string (match-string 1))))))
+      ;; Filter out ignored tags
+      (cl-remove-if (lambda (tag)
+                      (member (downcase tag) orb-ignored-tags))
+                    all-tags)))
+
+  (defun my/org-static-blog-link (link desc info)
+  "Transcode ID links to proper blog post URLs.
+Falls back to standard org-html-link for other link types."
+  (if (not (string= (org-element-property :type link) "id"))
+      (org-html-link link desc info)
+    (let* ((id (org-element-property :path link))
+           (node (org-roam-node-from-id id))
+           (tags (and node (org-roam-node-tags node)))
+           (published-p (and tags (seq-intersection tags '("blog" "blog-static-page" "note"))))
+           (fallback-desc (if node (org-roam-node-title node) id)))
+      (if published-p
+          (format "<a href=\"/%s\">%s</a>"
+                  (org-static-blog-get-post-public-path (org-roam-node-file node))
+                  (or desc (org-roam-node-title node)))
+        (format "<a href=\"broken-link.html\" class=\"broken-link\">%s</a>"
+                (or desc fallback-desc))))))
+
+;; Redefine the backend every time before rendering
+  (defun my/setup-blog-backend (&rest _args)
+    "Ensure our custom link and tikzcd handlers are in the backend."
+    (org-export-define-derived-backend 'org-static-blog-post-bare 'html
+      :translate-alist '((template . (lambda (contents info) contents))
+			 (link . my/org-static-blog-link)
+			 )))
+
+
+;; Hook into the render function
+  (advice-add 'org-static-blog-render-post-content :before #'my/setup-blog-backend)
+
+  (defvar js/tikzcd-svg-directory "diagrams/"
+    "Directory for tikzcd SVG files, relative to org file.")
+
+  (defun js/tikzcd-to-svg ()
+    "Render tikzcd environment at point to SVG and insert link.
+Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
+    (interactive)
+    (save-excursion
+      (let* ((start (progn (search-backward "\\begin{tikzcd}") (point)))
+             (end (progn (search-forward "\\end{tikzcd}") (point)))
+             (tikzcd-code (buffer-substring-no-properties start end))
+             (filename (read-string "SVG filename (without extension): "))
+             (svg-file (concat filename ".svg"))
+             (temp-dir (make-temp-file "tikzcd" t))
+             (temp-tex (expand-file-name "diagram.tex" temp-dir))
+             (temp-pdf (expand-file-name "diagram.pdf" temp-dir))
+             (temp-svg (expand-file-name "diagram.svg" temp-dir))
+             (org-dir (file-name-directory (buffer-file-name)))
+             (svg-dir (expand-file-name js/tikzcd-svg-directory org-dir))
+             (output-path (expand-file-name svg-file svg-dir))
+             (relative-link (concat js/tikzcd-svg-directory svg-file)))
+	
+	;; Create output directory if it doesn't exist
+	(unless (file-exists-p svg-dir)
+          (make-directory svg-dir t))
+	
+	;; Write LaTeX file
+	(with-temp-file temp-tex
+          (insert "\\documentclass[border=2pt]{standalone}\n")
+          (insert "\\usepackage{tikz-cd}\n")
+          (insert "\\usepackage{amsmath}\n")
+          (insert "\\usepackage{amssymb}\n")
+          (insert "\n\\begin{document}\n")
+          (insert tikzcd-code)
+          (insert "\n\\end{document}\n"))
+	
+	;; Compile to PDF in temp directory
+	(message "Compiling LaTeX...")
+	(shell-command (format "cd %s && pdflatex -interaction=nonstopmode diagram.tex"
+                               temp-dir))
+	
+	;; Convert to SVG and copy to destination
+	(if (file-exists-p temp-pdf)
+            (progn
+              (message "Converting to SVG...")
+              (shell-command (format "pdf2svg %s %s" temp-pdf temp-svg))
+              
+              (if (file-exists-p temp-svg)
+                  (progn
+                    ;; Copy SVG to destination
+                    (copy-file temp-svg output-path t)
+                    
+                    ;; Cleanup entire temp directory
+                    (delete-directory temp-dir t)
+                    
+                    ;; Insert link
+                    (goto-char end)
+                    (insert (format "\n\n[[file:%s]]\n" relative-link))
+                    (message "Created %s" output-path))
+		(progn
+                  (delete-directory temp-dir t)
+                  (error "SVG conversion failed"))))
+          (progn
+            (delete-directory temp-dir t)
+            (error "PDF compilation failed"))))))
+
+  )
+
+;;; End of org-static-blog code block.
+
+
+
+
 
 ;;; -> Org Mode -> Open Street map
 
