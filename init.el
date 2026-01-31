@@ -3561,14 +3561,15 @@ the current entry at point and move to the next line."
               :where (= tags:tag "blog")])))
   
   (defun org-static-blog-get-draft-filenames ()
-  "Get static pages from org-roam :page: tag."
-  (mapcar #'car
-          (org-roam-db-query
-           [:select [nodes:file]
-            :from nodes
-            :inner-join tags
-            :on (= tags:node-id nodes:id)
-            :where (= tags:tag "blog-static-page")])))
+    "Get static pages from org-roam :page: tag."
+    (mapcar #'car
+            (org-roam-db-query
+             [:select [nodes:file]
+		      :from nodes
+		      :inner-join tags
+		      :on (= tags:node-id nodes:id)
+		      :where (or (= tags:tag "blog-static-page")
+				 (= tags:tag "draft"))])))
   
   (defun org-static-blog-get-tags (post-filename)
     "Extract tags from POST-FILENAME, excluding management tags."
