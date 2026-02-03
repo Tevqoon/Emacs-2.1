@@ -1696,36 +1696,33 @@ Automatically expands the heading if it's folded."
     (org-previous-visible-heading 1)
     (my/org-narrow-to-heading-content))
 
-  ;;; -> Org mode -> Heading autosorting
-
-  ;; Inspired by
-  ;; https://christiantietze.de/posts/2025/04/keep-org-mode-items-sorted-alphabetically/
-  ;; https://edoput.it/2025/04/16/emacs-paradigm-shift.html
-
-  (defvar js/org-sort-priority-headings
-    '("Processing" "Web" "Elfeed" "Processed today" "Archived today")
-    "List of heading titles in priority order. Unlisted headings sort first.")
-
-  (defun js/org-priority-sort-key (priority-list)
-    "Return sort key for current heading based on PRIORITY-LIST."
-    (let* ((title (org-get-heading t t t t))
-           (position (cl-position title priority-list :test #'string=)))
-      (if position (+ 1000 position) 0)))
-
-  (defun js/org-sort-by-priority (&optional priority-list)
-    "Sort all top-level org entries with unlisted headings first, then PRIORITY-LIST order.
-PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
+  (defun js/org-goto-first-sibling ()
+    "Move to first sibling at current level."
     (interactive)
-    (let ((headings (or priority-list js/org-sort-priority-headings)))
-      (save-excursion
-	(save-restriction
-          (widen)
-          (goto-char (point-min))
-          (org-sort-entries 
-           nil ?f
-           (lambda () (js/org-priority-sort-key headings))
-           #'<)))))
+    (org-back-to-heading t)
+    (if (org-up-heading-safe)
+	(org-goto-first-child)
+      (goto-char (point-min))
+      (unless (org-at-heading-p) (outline-next-heading))))
 
+  (defun js/org-goto-last-sibling ()
+    "Move to last sibling at current level."
+    (interactive)
+    (org-back-to-heading t)
+    (let ((pos (point)))
+      (while (org-get-next-sibling)
+	(setq pos (point)))
+      (goto-char pos)))
+
+  (defun js/org-sort-siblings-by-todo ()
+    "Sort sibling entries by todo state order."
+    (interactive)
+    (save-excursion
+      (if (org-up-heading-safe)
+          (org-sort-entries nil ?o)
+	;; At top level, sort the whole file's top-level headings
+	(goto-char (point-min))
+	(org-sort-entries nil ?o))))
   )
 ;;; End of org-mode package block
 
@@ -1845,22 +1842,26 @@ PRIORITY-LIST defaults to `js/org-sort-priority-headings'."
          ("C-c n d" . org-roam-dailies-map)
          ("C-c n n r" . org-roam-refile)
          ("C-c n n g" . org-id-get-create)
-         ("C-c n n t" . org-roam-extract-subtree)
+         ("C-c n n t" . js/org-roam-extract-subtree)
          ("C-c n n a" . org-roam-alias-add)
          ("C-c n c" . org-capture-task)
          ("C-c n n u" . org-roam-ui-open)
 	 ("C-c n o" . open-urls-at-point-or-region)
 	 ("C-c n r" . js/roamify-url-at-point)
 	 ("C-c n t" . org-roam-tag-add)
-	 ("C-c n s" . org-roam-db-sync)
+	 ("C-c n n s" . org-roam-db-sync)
 
          :map org-mode-map
          ("C-M-i" . completion-at-point)
 
 	 ;; Narrowing and movement
-	 ("C-c n ." . my/org-narrow-to-heading-content) ;; current position
-	 ("C-c n >" . my/org-next-heading-narrow)       ;; move forward
-	 ("C-c n <" . my/org-previous-heading-narrow)   ;; move backward
+	 ;; ("C-c n ." . my/org-narrow-to-heading-content) ;; current position
+	 ;; ("C-c n >" . my/org-next-heading-narrow)       ;; move forward
+	 ;; ("C-c n <" . my/org-previous-heading-narrow)   ;; move backward
+
+	 ("C-c n >" . js/org-goto-last-sibling)
+	 ("C-c n <" . js/org-goto-first-sibling)
+	 ("C-c n s d" . js/org-sort-siblings-by-todo)
          )
   :hook (org-roam-mode . visual-line-mode)
   
