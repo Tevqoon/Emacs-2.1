@@ -1498,6 +1498,9 @@ exactly like the old ace-jump integration."
    )
   
   :config
+  ;; Open links in the same window
+  (setf (alist-get 'file org-link-frame-setup) #'find-file)
+  
   (defun js/org-rename-buffer-to-title ()
     "Rename buffer to value of #+TITLE:."
     (interactive)
@@ -1913,6 +1916,47 @@ With C-u prefix, show all nodes including archived."
       (org-roam-node-insert filter-fn)))
 
   (add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
+
+  (defun js/org-roam-extract-subtree (&optional no-link)
+  "Extract subtree to org-roam node.
+If heading contains a non-id link, adds it as ROAM_REFS.
+By default, replaces the heading with a link to the new node.
+With prefix arg NO-LINK, leave nothing behind (original behavior)."
+  (interactive "P")
+  (org-back-to-heading-or-point-min t)
+  (when (bobp) (user-error "Already a top-level node"))
+  (let* ((heading-text (org-get-heading t t t t))
+         (link-parts (js/extract-org-link heading-text))
+         (url (car link-parts))
+         (is-ref-link (and url (not (string-prefix-p "id:" url))))
+         (title (if (and is-ref-link (cadr link-parts)
+                         (not (string-empty-p (cadr link-parts))))
+                    (cadr link-parts)
+                  heading-text))
+         (level (org-current-level))
+         (marker (point-marker))
+         (id (org-id-get-create)))
+    (when is-ref-link
+      (org-edit-headline title))
+    (save-buffer)
+    (org-roam-extract-subtree)
+    ;; Add ref in the new file
+    (when is-ref-link
+      (when-let* ((node (org-roam-node-from-id id))
+                  (file (org-roam-node-file node)))
+        (with-current-buffer (find-file-noselect file)
+          (goto-char (org-roam-node-point node))
+          (org-roam-ref-add url)
+          (save-buffer))))
+    ;; Insert link at original position (unless suppressed)
+    (unless no-link
+      (with-current-buffer (marker-buffer marker)
+        (goto-char marker)
+        (set-marker marker nil)
+        (insert (make-string level ?*) " "
+                (org-link-make-string (concat "id:" id) title)
+                "\n")
+        (forward-line -1)))))
   
 ;;; -> org-roam -> Aesthetics
   
@@ -2585,6 +2629,70 @@ With C-u prefix, insert a transclusion instead."
 	(org-node-insert-transclusion)
       (let ((org-node-filter-fn #'js/org-node-not-archived-p))
 	(org-node-insert-link*))))
+
+  (defun org-node-insert-link (&optional region-as-initial-input novisit)
+    "Insert a link to one of your ID nodes.
+
+To behave exactly like org-roam\\='s `org-roam-node-insert',
+see `org-node-insert-link*', or pass REGION-AS-INITIAL-INPUT t.
+
+Argument NOVISIT for use by `org-node-insert-link-novisit'."
+    (interactive "@*" org-mode)
+    
+    ;; (unless (derived-mode-p 'org-mode)
+    ;;   (user-error "Only works in org-mode buffers"))
+    (org-node-cache-ensure)
+    (let* ((beg nil)
+           (end nil)
+           (region-text (when (region-active-p)
+                          (setq end (region-end))
+                          (goto-char (region-beginning))
+                          (skip-chars-forward "\n[:space:]")
+                          (setq beg (point))
+                          (goto-char end)
+                          (skip-chars-backward "\n[:space:]")
+                          (setq end (point))
+                          (org-link-display-format
+                           (buffer-substring-no-properties beg end))))
+           (initial (if (or region-as-initial-input
+                            (and region-text
+				 (try-completion region-text
+						 org-node--title<>affixations)))
+			region-text
+                      nil))
+           (_ (when (eq t initial)
+		;; Guard against `try-completion' returning t instead of a string
+		;; (who knew?!)
+		(setq initial nil)))
+           (input (if (and novisit initial)
+                      initial
+                    (org-node-read-candidate nil t initial)))
+           (_ (when (string-blank-p input)
+		(setq input (funcall org-node-blank-input-title-generator))))
+           (node (gethash input org-node--candidate<>entry))
+           (id (if node (org-mem-id node) (org-id-new)))
+           (link-desc (or region-text
+                          (and node
+                               org-node-custom-link-format-fn
+                               (funcall org-node-custom-link-format-fn node))
+                          (and (not org-node-alter-candidates) input)
+                          (and node (seq-find (##string-search % input)
+                                              (org-mem-entry-roam-aliases node)))
+                          (and node (org-mem-entry-title node))
+                          input)))
+      (atomic-change-group
+	(when region-text
+          (delete-region beg end))
+	;; TODO: When inserting a citation, insert a [cite:] instead of a normal
+	;;       link
+	;; (if (string-prefix-p "@" input))
+	(insert (org-link-make-string (concat "id:" id) link-desc)))
+      (run-hooks 'org-node-insert-link-hook)
+      ;; TODO: Delete the link if a node was not created
+      ;;       See `org-node-insert-transclusion'
+      ;; TODO: Respect `org-node-stay-in-source-buffer'
+      (unless node
+	(org-node-create input id))))
   
   ;; Initialize the cache
   (org-node-cache-mode)
@@ -3197,9 +3305,11 @@ All other subheadings will be ignored."
   :ensure org
   :defer t
   :custom
-  (org-todo-keywords
-   '((sequence "TODO(t)" "NEXT(n)" "PROCESS(p)" "PROJECT(P)" "ACTIVE(a)" "EXPLORE(e)" "HOLD(h)" "COURSE(C)" "EXAM(E)" "IDEA(I)"
-	       "|" "DONE(d)" "CANCELLED(c)" "FAILED(F)" "NAREDU(N)")))
+  (setq org-todo-keywords
+      '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)" 
+                  "TODO(t)" "PROCESS(p)" "EXPLORE(e)" "IDEA(I)" "HOLD(h)"
+                  "|" 
+                  "DONE(d)" "CANCELLED(c)" "FAILED(F)" "NAREDU(N)")))
 
   (org-agenda-start-with-log-mode t)
   (org-log-done 'time)
@@ -3350,7 +3460,7 @@ All other subheadings will be ignored."
 		  (todo "HOLD" ((org-agenda-overriding-header "* Currently on hold: ")))
 		  (todo "EXPLORE" ((org-agenda-overriding-header "* Things to explore: ")))
 		  )))))
-
+   
   ;;; -> Org mode -> Agenda -> Refiling integration
 
   (defun js/agenda-refile ()
@@ -3543,7 +3653,7 @@ the current entry at point and move to the next line."
 	"<h1> Welcome to my blog </h1>\n")
   
   :config
-  (defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page")
+  (defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page" "draft")
     "Tags used for file management that shouldn't appear on the blog.")
 
   ;; These tags should not be inherited to facilitate future subtree publishing
@@ -5329,6 +5439,11 @@ When pressed twice, make the sub/superscript roman."
       "\\prod\\limits_{?}^{}"  cdlatex-position-cursor nil nil t)
      ("capl"       "Insert \\bigcap\\limits_{}^{}"
       "\\bigcap\\limits_{?}^{}"  cdlatex-position-cursor nil nil t)
+     ("wedgel"       "Insert \\bigwedge\\limits_{}^{}"
+      "\\bigwedge\\limits_{?}^{}"  cdlatex-position-cursor nil nil t)
+     ("veel"       "Insert \\bigvee\\limits_{}^{}"
+      "\\bigvee\\limits_{?}^{}"  cdlatex-position-cursor nil nil t)
+     
      ("bin"       "Insert \\binom{}{}"
       "\\binom{?}{}"  cdlatex-position-cursor nil nil t)
      ("oper"       "Insert \\operatorname{}"
@@ -5342,6 +5457,7 @@ When pressed twice, make the sub/superscript roman."
      (?t "\\text" nil t nil nil)
      (?o "\\mathring" nil t nil nil)
      ( ?C    "\\mathcal"           nil        t   nil nil )
+     ( ?B    "\\mathbb"            nil t   nil nil )
      ))
 
   (cdlatex-math-symbol-alist
