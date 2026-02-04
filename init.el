@@ -2351,7 +2351,7 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
       (equal "Archived today" (car outline))))
 
   ;; https://freerangebits.com/posts/2024/01/archiving-in-org-mode/
-  (defun pjones:org-archive-subtree-to-daily (&optional _find-done)
+  (defun js/org-archive-subtree-to-daily (&optional _find-done)
     "Archive the current subtree to the roam daily file."
     (interactive "P")
     (require 'org-roam)
@@ -2391,7 +2391,7 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
       (save-buffer)))
 
   (custom-set-variables
-   '(org-archive-default-command #'pjones:org-archive-subtree-to-daily))
+   '(org-archive-default-command #'js/org-archive-subtree-to-daily))
 
   (setq org-archive-subtree-save-file-p t)
 
