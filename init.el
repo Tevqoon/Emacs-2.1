@@ -338,7 +338,8 @@ between Emacs sessions.")
 	 ("s-T" . tab-undo)
 	 ("s-w" . tab-close)
 	 ("C-s-f" . toggle-frame-fullscreen)
-	 ("s-o" . other-window))
+	 ("s-o" . other-window)
+	 ("M-s-d" . tab-bar-duplicate-tab))
   :config
   (tab-bar-mode 1))
 
@@ -1839,7 +1840,7 @@ Automatically expands the heading if it's folded."
   :ensure t
   :functions
   org-roam-node-from-ref
-  :bind (("C-c n b " . org-roam-buffer-toggle)
+  :bind (("C-c n n b " . org-roam-buffer-toggle)
          ;; ("C-c n f" . js/org-roam-node-find)
          ;; ("C-c n i" . js/org-roam-node-insert)
          ("C-c n d" . org-roam-dailies-map)
@@ -1853,6 +1854,10 @@ Automatically expands the heading if it's folded."
 	 ("C-c n r" . js/roamify-url-at-point)
 	 ("C-c n t" . org-roam-tag-add)
 	 ("C-c n n s" . org-roam-db-sync)
+
+	 ;; Blog
+	 ("C-c n b b" . org-static-blog-publish)
+	 ("C-c n b p" . js/sync-blog)
 
          :map org-mode-map
          ("C-M-i" . completion-at-point)
@@ -2697,7 +2702,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
   ;; Initialize the cache
   (org-node-cache-mode)
   (org-node-cache-ensure)
-  (org-node-roam-accelerator-mode t)
+  (org-node-roam-accelerator-mode nil)
   )
 
 ;;; -> Org-roam -> org-roam-ui
@@ -3305,7 +3310,7 @@ All other subheadings will be ignored."
   :ensure org
   :defer t
   :custom
-  (setq org-todo-keywords
+  (org-todo-keywords
       '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)" 
                   "TODO(t)" "PROCESS(p)" "EXPLORE(e)" "IDEA(I)" "HOLD(h)"
                   "|" 
@@ -3645,12 +3650,12 @@ the current entry at point and move to the next line."
 </nav>")
 
   (org-static-blog-page-postamble ;; End of <body> on every page
-	nil )
+	nil)
 
   ;; This HTML code is inserted into the index page between the preamble and
   ;;   the blog posts
   (org-static-blog-index-front-matter ;; Between preamble and blog posts on index page
-	"<h1> Welcome to my blog </h1>\n")
+	"Recent posts.")
   
   :config
   (defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page" "draft")
@@ -3794,6 +3799,15 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
             (delete-directory temp-dir t)
             (error "PDF compilation failed"))))))
 
+  (defun js/sync-blog ()
+    (interactive)
+    (async-shell-command "rsync -avz --delete ~/Documents/blog/ jure@muffalo:~/blog/"))
+
+  (defun js/sync-blog ()
+    "Sync blog to muffalo server."
+    (interactive)
+    (compile "rsync -avz --delete ~/Documents/blog/ jure@muffalo:~/blog/"))
+  
   )
 
 ;;; End of org-static-blog code block.
@@ -3873,6 +3887,10 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
 	 ("<wheel-up>" . previous-line)
 	 ("<wheel-down>" . next-line)
 
+	 ("y" . nil)
+	 ("y y" . elfeed-search-yank)
+	 ("y g" . js/elfeed-yank-entry-content)
+
 	 ("V" . elpapers-ingest-full)
 	 ("K" . elpapers-semantic-search)
 	 
@@ -3888,6 +3906,10 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
 	 ("W" . js/elfeed-entries-to-wallabag)
 	 ("O" . js/elfeed-entries-to-podcastify)
 	 ("V" . elpapers-ingest-full)
+
+	 ("y" . nil)
+	 ("y y" . elfeed-show-yank)
+	 ("y g" . js/elfeed-yank-entry-content)
          )
   :hook
   (elfeed-show-mode . mixed-pitch-mode)
@@ -3896,6 +3918,15 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
   (elfeed-search-mode . my/setup-elfeed-scroll)
   ;; (elfeed-search-mode . my/elfeed-setup-local-activation-hooks)
   :config
+  (defun js/elfeed-yank-entry-content ()
+    "Yank the full content of the current entry or selected entries.
+In elfeed-search-mode, works on selected entries (or entry at point).
+In elfeed-show-mode, works on the current entry.
+If multiple entries are selected, concatenates their content."
+    (interactive)
+    nil
+    )
+  
   ;; Variables
   (setq-default elfeed-search-filter "-trash -asmr @7-days-ago +unread")
 
