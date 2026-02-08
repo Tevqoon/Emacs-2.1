@@ -397,7 +397,7 @@ between Emacs sessions.")
    (setq ns-control-modifier 'control)
    (define-key key-translation-map (kbd "ESC") (kbd "C-g")) ; works in gui only
 
-   (setq ns-control-modifier 'hyper)
+   (setq ns-control-modifier 'control)
    (add-hook 'ns-system-appearance-change-functions #'my/apply-theme)
 
    (defvar org-roam-directory "~/Documents/org")
