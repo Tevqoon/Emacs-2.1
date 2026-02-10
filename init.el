@@ -1923,45 +1923,45 @@ With C-u prefix, show all nodes including archived."
   (add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
 
   (defun js/org-roam-extract-subtree (&optional no-link)
-  "Extract subtree to org-roam node.
+    "Extract subtree to org-roam node.
 If heading contains a non-id link, adds it as ROAM_REFS.
 By default, replaces the heading with a link to the new node.
 With prefix arg NO-LINK, leave nothing behind (original behavior)."
-  (interactive "P")
-  (org-back-to-heading-or-point-min t)
-  (when (bobp) (user-error "Already a top-level node"))
-  (let* ((heading-text (org-get-heading t t t t))
-         (link-parts (js/extract-org-link heading-text))
-         (url (car link-parts))
-         (is-ref-link (and url (not (string-prefix-p "id:" url))))
-         (title (if (and is-ref-link (cadr link-parts)
-                         (not (string-empty-p (cadr link-parts))))
-                    (cadr link-parts)
-                  heading-text))
-         (level (org-current-level))
-         (marker (point-marker))
-         (id (org-id-get-create)))
-    (when is-ref-link
-      (org-edit-headline title))
-    (save-buffer)
-    (org-roam-extract-subtree)
-    ;; Add ref in the new file
-    (when is-ref-link
-      (when-let* ((node (org-roam-node-from-id id))
-                  (file (org-roam-node-file node)))
-        (with-current-buffer (find-file-noselect file)
-          (goto-char (org-roam-node-point node))
-          (org-roam-ref-add url)
-          (save-buffer))))
-    ;; Insert link at original position (unless suppressed)
-    (unless no-link
-      (with-current-buffer (marker-buffer marker)
-        (goto-char marker)
-        (set-marker marker nil)
-        (insert (make-string level ?*) " "
-                (org-link-make-string (concat "id:" id) title)
-                "\n")
-        (forward-line -1)))))
+    (interactive "P")
+    (org-back-to-heading-or-point-min t)
+    (when (bobp) (user-error "Already a top-level node"))
+    (let* ((heading-text (org-get-heading t t t t))
+           (link-parts (js/extract-org-link heading-text))
+           (url (car link-parts))
+           (is-ref-link (and url (not (string-prefix-p "id:" url))))
+           (title (if (and is-ref-link (cadr link-parts)
+                           (not (string-empty-p (cadr link-parts))))
+                      (cadr link-parts)
+                    heading-text))
+           (level (org-current-level))
+           (marker (point-marker))
+           (id (org-id-get-create)))
+      (when is-ref-link
+	(org-edit-headline title))
+      (save-buffer)
+      (org-roam-extract-subtree)
+      ;; Add ref in the new file
+      (when is-ref-link
+	(when-let* ((node (org-roam-node-from-id id))
+                    (file (org-roam-node-file node)))
+          (with-current-buffer (find-file-noselect file)
+            (goto-char (org-roam-node-point node))
+            (org-roam-ref-add url)
+            (save-buffer))))
+      ;; Insert link at original position (unless suppressed)
+      (unless no-link
+	(with-current-buffer (marker-buffer marker)
+          (goto-char marker)
+          (set-marker marker nil)
+          (insert (make-string level ?*) " "
+                  (org-link-make-string (concat "id:" id) title)
+                  "\n")
+          (forward-line -1)))))
   
 ;;; -> org-roam -> Aesthetics
   
@@ -2073,7 +2073,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
     "Variable to pass current browser to capture templates.")
 
   (defvar org-roam-capture-body nil
-  "Variable to pass body content to capture templates.")
+    "Variable to pass body content to capture templates.")
   
   ;;; TODO: Simplify the autocapture templates
   ;;; https://github.com/org-roam/org-roam/commit/ed94524964a0b03538a84ae03c89ec61527ffe7d
@@ -3311,10 +3311,10 @@ All other subheadings will be ignored."
   :defer t
   :custom
   (org-todo-keywords
-      '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)" 
-                  "TODO(t)" "PROCESS(p)" "EXPLORE(e)" "IDEA(I)" "HOLD(h)"
-                  "|" 
-                  "DONE(d)" "CANCELLED(c)" "FAILED(F)" "NAREDU(N)")))
+   '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)" 
+               "TODO(t)" "PROCESS(p)" "EXPLORE(e)" "IDEA(I)" "HOLD(h)"
+               "|" 
+               "DONE(d)" "CANCELLED(c)" "FAILED(F)" "NAREDU(N)")))
 
   (org-agenda-start-with-log-mode t)
   (org-log-done 'time)
@@ -3331,10 +3331,10 @@ All other subheadings will be ignored."
   (org-agenda-sticky t)
   (org-priority-default ?C)
   (org-agenda-prefix-format
-      '((agenda . " %i %-12:c%?-12t% s")
-        (todo . " %i %-12:c")
-        (tags . " %i %-12:c")
-        (search . " %i %-12:c")))
+   '((agenda . " %i %-12:c%?-12t% s")
+     (todo . " %i %-12:c")
+     (tags . " %i %-12:c")
+     (search . " %i %-12:c")))
   
   :bind (("C-c a" . open-org-agenda)
 	 :map org-agenda-mode-map
@@ -3465,7 +3465,7 @@ All other subheadings will be ignored."
 		  (todo "HOLD" ((org-agenda-overriding-header "* Currently on hold: ")))
 		  (todo "EXPLORE" ((org-agenda-overriding-header "* Things to explore: ")))
 		  )))))
-   
+  
   ;;; -> Org mode -> Agenda -> Refiling integration
 
   (defun js/agenda-refile ()
@@ -3626,7 +3626,7 @@ the current entry at point and move to the next line."
   (org-static-blog-enable-og-tags t)
   
   (org-static-blog-page-header
- "<meta name=\"author\" content=\"Jure Smolar\">
+   "<meta name=\"author\" content=\"Jure Smolar\">
 <meta name=\"referrer\" content=\"no-referrer\">
 <meta name=\"viewport\" content=\"initial-scale=1,width=device-width,minimum-scale=1\">
 <link href=\"static/sakura.css\" rel=\"stylesheet\" type=\"text/css\" />
@@ -3650,12 +3650,12 @@ the current entry at point and move to the next line."
 </nav>")
 
   (org-static-blog-page-postamble ;; End of <body> on every page
-	nil)
+   nil)
 
   ;; This HTML code is inserted into the index page between the preamble and
   ;;   the blog posts
   (org-static-blog-index-front-matter ;; Between preamble and blog posts on index page
-	"Recent posts.")
+   "Recent posts.")
   
   :config
   (defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page" "draft")
@@ -3671,10 +3671,10 @@ the current entry at point and move to the next line."
     (mapcar #'car
             (org-roam-db-query
              [:select [nodes:file]
-              :from nodes
-              :inner-join tags
-              :on (= tags:node-id nodes:id)
-              :where (= tags:tag "blog")])))
+		      :from nodes
+		      :inner-join tags
+		      :on (= tags:node-id nodes:id)
+		      :where (= tags:tag "blog")])))
   
   (defun org-static-blog-get-draft-filenames ()
     "Get static pages from org-roam :page: tag."
@@ -3697,31 +3697,31 @@ the current entry at point and move to the next line."
         (when (or (search-forward-regexp "^\\#\\+filetags:[ ]*:\\(.*\\):$" nil t)
                   (search-forward-regexp "^\\#\\+filetags:[ ]*\\(.+\\)$" nil t))
           (setq all-tags (if (match-string 1)
-                            (split-string (match-string 1) ":")
-                          (split-string (match-string 1))))))
+                             (split-string (match-string 1) ":")
+                           (split-string (match-string 1))))))
       ;; Filter out ignored tags
       (cl-remove-if (lambda (tag)
                       (member (downcase tag) orb-ignored-tags))
                     all-tags)))
 
   (defun my/org-static-blog-link (link desc info)
-  "Transcode ID links to proper blog post URLs.
+    "Transcode ID links to proper blog post URLs.
 Falls back to standard org-html-link for other link types."
-  (if (not (string= (org-element-property :type link) "id"))
-      (org-html-link link desc info)
-    (let* ((id (org-element-property :path link))
-           (node (org-roam-node-from-id id))
-           (tags (and node (org-roam-node-tags node)))
-           (published-p (and tags (seq-intersection tags '("blog" "blog-static-page" "note"))))
-           (fallback-desc (if node (org-roam-node-title node) id)))
-      (if published-p
-          (format "<a href=\"/%s\">%s</a>"
-                  (org-static-blog-get-post-public-path (org-roam-node-file node))
-                  (or desc (org-roam-node-title node)))
-        (format "<a href=\"broken-link.html\" class=\"broken-link\">%s</a>"
-                (or desc fallback-desc))))))
+    (if (not (string= (org-element-property :type link) "id"))
+	(org-html-link link desc info)
+      (let* ((id (org-element-property :path link))
+             (node (org-roam-node-from-id id))
+             (tags (and node (org-roam-node-tags node)))
+             (published-p (and tags (seq-intersection tags '("blog" "blog-static-page" "note"))))
+             (fallback-desc (if node (org-roam-node-title node) id)))
+	(if published-p
+            (format "<a href=\"/%s\">%s</a>"
+                    (org-static-blog-get-post-public-path (org-roam-node-file node))
+                    (or desc (org-roam-node-title node)))
+          (format "<a href=\"broken-link.html\" class=\"broken-link\">%s</a>"
+                  (or desc fallback-desc))))))
 
-;; Redefine the backend every time before rendering
+  ;; Redefine the backend every time before rendering
   (defun my/setup-blog-backend (&rest _args)
     "Ensure our custom link and tikzcd handlers are in the backend."
     (org-export-define-derived-backend 'org-static-blog-post-bare 'html
@@ -3730,7 +3730,7 @@ Falls back to standard org-html-link for other link types."
 			 )))
 
 
-;; Hook into the render function
+  ;; Hook into the render function
   (advice-add 'org-static-blog-render-post-content :before #'my/setup-blog-backend)
 
   (defvar js/tikzcd-svg-directory "diagrams/"
@@ -4844,18 +4844,18 @@ If a key is provided, use it instead of the default capture template."
 ;;   ;; Output location - single file in readwise subfolder
 ;;   (org-readwise-output-directory 
 ;;    (expand-file-name "readwise" org-roam-directory))
-  
+
 ;;   ;; Sync both classic Readwise highlights and Reader documents
 ;;   (org-readwise-sync-highlights t)
 ;;   (org-readwise-sync-reader t)
-  
+
 ;;   ;; Track last sync time
 ;;   (org-readwise-last-sync-time-file 
 ;;    (expand-file-name ".org-readwise-last-sync" user-emacs-directory))
-  
+
 ;;   ;; Debug level (set to 0 once working)
 ;;   (org-readwise-debug-level 1)
-  
+
 ;;   :config
 ;;   ;; Ensure the readwise subdirectory exists
 ;;     (unless (file-exists-p org-readwise-output-directory)
@@ -5325,6 +5325,76 @@ In entry mode, operates on the current entry."
 ;;   :demand t
 ;;   :config
 ;;   (global-treesit-auto-mode))
+
+;;; -> Programming -> apheleia
+
+(use-package apheleia
+  :config
+  ;; -- Formatter definitions for tools not built into apheleia --
+
+  ;; Nix: nixfmt (or alejandra if you prefer)
+  (setf (alist-get 'nixfmt apheleia-formatters)
+        '("nixfmt" "-"))
+
+  ;; Clojure: cljfmt via clj-kondo's --lint or zprint standalone
+  ;; zprint is simpler - single binary, no project config needed
+  (setf (alist-get 'zprint apheleia-formatters)
+        '("zprint" "{:style [:community] :map {:comma? false}}"))
+
+  ;; Emacs Lisp: use the built-in lisp-indent formatter
+  ;; (this is an elisp function formatter bundled with apheleia)
+
+  ;; -- Mode associations --
+  ;; These override/extend apheleia's defaults
+
+  ;; Python: black is already the default, but chain with isort
+  (setf (alist-get 'isort apheleia-formatters)
+        '("isort" "--profile" "black" "--stdout" "-"))
+  (setf (alist-get 'python-mode apheleia-mode-alist)
+        '(isort black))
+
+  ;; C/C++: clang-format (already built-in to apheleia)
+  ;; These are already mapped by default, but being explicit:
+  (setf (alist-get 'c-mode apheleia-mode-alist) 'clang-format)
+  (setf (alist-get 'c++-mode apheleia-mode-alist) 'clang-format)
+
+  ;; Rust: rustfmt (already built-in)
+  ;; rust-mode -> rustfmt is already the default
+
+  ;; Haskell: ormolu (or fourmolu if you prefer)
+  ;; Both are already defined in apheleia-formatters
+  (setf (alist-get 'haskell-mode apheleia-mode-alist) 'ormolu)
+
+  ;; Nix
+  (setf (alist-get 'nix-mode apheleia-mode-alist) 'nixfmt)
+
+  ;; OCaml: ocamlformat (already built-in)
+  ;; tuareg-mode -> ocamlformat is already the default
+
+  ;; Clojure
+  (setf (alist-get 'clojure-mode apheleia-mode-alist) 'zprint)
+
+  ;; Emacs Lisp: opt-in to lisp-indent
+  (setf (alist-get 'emacs-lisp-mode apheleia-mode-alist) 'lisp-indent)
+
+  ;; YAML: prettier handles this (already built-in)
+  ;; yaml-mode -> prettier is already the default
+
+  ;; Dockerfile: no good standalone formatter, skip
+
+  ;; LaTeX: latexindent (already built-in)
+  ;; latex-mode -> latexindent is already the default
+
+  ;; Shell: shfmt (disabled by default upstream due to zsh issues)
+  ;; Re-enable for bash specifically
+  (setf (alist-get 'sh-mode apheleia-mode-alist) 'shfmt)
+
+  ;; -- Inhibit in modes where formatting is unwanted --
+  ;; Org, restclient, octave - no formatters, apheleia will
+  ;; silently skip these since they have no mode-alist entry
+
+  ;; Enable globally
+  (apheleia-global-mode +1))
 
 ;;; -> Programming -> LSP Eglot
 
