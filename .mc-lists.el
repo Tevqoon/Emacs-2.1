@@ -24,6 +24,7 @@
 	cdlatex-math-symbol
 	cdlatex-pbb
 	cdlatex-sub-superscript
+	cider-eval-last-sexp
 	comment-line
 	comment-set-column
 	count-words
@@ -32,7 +33,9 @@
 	cycle-spacing
 	deadgrep-visit-result
 	delete-horizontal-space
+	dired-do-kill-lines
 	dired-do-rename
+	dired-find-file
 	dired-flag-file-deletion
 	dired-maybe-insert-subdir
 	dired-next-line
@@ -54,6 +57,8 @@
 	indent-for-tab-command
 	isearch-repeat-forward
 	ivy-occur-delete-candidate
+	js/agenda-refile
+	kill-region
 	kill-visual-line
 	kmacro-end-or-call-macro
 	lean4-tab-indent
@@ -123,7 +128,6 @@
 	iedit-switch-to-mc-mode
 	ignore
 	ivy-wgrep-change-to-wgrep-mode
-	kill-region
 	lsp-ui-doc--handle-mouse-movement
 	mark-whole-buffer
 	mouse-drag-mode-line
