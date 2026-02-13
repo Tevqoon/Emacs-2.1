@@ -48,7 +48,7 @@
   (tooltip-mode -1)
   (set-fringe-mode 5)
   (column-number-mode)
-  (delete-selection-mode 1)
+  (delete-selection-mode nil) ; For lispy
   (global-auto-revert-mode 1)
   (pixel-scroll-precision-mode 1)
   :custom
@@ -62,7 +62,7 @@
   (sentence-end-double-space nil)
   (pixel-scroll-precision-use-momentum t)
   (auto-hscroll-mode t)
-  (mouse-wheel-scroll-amount '(1 ((meta)) 
+  (mouse-wheel-scroll-amount '(1 ((meta))
                                  ((control meta) . global-text-scale)
                                  ((control) . text-scale)))
 
@@ -386,6 +386,12 @@ between Emacs sessions.")
   (sinister-stillness-mode 1)
   )
 
+(use-package winpulse
+  :vc (:url "https://github.com/xenodium/winpulse"
+	    :rev :newest)
+  :config
+  (winpulse-mode +1))
+
 ;;; -> OS specific configuration
 
 (pcase system-type
@@ -399,6 +405,8 @@ between Emacs sessions.")
 
    (setq ns-control-modifier 'control)
    (add-hook 'ns-system-appearance-change-functions #'my/apply-theme)
+
+   (setq ns-pop-up-frames nil)
 
    (defvar org-roam-directory "~/Documents/org")
    ;;; MacOS Autocommit:
@@ -1023,26 +1031,45 @@ exactly like the old ace-jump integration."
   :ensure nil
   :bind (:map Info-mode-map ("C-o" . casual-info-tmenu)))
 
-(use-package casual-dired
-  :defines dired-mode-map
+(use-package dired
   :ensure nil
-  :bind (:map dired-mode-map ("C-o" . casual-dired-tmenu))
+  :bind (:map dired-mode-map
+              ("C-a" . js/dired-smart-bol)
+              ("C-e" . js/dired-smart-eol))
   :custom
   (dired-listing-switches "-lagGFDh")
   :config
+  (defun js/dired-smart-bol ()
+    "Toggle point between beginning of filename and beginning of line."
+    (interactive)
+    (let ((old (point))
+          (filename-pos (dired-move-to-filename)))
+      (if (or (null filename-pos) (<= old filename-pos))
+          (move-beginning-of-line 1))))
+
+  (defun js/dired-smart-eol ()
+    "Cycle point: before filename → filename start, before filename end → filename end, else → eol."
+    (interactive)
+    (let ((old (point))
+          (fn-start (save-excursion (dired-move-to-filename))))
+      (cond
+       ((or (null fn-start) (< old fn-start))
+	(goto-char fn-start))
+       (t
+	(dired-move-to-filename)
+	(let ((fn-end (dired-move-to-end-of-filename t)))
+          (if (or (null fn-end) (>= old fn-end))
+              (move-end-of-line 1)))))))
+
   ;; Handle video files with external viewer via file-name-handler-alist
   (defun video-external-handler (operation &rest args)
     "Handle video files by opening them externally."
     (cond
-     ;; For insert-file-contents (what find-file uses), open externally instead
      ((eq operation 'insert-file-contents)
       (let ((filename (car args)))
         (start-process "open-video" nil "open" filename)
         (message "Opening %s externally..." (file-name-nondirectory filename))
-        ;; Signal that we handled it by throwing an error that find-file will catch
         (error "Video file opened externally")))
-     
-     ;; For all other operations, delegate to the default handler
      (t
       (let ((inhibit-file-name-handlers
              (cons 'video-external-handler
@@ -1050,10 +1077,15 @@ exactly like the old ace-jump integration."
                         inhibit-file-name-handlers)))
             (inhibit-file-name-operation operation))
         (apply operation args)))))
-  
-  ;; Register the handler for video files
+
   (add-to-list 'file-name-handler-alist
                '("\\.\\(mp4\\|avi\\|mkv\\|mov\\|webm\\|flv\\|wmv\\|m4v\\|3gp\\|ogv\\|mpg\\|mpeg\\|vob\\)\\'" . video-external-handler)))
+
+(use-package casual-dired
+  :defines dired-mode-map
+  :ensure nil
+  :bind (:map dired-mode-map ("C-o" . casual-dired-tmenu))
+  )
 
 (use-package dired-preview
   :bind (:map dired-mode-map ("P" . dired-preview-mode)))
@@ -3330,6 +3362,7 @@ All other subheadings will be ignored."
   (org-agenda-window-setup 'current-window)
   (org-agenda-sticky t)
   (org-priority-default ?C)
+  (org-agenda-bulk-persistent-marks t) ;; Process -> Refile
   (org-agenda-prefix-format
    '((agenda . " %i %-12:c%?-12t% s")
      (todo . " %i %-12:c")
@@ -3425,7 +3458,8 @@ All other subheadings will be ignored."
                                                (quote regexp) "\n]+>")))
 		  (org-agenda-overriding-header "* Unscheduled TODO entries: ")))
 		("p" "Process Items"
-		 ((todo "PROCESS" ((org-agenda-overriding-header "* Items to Process:")))))
+		 ((todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")
+				   (org-agenda-sorting-strategy '(category-up alpha-up))))))
 
 		
 		("d" "Daily agenda and all TODOs"
@@ -3451,7 +3485,8 @@ All other subheadings will be ignored."
 		  (agenda "" ((org-agenda-span 'week)
 			      (org-agenda-skip-function
 			       '(org-agenda-skip-entry-if 'todo 'done))))
-		  (todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")))
+		  (todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")
+				   (org-agenda-sorting-strategy '(category-up alpha-up))))
 		  (alltodo "" ((org-agenda-skip-function
 				'(or (air-org-skip-subtree-if-habit)
 				     (air-org-skip-subtree-if-priority ?A)
@@ -5595,6 +5630,8 @@ When pressed twice, make the sub/superscript roman."
   :config
   (defun setup-check-parens ()
     (add-hook 'before-save-hook #'check-parens nil t)))
+
+
 
 ;;; -> Programming -> Lisp -> Common lisp
 

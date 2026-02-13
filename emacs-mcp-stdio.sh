@@ -147,7 +147,8 @@ while read -r line; do
 	# Process JSON-RPC request and return the result with proper UTF-8 encoding
 	# Encode the response to base64 to avoid any character encoding issues
 	# Handle nil responses from notifications by converting to empty string
-	elisp_expr="(base64-encode-string (encode-coding-string (or (mcp-server-lib-process-jsonrpc (base64-decode-string \"$base64_input\") \"$SERVER_ID\") \"\") 'utf-8 t) t)"
+	# elisp_expr="(base64-encode-string (encode-coding-string (or (mcp-server-lib-process-jsonrpc (base64-decode-string \"$base64_input\") \"$SERVER_ID\") \"\") 'utf-8 t) t)"
+	elisp_expr="(base64-encode-string (encode-coding-string (or (mcp-server-lib-process-jsonrpc (decode-coding-string (base64-decode-string \"$base64_input\") 'utf-8) \"$SERVER_ID\") \"\") 'utf-8 t) t)"
 
 	# Get response from emacsclient - capture stderr for debugging
 	stderr_file="/tmp/mcp-stderr.$$-$(date +%s%N)"
