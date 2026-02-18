@@ -1,0 +1,7 @@
+# -*- mode: snippet -*-
+# name: subproof
+# key: sp
+# --
+\\begin{subproof}
+  $0
+\\end{subproof}

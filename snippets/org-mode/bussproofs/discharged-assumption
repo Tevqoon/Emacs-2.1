@@ -1,0 +1,8 @@
+# -*- mode: snippet -*-
+# name: discharged assumption
+# key: da
+# condition: (js/inside-prooftree-p)
+# --
+\\AxiomC{[\\(${1:}\\)]}
+\\noLine
+\\UnaryInfC{\\(${2:}\\)}$0

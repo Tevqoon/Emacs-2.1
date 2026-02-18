@@ -1,0 +1,6 @@
+# -*- mode: snippet -*-
+# name: trinary inference
+# key: ti
+# condition: (js/inside-prooftree-p)
+# --
+\\TrinaryInfC{\\(${1:}\\)}$0

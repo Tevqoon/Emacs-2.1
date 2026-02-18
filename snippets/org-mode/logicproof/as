@@ -1,0 +1,5 @@
+# -*- mode: snippet -*-
+# name: logicproof assumption
+# key: as
+# --
+${1:formula} & assumption \\\\$0

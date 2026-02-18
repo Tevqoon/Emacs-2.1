@@ -1,0 +1,7 @@
+# -*- mode: snippet -*-
+# name: prooftree
+# key: pt
+# --
+\\begin{prooftree}
+$0
+\\end{prooftree}

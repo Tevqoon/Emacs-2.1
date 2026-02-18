@@ -1,0 +1,6 @@
+# -*- mode: snippet -*-
+# name: axiom
+# key: ax
+# condition: (js/inside-prooftree-p)
+# --
+\\AxiomC{\\(${1:}\\)}$0

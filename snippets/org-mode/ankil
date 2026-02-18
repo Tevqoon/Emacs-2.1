@@ -1,0 +1,17 @@
+# -*- mode: snippet -*-
+# name: Latin vocabulary card
+# key: ankil
+# --
+`(make-string (1+ (or (org-current-level) 0)) ?*)` ${1:Latin word}
+:PROPERTIES:
+:ANKI_NOTE_TYPE: Basic
+:ANKI_DECK: Latin::Mining
+:ANKI_TAGS: latin vocabulary ${2:source}
+:END:
+
+${4:Definition}
+
+${3:(part of speech, principal parts)}
+
+${5:Example sentence if available}
+$0

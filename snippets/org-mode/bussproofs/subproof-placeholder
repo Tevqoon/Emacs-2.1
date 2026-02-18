@@ -1,0 +1,12 @@
+# -*- mode: snippet -*-
+# name: subproof placeholder
+# key: sp
+# condition: (js/inside-prooftree-p)
+# --
+\\AxiomC{\\(${1:\\Pi}\\)}
+\\noLine
+\\def\\extraVskip{0pt}
+\\UnaryInfC{\\(\\vdots\\)}
+\\noLine
+\\UnaryInfC{\\(${2:}\\)}
+\\def\\extraVskip{2pt}$0

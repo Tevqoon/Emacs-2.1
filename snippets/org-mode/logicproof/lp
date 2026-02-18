@@ -1,0 +1,7 @@
+# -*- mode: snippet -*-
+# name: logicproof
+# key: lp
+# --
+\\begin{logicproof}{${1:2}}
+  $0
+\\end{logicproof}

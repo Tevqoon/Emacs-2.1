@@ -1,0 +1,7 @@
+# -*- mode: snippet -*-
+# name: overlined discharge
+# key: ol
+# condition: (js/inside-prooftree-p)
+# --
+\\AxiomC{}
+\\UnaryInfC{\\(${1:}\\)}$0

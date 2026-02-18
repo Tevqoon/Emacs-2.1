@@ -1,0 +1,6 @@
+# -*- mode: snippet -*-
+# name: left label
+# key: ll
+# condition: (js/inside-prooftree-p)
+# --
+\\LeftLabel{{1:}}$0

@@ -1,0 +1,6 @@
+# -*- mode: snippet -*-
+# name: binary inference
+# key: bi
+# condition: (js/inside-prooftree-p)
+# --
+\\BinaryInfC{\\(${1:}\\)}$0

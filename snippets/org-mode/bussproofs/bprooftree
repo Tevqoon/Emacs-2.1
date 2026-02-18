@@ -1,0 +1,7 @@
+# -*- mode: snippet -*-
+# name: bprooftree
+# key: bpt
+# --
+\\begin{bprooftree}
+$0
+\\end{bprooftree}

@@ -1,0 +1,6 @@
+# -*- mode: snippet -*-
+# name: right label
+# key: rl
+# condition: (js/inside-prooftree-p)
+# --
+\\RightLabel{${1:}}$0

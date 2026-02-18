@@ -1,0 +1,5 @@
+# -*- mode: snippet -*-
+# name: logicproof line
+# key: ll
+# --
+${1:formula} & ${2:justification} \\\\$0

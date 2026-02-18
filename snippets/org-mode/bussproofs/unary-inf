@@ -1,0 +1,6 @@
+# -*- mode: snippet -*-
+# name: unary inference
+# key: ui
+# condition: (js/inside-prooftree-p)
+# --
+\\UnaryInfC{\\(${1:}\\)}$0
