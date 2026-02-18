@@ -31,11 +31,19 @@
 
 \usepackage{readarray}
 \usepackage{gensymb}
+\usepackage{bussproofs}
+
+% Allow use inside math mode
+\newenvironment{bprooftree}
+{\leavevmode\hbox\bgroup}
+{\DisplayProof\egroup}
+
+\usepackage{logicproof}
 
 %\usepackage{polyglossia}
 \usepackage{tikz}
 
-\usepackage{csquotes} 
+\usepackage{csquotes}
 \usepackage{tikz-cd}
 \usetikzlibrary{babel}
 \usetikzlibrary{calc}
@@ -124,12 +132,12 @@
 % Quiver commands
 % A TikZ style for curved arrows of a fixed height, due to AndréC.
 \tikzset{curve/.style={settings={#1},to path={(\tikztostart)
-    .. controls ($(\tikztostart)!\pv{pos}!(\tikztotarget)!\pv{height}!270:(\tikztotarget)$)
-    and ($(\tikztostart)!1-\pv{pos}!(\tikztotarget)!\pv{height}!270:(\tikztotarget)$)
-    .. (\tikztotarget)\tikztonodes}},
-    settings/.code={\tikzset{quiver/.cd,#1}
-        \def\pv##1{\pgfkeysvalueof{/tikz/quiver/##1}}},
-    quiver/.cd,pos/.initial=0.35,height/.initial=0}
+					.. controls ($(\tikztostart)!\pv{pos}!(\tikztotarget)!\pv{height}!270:(\tikztotarget)$)
+					and ($(\tikztostart)!1-\pv{pos}!(\tikztotarget)!\pv{height}!270:(\tikztotarget)$)
+					.. (\tikztotarget)\tikztonodes}},
+	settings/.code={\tikzset{quiver/.cd,#1}
+			\def\pv##1{\pgfkeysvalueof{/tikz/quiver/##1}}},
+	quiver/.cd,pos/.initial=0.35,height/.initial=0}
 
 % TikZ arrowhead/tail styles.
 \tikzset{tail reversed/.code={\pgfsetarrowsstart{tikzcd to}}}
@@ -162,24 +170,24 @@
 \makeatletter
 \newcommand*{\relrelbarsep}{.386ex}
 \newcommand*{\relrelbar}{%
-  \mathrel{%
-    \mathpalette\@relrelbar\relrelbarsep
-  }%
+	\mathrel{%
+		\mathpalette\@relrelbar\relrelbarsep
+	}%
 }
 \newcommand*{\@relrelbar}[2]{%
-  \raise#2\hbox to 0pt{$\m@th#1\relbar$\hss}%
-  \lower#2\hbox{$\m@th#1\relbar$}%
+	\raise#2\hbox to 0pt{$\m@th#1\relbar$\hss}%
+	\lower#2\hbox{$\m@th#1\relbar$}%
 }
 \providecommand*{\rightrightarrowsfill@}{%
-  \arrowfill@\relrelbar\relrelbar\rightrightarrows
+	\arrowfill@\relrelbar\relrelbar\rightrightarrows
 }
 \providecommand*{\leftleftarrowsfill@}{%
-  \arrowfill@\leftleftarrows\relrelbar\relrelbar
+	\arrowfill@\leftleftarrows\relrelbar\relrelbar
 }
 \providecommand*{\xrightrightarrows}[2][]{%
-  \ext@arrow 0359\rightrightarrowsfill@{#1}{#2}%
+	\ext@arrow 0359\rightrightarrowsfill@{#1}{#2}%
 }
 \providecommand*{\xleftleftarrows}[2][]{%
-  \ext@arrow 3095\leftleftarrowsfill@{#1}{#2}%
+	\ext@arrow 3095\leftleftarrowsfill@{#1}{#2}%
 }
 \makeatother

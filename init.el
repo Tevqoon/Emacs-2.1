@@ -728,6 +728,19 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (counsel-mode)
   (setq ivy-re-builders-alist '((t . ivy--regex-ignore-order)))
   (setq swiper-use-visual-line-p #'ignore)
+
+  (defun js/ivy-org-node-mtime-compare (a b)
+    "Compare org-node candidates A and B by file mtime, most recent first."
+    (let* ((node-a (gethash a org-node--candidate<>entry))
+           (node-b (gethash b org-node--candidate<>entry))
+           (mtime-a (and node-a (ignore-errors (org-mem-file-mtime node-a))))
+           (mtime-b (and node-b (ignore-errors (org-mem-file-mtime node-b)))))
+      (cond ((null mtime-a) nil)
+            ((null mtime-b) t)
+            (t (time-less-p mtime-b mtime-a)))))
+
+  (add-to-list 'ivy-sort-functions-alist
+               '(org-node-collection . js/ivy-org-node-mtime-compare))
   )
 
 (use-package ibuffer
@@ -804,6 +817,28 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   :init (yas-global-mode 1)
   :custom
   (yas-fallback-behavior 'return-nil)
+  :config
+  (defun js/inside-prooftree-p ()
+    "Return non-nil if point is inside a prooftree or bprooftree environment."
+    (let ((pos (point)))
+      (or
+       (save-excursion
+	 (and (re-search-backward "\\\\begin{prooftree}" nil t)
+              (re-search-forward "\\\\end{prooftree}" nil t)
+              (> (point) pos)))
+       (save-excursion
+	 (and (re-search-backward "\\\\begin{bprooftree}" nil t)
+              (re-search-forward "\\\\end{bprooftree}" nil t)
+              (> (point) pos))))))
+  
+  (defun js/inside-logicproof-p ()
+    "Return non-nil if point is inside a logicproof environment."
+    (save-excursion
+      (let ((pos (point)))
+	(and (re-search-backward "\\\\begin{\\(logicproof\\|subproof\\)}" nil t)
+             (let ((begin-pos (point)))
+               (goto-char pos)
+               (not (re-search-backward "\\\\end{logicproof}" begin-pos t)))))))
   )
 
 (use-package undo-fu
@@ -2643,6 +2678,9 @@ you can catch it with `condition-case'."
   (org-node-extra-id-dirs 
    (list org-roam-directory
          (expand-file-name org-roam-dailies-directory org-roam-directory)))
+
+  ;; Customs
+  (org-node-display-sort-fn #'org-node-sort-by-file-mtime)
   
   :config
   ;; Your custom filtering logic
@@ -2971,7 +3009,7 @@ Each function is called with two arguments: the tag and the buffer.")
   ;;; -> Org mode -> Anki -> Overrides
   
   ;; Define environments that should always use Anki builtin LaTeX
-  (defcustom anki-editor-builtin-latex-environments '("tikzcd")
+  (defcustom anki-editor-builtin-latex-environments '("tikzcd" "bprooftree" "prooftree" "logicproof")
     "LaTeX environments that will always be translated using Anki's built-in LaTeX.
 This is useful for environments not supported by MathJax."
     :type '(repeat string))
@@ -5470,9 +5508,14 @@ In entry mode, operates on the current entry."
   (reftex-plug-into-AUCTeX t)
   (LaTeX-electric-left-right-brace t)
   (TeX-command-extra-options " --shell-escape ")
+  (texmathp-tex-commands
+   '(("prooftree" env-on)
+     ("tikzcd" env-on)
+     ("logicproof" env-on)))
 
   :config
   (setq-default TeX-master nil)
+  
   
   :hook
   (LaTeX-mode . turn-on-reftex)
@@ -5600,7 +5643,8 @@ When pressed twice, make the sub/superscript roman."
    '((?o ("\\omega" "\\circ"))
      (?O ("\\Omega" "\\degree"))
      (?+  ("\\cup" "\\oplus"))
-     (?*  ("\\times" "\\otimes" "\\bullet"))))
+     (?*  ("\\times" "\\otimes" "\\bullet"))
+     (?T ("\\top" "\\bot" "\\arctan"))))
 
   :hook
   (org-mode . org-cdlatex-mode)
@@ -5835,7 +5879,7 @@ markers, resetting the state)."
 (defun time-until-date ()
   "Calculate and display the time remaining until a target date and time.
 Uses org-mode's calendar picker for date selection and prompts for time.
-Shows the remaining time in HH:MM format suitable for setting on a physical timer.
+Shows the remaining time in HH:MM format suitable for a physical timer.
 
 Accepts time in HH:MM format or military time (HHMM, e.g., 1800 for 18:00).
 If more than 100 hours remain, shows days + hours instead."
