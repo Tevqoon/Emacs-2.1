@@ -3938,7 +3938,6 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
 ;;; --> Elfeed
 
 (use-package elfeed
-  :if (eq system-type 'darwin)
   :defines
   elfeed-search-mode-map
   elfeed-show-mode-map
@@ -4900,6 +4899,7 @@ If a key is provided, use it instead of the default capture template."
 
 ;;; Works for Emacs 30+
 (use-package elpapers
+  :if (eq system-type 'darwin)
   :after elfeed
   :demand t
   :load-path "~/Documents/repos/elpapers/lisp/"
