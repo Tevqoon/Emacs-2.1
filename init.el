@@ -1833,7 +1833,7 @@ Automatically expands the heading if it's folded."
   :defer nil
   :after org
   :custom
-  (org-latex-create-formula-image-program 'imagemagick)
+  (org-latex-create-formula-image-program 'lualatex-imagemagick)
   (org-latex-packages-alist '(("" "/Users/jure/.emacs.d/defaults/js" t)))
   (org-export-in-background nil)
   
@@ -1849,6 +1849,20 @@ Automatically expands the heading if it's folded."
      ("lualatex -interaction nonstopmode -output-directory %o %f")
      :image-converter
      ("convert -density %D -trim -antialias %f -quality 100 %O")))
+  (add-to-list
+   'org-preview-latex-process-alist
+   '(svg-lualatex
+     :programs ("lualatex" "pdf2svg") :description "pdf > svg"
+     :message
+     "you need to install the programs: lualatex and pdf2svg."
+     :image-input-type "pdf" :image-output-type "png"
+     :image-size-adjust (1.0 . 1.0) :latex-compiler
+     ("lualatex -interaction nonstopmode -output-directory %o %f")
+     :image-converter
+     ;; ("convert -density %D -trim -antialias %f -quality 100 %O")
+     ("pdf2svg %f %O")
+
+     ))
 
   (plist-put org-format-latex-options :scale 1.6)
   )
@@ -3382,7 +3396,7 @@ All other subheadings will be ignored."
   :custom
   (org-todo-keywords
    '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)" 
-               "TODO(t)" "PROCESS(p)" "EXPLORE(e)" "IDEA(I)" "HOLD(h)"
+               "TODO(t)" "FINISH(f)" "PROCESS(p)" "EXPLORE(e)" "IDEA(I)" "HOLD(h)"
                "|" 
                "DONE(d)" "CANCELLED(c)" "FAILED(F)" "NAREDU(N)")))
 
@@ -3523,6 +3537,8 @@ All other subheadings will be ignored."
 		  (agenda "" ((org-agenda-span 'week)
 			      (org-agenda-skip-function
 			       '(org-agenda-skip-entry-if 'todo 'done))))
+		  (todo "FINISH" ((org-agenda-overriding-header "* Items to finish up:  ")
+				  (org-agenda-sorting-strategy '(category-up alpha-up))))
 		  (todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")
 				   (org-agenda-sorting-strategy '(category-up alpha-up))))
 		  (alltodo "" ((org-agenda-skip-function
@@ -3531,7 +3547,7 @@ All other subheadings will be ignored."
 				     (air-org-skip-subtree-if-priority ?B)
                                      (air-org-skip-if-blocked)
 				     (org-agenda-skip-if nil '(scheduled deadline))
-				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA"))
+				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISHED"))
 				     (js/org-skip-if-ancestor-blocked)))
 			       (org-agenda-overriding-header "* All normal priority tasks:")))
 		  (todo "IDEA" ((org-agenda-overriding-header "* Ideas: ")))
