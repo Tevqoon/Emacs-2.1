@@ -1228,14 +1228,6 @@ exactly like the old ace-jump integration."
          ("M-j" . org-agenda-clock-goto) ; optional
          ("J" . bookmark-jump))) ; optional
 
-;;; -> Searching and navigation -> Lookuppers
-
-(use-package wiki-summary
-  :bind ("C-c n w" . wiki-summary)
-  ;; :vc (:url "https://github.com/Tevqoon/wiki-summary.el")
-  :load-path "~/.emacs.d/lisp/wiki-summary.el/"
-  )
-
 ;;; -> Searching and navigation -> Additional keybinds
 
 (use-package key-chord
