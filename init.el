@@ -1825,7 +1825,7 @@ Automatically expands the heading if it's folded."
   :defer nil
   :after org
   :custom
-  (org-latex-create-formula-image-program 'dvipng)
+  (org-latex-create-formula-image-program 'imagemagick-lualatex)
   (org-latex-packages-alist
    (pcase system-type
      ('gnu/linux '(("" "/home/jure/.emacs.d/defaults/js" t)))
@@ -1840,26 +1840,16 @@ Automatically expands the heading if it's folded."
      :message
      "you need to install the programs: latex and imagemagick."
      :image-input-type "pdf" :image-output-type "png"
-     :image-size-adjust (1.0 . 1.0) :latex-compiler
+     :image-size-adjust (1.0 . 1.0)
+     :latex-compiler
      ("lualatex -interaction nonstopmode -output-directory %o %f")
      :image-converter
-     ("convert -density %D -trim -antialias %f -quality 100 %O")))
-  (add-to-list
-   'org-preview-latex-process-alist
-   '(svg-lualatex
-     :programs ("lualatex" "pdf2svg") :description "pdf > svg"
-     :message
-     "you need to install the programs: lualatex and pdf2svg."
-     :image-input-type "pdf" :image-output-type "png"
-     :image-size-adjust (1.0 . 1.0) :latex-compiler
-     ("lualatex -interaction nonstopmode -output-directory %o %f")
-     :image-converter
-     ;; ("convert -density %D -trim -antialias %f -quality 100 %O")
-     ("pdf2svg %f %O")
-
+     ("convert -verbose -density %D -background none -trim -antialias %f -quality 100 %O")
      ))
-
-  (plist-put org-format-latex-options :scale 1.6)
+  
+  (pcase system-type
+    ('gnu/linux (plist-put org-format-latex-options :scale 1.5))
+    ('darwin (plist-put org-format-latex-options :scale 1.6)))
   )
 
 (use-package org-appear
