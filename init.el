@@ -1833,8 +1833,11 @@ Automatically expands the heading if it's folded."
   :defer nil
   :after org
   :custom
-  (org-latex-create-formula-image-program 'imagemagick)
-  (org-latex-packages-alist '(("" "/Users/jure/.emacs.d/defaults/js" t)))
+  (org-latex-create-formula-image-program 'dvipng)
+  (org-latex-packages-alist
+   (pcase system-type
+     ('gnu/linux '(("" "/home/jure/.emacs.d/defaults/js" t)))
+     ('darwin '(("" "/Users/jure/.emacs.d/defaults/js" t)))))
   (org-export-in-background nil)
   
   :config
