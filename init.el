@@ -1803,7 +1803,9 @@ Automatically expands the heading if it's folded."
 	("C-c n !" . xenops-mode))
   :config
   (setq xenops-reveal-on-entry t)
-  (setq xenops-math-image-scale-factor 1.6) ;; Scaling factor for SVG math images
+  (pcase system-type
+    ('gnu/linux (setq xenops-math-image-scale-factor 2.0))
+    ('darwin (setq xenops-math-image-scale-factor 1.6)))
   (setq xenops-math-latex-process 'imagemagick)
   (defun xenops-src-parse-at-point ()
     "Parse 'src element at point."
