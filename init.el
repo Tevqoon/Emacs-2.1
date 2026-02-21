@@ -53,6 +53,7 @@
   (pixel-scroll-precision-mode 1)
   :custom
   (inhibit-startup-message t)
+  (enable-recursive-minibuffers t)
   (frame-resize-pixelwise t)
   (cursor-type 'bar)
   (echo-keystrokes .01)
@@ -1354,10 +1355,10 @@ exactly like the old ace-jump integration."
     :endpoint "/api/v1/chat/completions"
     :stream t
     :key 'gptel-api-key-from-auth-source
-    :models '(openai/gpt-4o
-	      openai/gpt-5-mini
+    :models '(openai/gpt-5-mini
+	      openai/gpt-4o
 	      openai/o4-mini-deep-research
-	      anthropic/claude-sonnet-4)
+	      anthropic/claude-sonnet-4.6)
     ;; :request-params '(:provider (:only ["openai"]))
     )
 
@@ -1846,7 +1847,9 @@ Automatically expands the heading if it's folded."
      :image-converter
      ("convert -verbose -density %D -background none -trim -antialias %f -quality 100 %O")
      ))
-  
+
+  ;; In some rare cases, the argument that gets passed to the density makes convert unable to trim.
+  ;; 1.6 fucks randy up
   (pcase system-type
     ('gnu/linux (plist-put org-format-latex-options :scale 1.5))
     ('darwin (plist-put org-format-latex-options :scale 1.6)))
