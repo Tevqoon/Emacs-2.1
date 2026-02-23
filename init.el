@@ -1881,7 +1881,7 @@ Automatically expands the heading if it's folded."
   ;; In some rare cases, the argument that gets passed to the density makes convert unable to trim.
   ;; 1.6 fucks randy up
   (pcase system-type
-    ('gnu/linux (plist-put org-format-latex-options :scale 1.5))
+    ('gnu/linux (plist-put org-format-latex-options :scale 2.0))
     ('darwin (plist-put org-format-latex-options :scale 1.6)))
   )
 
