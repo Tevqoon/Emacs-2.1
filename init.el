@@ -1471,15 +1471,14 @@ exactly like the old ace-jump integration."
 
 (use-package mcp
   :ensure t
-  :after gptel
+  :after gptel emacs-mcp-tool-server
   :custom (mcp-hub-servers
            `(
-	     ;; ("filesystem" . (:command "npx" :args ("-y" "@modelcontextprotocol/server-filesystem" "/home/lizqwer/MyProject/")))
-             ;; ("fetch" . (:command "uvx" :args ("mcp-server-fetch")))
-             ;; ("qdrant" . (:url "http://localhost:8000/sse"))
+             ("fetch" . (:command "uvx" :args ("mcp-server-fetch")))
+	     ("duckduckgo" . (:command "uvx" :args ("duckduckgo-mcp-server")))
 	     ("emacs-mcp-tool-server" .
-	      (:command "/Users/jure/.emacs.d/emacs-mcp-stdio.sh"
-			:args ("--init-function=emacs-mcp-tool-start-server" "--stop-function=emacs-mcp-tool-stop-server")))
+	      (:command "~/.emacs.d/emacs-mcp-stdio.sh"
+			:args ("--init-function=emacs-mcp-tool-start-server" "--stop-function=emacs-mcp-tool-stop-server", "--server-id=default")))
              ))
   :config
   (require 'mcp-hub)
