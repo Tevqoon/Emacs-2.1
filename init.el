@@ -1472,7 +1472,6 @@ exactly like the old ace-jump integration."
 
 (use-package mcp
   :ensure t
-  :after gptel emacs-mcp-tool-server
   :custom (mcp-hub-servers
            `(
              ("fetch" . (:command "uvx" :args ("mcp-server-fetch")))
