@@ -813,7 +813,8 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   :bind ("C-;" . iedit-mode))
 
 (use-package imenu-list
-  :bind ("C-c n h" . imenu-list-smart-toggle)
+  :bind
+  ("C-c n h" . imenu-list-smart-toggle)
   :custom
   (imenu-list-focus-after-activation t)
   (use-package-enable-imenu-support t)
@@ -1879,7 +1880,7 @@ Automatically expands the heading if it's folded."
   ;; In some rare cases, the argument that gets passed to the density makes convert unable to trim.
   ;; 1.6 fucks randy up
   (pcase system-type
-    ('gnu/linux (plist-put org-format-latex-options :scale 1.5))
+    ('gnu/linux (plist-put org-format-latex-options :scale 2.0))
     ('darwin (plist-put org-format-latex-options :scale 1.6)))
   )
 
