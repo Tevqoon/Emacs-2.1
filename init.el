@@ -805,7 +805,8 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   :bind ("C-;" . iedit-mode))
 
 (use-package imenu-list
-  :bind ("C-c n h" . imenu-list-smart-toggle)
+  :bind
+  ("C-c n h" . imenu-list-smart-toggle)
   :custom
   (imenu-list-focus-after-activation t)
   (use-package-enable-imenu-support t)
