@@ -103,6 +103,7 @@
 	org-todo
 	org-yank
 	racket-insert-closing
+	tab-bar-duplicate-tab
 	transpose-sexps
 	transpose-words
 	undefined

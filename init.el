@@ -1352,7 +1352,8 @@ exactly like the old ace-jump integration."
   (gptel-default-mode 'org-mode)
   
   :config   
-  (setq gptel-model 'gpt-5-mini)
+  (setq gptel-model 'claude-sonnet-4.5
+	gptel-backend (gptel-make-gh-copilot "Copilot"))
   (require 'gptel-org)
   (defvar org-roam-chatlogs-directory "chatlogs/"
     "The directory to save gptel chatlogs in.")
@@ -1430,6 +1431,20 @@ exactly like the old ace-jump integration."
   )
 
 ;;; End of GPTel package block
+
+;;; -> AI Configuration -> Copilot
+
+(use-package copilot
+  :ensure t
+  :vc (:url "https://github.com/copilot-emacs/copilot.el"
+            :rev :newest
+            :branch "main")
+  :bind (:map copilot-completion-map
+              ("C-f" . copilot-accept-completion)
+              ("M-f" . copilot-accept-completion-by-word)
+              ("C-e" . copilot-accept-completion-by-line)
+              ("M-n" . copilot-next-completion)
+              ("M-p" . copilot-previous-completion)))
 
 ;;; -> AI configuration -> Emacs MCP
 
@@ -2783,7 +2798,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
   ;; Initialize the cache
   (org-node-cache-mode)
   (org-node-cache-ensure)
-  (org-node-roam-accelerator-mode nil)
+  (org-node-roam-accelerator-mode -1)
   )
 
 ;;; -> Org-roam -> org-roam-ui
