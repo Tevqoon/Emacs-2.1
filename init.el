@@ -3639,6 +3639,7 @@ the current entry at point and move to the next line."
      (python . t)
      (C . t)
      (haskell . t)
+     (ocaml . t)
      (octave . t)
      (awk . t)
      (shell . t)
@@ -3649,6 +3650,7 @@ the current entry at point and move to the next line."
   (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
   (add-to-list 'org-structure-template-alist '("hl" . "src haskell"))
   (add-to-list 'org-structure-template-alist '("py" . "src python :results output"))
+  (add-to-list 'org-structure-template-alist '("oc" . "src ocaml"))
   (add-to-list 'org-structure-template-alist '("cs" . "src C"))
   (add-to-list 'org-structure-template-alist '("md" . "src markdown"))
   (add-to-list 'org-structure-template-alist '("def" . "definicija"))
@@ -5678,7 +5680,10 @@ When pressed twice, make the sub/superscript roman."
      (?O ("\\Omega" "\\degree"))
      (?+  ("\\cup" "\\oplus"))
      (?*  ("\\times" "\\otimes" "\\bullet"))
-     (?T ("\\top" "\\bot" "\\arctan"))))
+     (?T ("\\top" "\\bot" "\\arctan"))
+     (?P ("\\Pi" "\\Prop"))
+     (?V ("\\vdash" "\\dashv"))
+     ))
 
   :hook
   (org-mode . org-cdlatex-mode)
@@ -5758,6 +5763,23 @@ When pressed twice, make the sub/superscript roman."
 ;; Major mode for OCaml programming
 (use-package tuareg
   :mode (("\\.ocamlinit\\'" . tuareg-mode)))
+
+(use-package utop
+  :ensure t
+  :commands utop
+  :config
+  ;; optional: use utop as the default REPL for tuareg
+  (add-hook 'tuareg-mode-hook #'utop-minor-mode))
+
+;; (use-package ob-ocaml
+;;   :ensure nil   ;; if not available from MELPA, see fallback below
+;;   :after org
+;;   :config
+;;   (setq org-babel-default-header-args:ocaml
+;; 	'((:session . "utop")    ; use utop session by default
+;;           (:results . "output")  ; capture printed output
+;;           (:exports . "both")    ; export code and results
+;;           (:cache . "no"))))
 
 ;; Major mode for editing Dune project files
 (use-package dune)
