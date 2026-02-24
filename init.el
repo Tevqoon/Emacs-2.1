@@ -1323,6 +1323,16 @@ exactly like the old ace-jump integration."
 (use-package vterm
   :if (eq system-type 'darwin))
 
+;;; -> Misc -> PDFView
+
+(use-package pdf-tools
+  :ensure t
+  :mode ("\\.pdf\\'" . pdf-view-mode)
+  :config
+  ;; Build/install the helper binary on first run (quiet)
+  (unless (featurep 'pdf-tools)
+    (pdf-tools-install :noquery)))
+
 ;;; --> AI configuration
 ;;; -> AI configuration -> GPTel
 
