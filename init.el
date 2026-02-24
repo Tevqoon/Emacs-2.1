@@ -1354,7 +1354,7 @@ exactly like the old ace-jump integration."
   (gptel-default-mode 'org-mode)
 
   :config
-  (setq gptel-model 'gpt-4.1
+  (setq gptel-model 'gpt-5-mini
 	gptel-backend (gptel-make-gh-copilot "Copilot"))
   (require 'gptel-org)
   (defvar org-roam-chatlogs-directory "chatlogs/"
@@ -1474,7 +1474,7 @@ exactly like the old ace-jump integration."
   :ensure t
   :custom (mcp-hub-servers
            `(
-             ("fetch" . (:command "uvx" :args ("mcp-server-fetch")))
+             ;; ("fetch" . (:command "uvx" :args ("mcp-server-fetch"))) ; Seems like DDG has its own fetch tool.
 	     ("duckduckgo" . (:command "uvx" :args ("duckduckgo-mcp-server")))
 	     ("emacs-mcp-tool-server" .
 	      (:command "~/.emacs.d/emacs-mcp-stdio.sh"
