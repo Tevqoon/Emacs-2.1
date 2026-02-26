@@ -50,7 +50,9 @@
   (column-number-mode)
   (delete-selection-mode nil) ; For lispy
   (global-auto-revert-mode 1)
-  (pixel-scroll-precision-mode 1)
+  (when (eq system-type 'darwin)
+    (pixel-scroll-precision-mode 1)
+    (pixel-scroll-precision-use-momentum t))
   :custom
   (inhibit-startup-message t)
   (enable-recursive-minibuffers t)
@@ -61,7 +63,7 @@
   (global-auto-revert-non-file-buffers t)
   (delete-by-moving-to-trash t)
   (sentence-end-double-space nil)
-  (pixel-scroll-precision-use-momentum t)
+  
   (auto-hscroll-mode t)
   (mouse-wheel-scroll-amount '(1 ((meta))
                                  ((control meta) . global-text-scale)
