@@ -1595,6 +1595,14 @@ exactly like the old ace-jump integration."
    )
   
   :config
+  ;; Exporting
+
+  (defun js/org-export-configure-numbering (backend)
+    (pcase backend
+      ('latex (setq-local org-export-with-section-numbers t))
+      ('html  (setq-local org-export-with-section-numbers nil))))
+
+  (add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
   ;; Open links in the same window
   (setf (alist-get 'file org-link-frame-setup) #'find-file)
   
@@ -3663,14 +3671,16 @@ the current entry at point and move to the next line."
   (add-to-list 'org-structure-template-alist '("oc" . "src ocaml"))
   (add-to-list 'org-structure-template-alist '("cs" . "src C"))
   (add-to-list 'org-structure-template-alist '("md" . "src markdown"))
-  (add-to-list 'org-structure-template-alist '("def" . "definicija"))
+  (add-to-list 'org-structure-template-alist '("defa" . "definicija"))
+  (add-to-list 'org-structure-template-alist '("def" . "definition"))
   (add-to-list 'org-structure-template-alist '("izr" . "izrek"))
   (add-to-list 'org-structure-template-alist '("thm" . "theorem"))
+  (add-to-list 'org-structure-template-alist '("prop" . "proposition"))
   (add-to-list 'org-structure-template-alist '("prf" . "proof"))
   (add-to-list 'org-structure-template-alist '("trd" . "trditev"))
   (add-to-list 'org-structure-template-alist '("lem" . "lema"))
   (add-to-list 'org-structure-template-alist '("abst" . "abstract"))
-  (add-to-list 'org-structure-template-alist '("ex" . "example"))
+  (add-to-list 'org-structure-template-alist '("ex" . "lexample"))
   (add-to-list 'org-structure-template-alist '("item" . "itemize"))
   )
 
@@ -3737,7 +3747,10 @@ the current entry at point and move to the next line."
   (org-static-blog-drafts-directory org-roam-directory)
   (org-static-blog-enable-tags t)
   (org-export-with-toc nil)
-  (org-export-with-section-numbers nil)
+
+  ;; This is destructive. 
+  ;; (org-export-with-section-numbers nil)
+
   (org-static-blog-use-preview t)
   (org-static-blog-enable-tag-rss t)
   (org-static-blog-enable-og-tags t)
