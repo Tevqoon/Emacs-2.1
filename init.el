@@ -3498,6 +3498,8 @@ All other subheadings will be ignored."
      (todo . " %i %-12:c")
      (tags . " %i %-12:c")
      (search . " %i %-12:c")))
+  (org-agenda-hide-tags-regexp
+   (regexp-opt '("lecture-notes" "noexport")))
   
   :bind (("C-c a" . open-org-agenda)
 	 :map org-agenda-mode-map
