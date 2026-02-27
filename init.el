@@ -1775,6 +1775,48 @@ With prefix ARG, use secondary browser."
            ;; Finally, give up
            (t (message "No URL at point")))))))
 
+  (defun my/org-wrap-or-toggle (n)
+    "If region is active, wrap/unwrap it with the typed char `last-command-event'.
+Handles both |*abc*| and *|abc|* cases. Otherwise behave like self-insert."
+    (interactive "p")
+    (let ((c last-command-event))
+      (if (use-region-p)
+          (let* ((beg (region-beginning))
+		 (end (region-end))
+		 (mbeg (copy-marker beg))
+		 (mend (copy-marker end))
+		 (before-beg (and (> (marker-position mbeg) (point-min))
+                                  (char-before (marker-position mbeg))))
+		 (after-end (and (< (marker-position mend) (point-max))
+				 (char-after (marker-position mend))))
+		 (at-beg (char-after (marker-position mbeg)))
+		 (before-end (char-before (marker-position mend))))
+            (save-excursion
+              (cond
+               ;; case: *|abc|*  (markers just outside region)
+               ((and before-beg after-end (eq before-beg c) (eq after-end c))
+		;; delete the after-end marker first, then the before-beg marker
+		(goto-char (marker-position mend)) (delete-char 1)
+		(goto-char (marker-position mbeg)) (delete-char -1))
+               ;; case: |*abc*|  (markers inside region)
+               ((and (> (- (marker-position mend) (marker-position mbeg)) 1)
+                     (eq at-beg c) (eq before-end c))
+		;; delete the end marker (char before end) first, then the beginning marker
+		(goto-char (marker-position mend)) (delete-char -1)
+		(goto-char (marker-position mbeg)) (delete-char 1))
+               ;; otherwise wrap the region
+               (t
+		(goto-char (marker-position mend)) (insert (char-to-string c))
+		(goto-char (marker-position mbeg)) (insert (char-to-string c))))))
+	(self-insert-command n))))
+
+  (defun my/org-setup-wrap-keys ()
+    "Bind common Org emphasis keys to `my/org-wrap-or-toggle' in org-mode."
+    (dolist (k '("*" "/" "_" "=" "~" "+"))
+      (local-set-key (kbd k) #'my/org-wrap-or-toggle)))
+
+  (add-hook 'org-mode-hook #'my/org-setup-wrap-keys)
+
   ;;; -> Org mode -> Navigation
   (defun my/org-narrow-to-heading-content ()
     "Narrow to current heading's content, excluding subheadings.
@@ -3678,9 +3720,10 @@ the current entry at point and move to the next line."
   (add-to-list 'org-structure-template-alist '("izr" . "izrek"))
   (add-to-list 'org-structure-template-alist '("thm" . "theorem"))
   (add-to-list 'org-structure-template-alist '("prop" . "proposition"))
-  (add-to-list 'org-structure-template-alist '("prf" . "proof"))
+  (add-to-list 'org-structure-template-alist '("pf" . "proof"))
   (add-to-list 'org-structure-template-alist '("trd" . "trditev"))
   (add-to-list 'org-structure-template-alist '("lem" . "lema"))
+  (add-to-list 'org-structure-template-alist '("lemm" . "lemma"))
   (add-to-list 'org-structure-template-alist '("abst" . "abstract"))
   (add-to-list 'org-structure-template-alist '("ex" . "lexample"))
   (add-to-list 'org-structure-template-alist '("item" . "itemize"))
