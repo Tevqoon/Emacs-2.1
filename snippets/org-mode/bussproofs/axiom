@@ -3,4 +3,4 @@
 # key: ax
 # condition: (js/inside-prooftree-p)
 # --
-\\AxiomC{\\(${1:}\\)}$0
+\\AxiomC{\\($0\\)}

@@ -3,4 +3,4 @@
 # key: bi
 # condition: (js/inside-prooftree-p)
 # --
-\\BinaryInfC{\\(${1:}\\)}$0
+\\BinaryInfC{\\($0\\)}

@@ -3,4 +3,4 @@
 # key: ui
 # condition: (js/inside-prooftree-p)
 # --
-\\UnaryInfC{\\(${1:}\\)}$0
+\\UnaryInfC{\\($0\\) }

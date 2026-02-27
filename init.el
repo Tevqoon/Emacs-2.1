@@ -3975,10 +3975,6 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
             (error "PDF compilation failed"))))))
 
   (defun js/sync-blog ()
-    (interactive)
-    (async-shell-command "rsync -avz --delete ~/Documents/blog/ jure@muffalo:~/blog/"))
-
-  (defun js/sync-blog ()
     "Sync blog to muffalo server."
     (interactive)
     (compile "rsync -avz --delete ~/Documents/blog/ jure@muffalo:~/blog/"))
@@ -5752,6 +5748,7 @@ When pressed twice, make the sub/superscript roman."
      (?t ("\\tau" "\\tan" "\\arctan"))
      (?P ("\\Pi" "\\Prop"))
      (?V ("\\vdash" "\\dashv"))
+     (?4 ("\\quad"))
      ))
 
   :hook
