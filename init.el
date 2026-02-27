@@ -4928,7 +4928,7 @@ If a key is provided, use it instead of the default capture template."
              (output-template (concat (file-name-as-directory yt-dlp-folder)
 				      (escape-single-quotes base-filename)
 				      ".%(ext)s"))
-             (yt-dlp-command (format "yt-dlp --no-progress -S 'res:1080,ext,vcodec:h265,h264' --embed-subs --sub-lang 'en.*' --sponsorblock-mark all --sponsorblock-remove 'sponsor' -o '%s' '%s'" output-template (elfeed-entry-link entry)))
+             (yt-dlp-command (format "yt-dlp --cookies-from-browser firefox --no-progress -S 'res:1080,ext,vcodec:h265,h264' --embed-subs --sub-lang 'en.*' --sponsorblock-mark all --sponsorblock-remove 'sponsor' -o '%s' '%s'" output-template (elfeed-entry-link entry)))
              (process (start-process-shell-command "yt-dlp" "*yt-dlp-output*" yt-dlp-command)))
         ;; Use the constructed sentinel for each entry
         (set-process-sentinel process (eval (create-single-entry-sentinel entry base-filename)))))
