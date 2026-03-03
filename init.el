@@ -3633,7 +3633,7 @@ All other subheadings will be ignored."
 				     (air-org-skip-subtree-if-priority ?B)
                                      (air-org-skip-if-blocked)
 				     (org-agenda-skip-if nil '(scheduled deadline))
-				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISHED"))
+				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISH"))
 				     (js/org-skip-if-ancestor-blocked)))
 			       (org-agenda-overriding-header "* All normal priority tasks:")))
 		  (todo "IDEA" ((org-agenda-overriding-header "* Ideas: ")))
@@ -3820,7 +3820,8 @@ the current entry at point and move to the next line."
 ")
 
   (org-static-blog-page-preamble
-   "<nav class=\"header\">
+   "<div style=\"display:none\">\\(\\newenvironment{bprooftree}{\\begin{prooftree}}{\\end{prooftree}}\\)</div>
+<nav class=\"header\">
   <div class=\"header-left\">
     <a href=\"/\">Home</a>
     <a href=\"/archive.html\">Archive</a>
@@ -5847,7 +5848,7 @@ When pressed twice, make the sub/superscript roman."
      (?t ("\\tau" "\\tan" "\\arctan"))
      (?P ("\\Pi" "\\Prop"))
      (?V ("\\vdash" "\\dashv"))
-     (?4 ("\\quad"))
+     (?4 ("\\quad" "\\qquad"))
      (?j ("\\iota" "\\jmath"))
      ))
 
