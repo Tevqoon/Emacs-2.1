@@ -3608,14 +3608,15 @@ All other subheadings will be ignored."
 							       (air-org-skip-if-blocked)
 							       (js/org-skip-if-ancestor-blocked)))
 				(org-agenda-overriding-header "* Up next: ")))
+		  (todo "ACTIVE" ((org-agenda-overriding-header "* Active projects: ")
+				  (org-agenda-sorting-strategy '(deadline-up))))
 		  (tags "PRIORITY=\"B\""
 			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
 			 (org-agenda-overriding-header "* Lower-priority:")))
 		  (todo "COURSE" ((org-agenda-overriding-header "* Active courses: ")))
 		  (todo "EXAM" ((org-agenda-overriding-header "* Looming exams: ")
 				(org-agenda-sorting-strategy '(deadline-up))))
-		  (todo "ACTIVE" ((org-agenda-overriding-header "* Active projects: ")
-				  (org-agenda-sorting-strategy '(deadline-up))))
+		  
 		  (todo "PROJECT" ((org-agenda-overriding-header "* Projects: ")))
 		  
 		  ;; (agenda "" ((org-agenda-span 'week)))
@@ -5847,6 +5848,7 @@ When pressed twice, make the sub/superscript roman."
      (?P ("\\Pi" "\\Prop"))
      (?V ("\\vdash" "\\dashv"))
      (?4 ("\\quad"))
+     (?j ("\\iota" "\\jmath"))
      ))
 
   :hook
