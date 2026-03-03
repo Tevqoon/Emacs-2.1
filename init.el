@@ -52,7 +52,7 @@
   (global-auto-revert-mode 1)
   (when (eq system-type 'darwin)
     (pixel-scroll-precision-mode 1)
-    (pixel-scroll-precision-use-momentum t))
+    (setq pixel-scroll-precision-use-momentum t))
   :custom
   (inhibit-startup-message t)
   (enable-recursive-minibuffers t)
@@ -108,7 +108,6 @@ are defining or executing a macro."
 	(funcall-interactively quit))))
 
   (server-start)
-
   )
 
 (use-package files
@@ -1081,7 +1080,11 @@ exactly like the old ace-jump integration."
   :ensure nil
   :bind (:map dired-mode-map
               ("C-a" . js/dired-smart-bol)
-              ("C-e" . js/dired-smart-eol))
+              ("C-e" . js/dired-smart-eol)
+	      :map wdired-mode-map
+	      ("C-a" . js/dired-smart-bol)
+              ("C-e" . js/dired-smart-eol)
+	      )
   :custom
   (dired-listing-switches "-lagGFDh")
   :config
@@ -4049,7 +4052,7 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
          ("T" . elfeed-filter-trash)
 	 ("A" . elfeed-filter-asmr)
 	 ("P" . elfeed-filter-papers)
-         ("i" . open-youtube-in-iina)
+         ("i" . open-downloaded-youtube-in-iina)
          ("I" . download-selected-youtube-videos)
          ("D" . elfeed-filter-downloaded)
 	 ("s" . my/elfeed-show-default)
@@ -4073,7 +4076,7 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
 	 ("U" . js/log-elfeed-process)
          ;; If called with C-u then bring up the capture buffer
 	 ("t" . elfeed-show-trash)
-         ("i" . open-youtube-in-iina)
+         ("i" . open-downloaded-youtube-in-iina)
 	 ("M-o" . ace-link-safari)
 	 ("B" . elfeed-browse-with-secondary-browser)
 	 ("W" . js/elfeed-entries-to-wallabag)
@@ -4904,6 +4907,38 @@ If a key is provided, use it instead of the default capture template."
       (start-process-shell-command "iina" nil (concat iina-command " \"" playlist-file "\""))
       (message "Opening YouTube playlist in IINA...")))
 
+  (defun open-downloaded-youtube-in-iina ()
+    "Open downloaded files for selected elfeed entries as a playlist in IINA.
+For each entry with the +downloaded tag, opens the local file.
+If the file doesn't exist, removes the +downloaded tag and skips it."
+    (interactive)
+    (let* ((entries (elfeed-search-selected))
+           (iina-command "open -a IINA")
+           (playlist-file (make-temp-file "emacs-iina-playlist" nil ".m3u8"))
+           (any-added nil))
+      (with-temp-file playlist-file
+	(dolist (entry entries)
+          (if (not (member 'downloaded (elfeed-entry-tags entry)))
+              (message "Skipping \"%s\": no +downloaded tag." (elfeed-entry-title entry))
+            (let* ((relative-filename (elfeed-meta entry :filename))
+                   (filename (and relative-filename
+                                  (expand-file-name relative-filename yt-dlp-folder))))
+              (if (and filename (file-exists-p filename))
+                  (progn
+                    (elfeed-untag entry 'unread)
+                    (insert filename)
+                    (insert "\n")
+                    (setq any-added t))
+		(elfeed-untag entry 'downloaded)
+		(message "File not found for \"%s\"; removed +downloaded tag."
+			 (elfeed-entry-title entry)))))))
+      (if any-added
+          (progn
+            (start-process-shell-command "iina" nil
+					 (concat iina-command " \"" playlist-file "\""))
+            (message "Opening downloaded videos in IINA..."))
+	(message "No downloaded files found to open."))))
+
   (defun determine-subfolder (entry)
     "Determine the subfolder for the video based on its tags and yt-dlp-priority-tags."
     (let ((tags (elfeed-entry-tags entry)))
@@ -4978,6 +5013,64 @@ If a key is provided, use it instead of the default capture template."
   (defun elfeed-filter-downloaded ()
     (interactive)
     (elfeed-filter-maker "+downloaded" "Showing previously downloaded items."))
+
+  ;;; Manually add items
+  (defun js/elfeed-fetch-youtube-metadata (url)
+    "Synchronously fetch title and channel info for a YouTube video at URL.
+Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
+    (condition-case err
+	(with-current-buffer (url-retrieve-synchronously url t t 10)
+          (goto-char (point-min))
+          (let ((title      (when (re-search-forward "<title>\\(.*?\\) - YouTube</title>" nil t)
+                              (decode-coding-string (match-string 1) 'utf-8)))
+		(ch-name    nil)
+		(ch-id      nil))
+            (goto-char (point-min))
+            (when (re-search-forward "\"channelId\":\"\\([^\"]+\\)\"" nil t)
+              (setq ch-id (match-string 1)))
+            (goto-char (point-min))
+            (when (re-search-forward "\"ownerChannelName\":\"\\([^\"]+\\)\"" nil t)
+              (setq ch-name (match-string 1)))
+            (list :title       (or title url)
+                  :channel-name (or ch-name "Unknown Channel")
+                  :channel-id   ch-id)))
+      (error
+       (message "js/elfeed-fetch-youtube-metadata: %s" err)
+       nil)))
+
+  (defun js/elfeed-add-url (url)
+    "Add URL as a manually-added entry in the elfeed database.
+Synchronously fetches title and channel, creates the entry under
+the channel's feed (using its real RSS feed ID if available), and
+tags it `manually-added' + `unread'."
+    (interactive "sYouTube URL: ")
+    (elfeed-db-ensure)
+    (let* ((meta       (or (js/elfeed-fetch-youtube-metadata url)
+                           (list :title url :channel-name "Unknown Channel" :channel-id nil)))
+           (title      (plist-get meta :title))
+           (ch-name    (plist-get meta :channel-name))
+           (ch-id      (plist-get meta :channel-id))
+           ;; Use real RSS URL as feed-id when we have a channel-id, so it
+           ;; merges with the channel if you subscribe to it later
+           (feed-id    (if ch-id
+                           (format "https://www.youtube.com/feeds/videos.xml?channel_id=%s" ch-id)
+			 (concat "manually-added/" ch-name)))
+           (feed       (elfeed-db-get-feed feed-id))
+           (id         (cons feed-id url))
+           (entry      (elfeed-entry--create
+			:id      id
+			:title   title
+			:link    url
+			:date    (float-time)
+			:feed-id feed-id
+			:tags    '(manually-added unread))))
+      (unless (elfeed-feed-title feed)
+	(setf (elfeed-feed-title feed) ch-name))
+      (elfeed-db-add (list entry))
+      (when (fboundp 'elfeed-tube-fetch)
+	(elfeed-tube-fetch (list entry)))
+      (elfeed-search-update :force)
+      (message "Added \"%s\" by %s to elfeed." title ch-name)))
 
   ) ;;
 ;;; End of elfeed-tube package block
