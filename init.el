@@ -1602,10 +1602,11 @@ exactly like the old ace-jump integration."
   :config
   ;; Exporting
 
-  (defun js/org-export-configure-numbering (backend)
-    (pcase backend
-      ('latex (setq-local org-export-with-section-numbers t))
-      ('html  (setq-local org-export-with-section-numbers nil))))
+  ;; (defun js/org-export-configure-numbering (backend)
+  ;;   (pcase backend
+  ;;     ('latex (setq-local org-export-with-section-numbers t))
+  ;;     ('html  (setq-local org-export-with-section-numbers nil))))
+  (setq org-export-with-section-numbers nil)
 
   (add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
   ;; Open links in the same window
@@ -1910,6 +1911,7 @@ Automatically expands the heading if it's folded."
 	 :type 'src
 	 :language (nth 0 org-babel-info)
 	 :org-babel-info org-babel-info)))
+  
   ;; :hook org-mode
   )
 
@@ -4062,6 +4064,7 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
 	 ("O" . js/elfeed-entries-to-podcastify)
 	 ("<wheel-up>" . previous-line)
 	 ("<wheel-down>" . next-line)
+	 ("a" . js/elfeed-add-url)
 
 	 ("y" . nil)
 	 ("y y" . elfeed-search-yank)
