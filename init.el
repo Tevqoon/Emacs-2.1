@@ -359,6 +359,7 @@ between Emacs sessions.")
   :hook
   (visual-fill-column-mode . efs/org-mode-visual-fill)
   (text-mode . visual-line-mode)
+  (visual-line-mode . visual-wrap-prefix-mode)
   text-mode
   :config
   (defun efs/org-mode-visual-fill ()
@@ -1076,11 +1077,13 @@ exactly like the old ace-jump integration."
   :ensure nil
   :bind (:map Info-mode-map ("C-o" . casual-info-tmenu)))
 
+;;; Dired
 (use-package dired
   :ensure nil
   :bind (:map dired-mode-map
               ("C-a" . js/dired-smart-bol)
               ("C-e" . js/dired-smart-eol)
+	      ("F" . js/dired-find-marked-files-in-tabs)
 	      :map wdired-mode-map
 	      ("C-a" . js/dired-smart-bol)
               ("C-e" . js/dired-smart-eol)
@@ -1088,6 +1091,14 @@ exactly like the old ace-jump integration."
   :custom
   (dired-listing-switches "-lagGFDh")
   :config
+  (defun js/dired-find-marked-files-in-tabs ()
+    "Open each marked file in a new tab."
+    (interactive)
+    (let ((files (dired-get-marked-files)))
+      (dolist (file files)
+	(tab-bar-new-tab)
+	(find-file file))))
+  
   (defun js/dired-smart-bol ()
     "Toggle point between beginning of filename and beginning of line."
     (interactive)
