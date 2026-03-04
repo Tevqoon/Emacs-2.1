@@ -1723,6 +1723,22 @@ exactly like the old ace-jump integration."
 ;;   )
 
 ;;; End of aidermacs package block
+
+;;; -> AI Configuration -> Xenodium Agent shell
+
+(use-package agent-shell
+  :ensure t
+  :ensure-system-package
+  ((opencode . "npm install -g opencode-ai"))
+  :custom
+  (agent-shell-preferred-agent-config 'opencode)
+  :bind
+  (:map agent-shell-mode-map
+	("M-<tab>" . agent-shell-cycle-session-mode)
+	("C-c C-f" . agent-shell-prompt-compose)))
+
+;;; End of Agent shell block
+
 ;;; End of AI configuration block
 
 
