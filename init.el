@@ -239,6 +239,29 @@ between Emacs sessions.")
     (dump-vars-to-file closing-variables closing-variables-filename))
   )
 
+;;; --> Projects
+(use-package project
+  :ensure nil
+  :bind-keymap ("C-c p" . project-prefix-map)
+  :custom
+  (project-switch-commands
+   '((project-find-file "Find file" ?f)
+     (project-find-regexp "Find regexp" ?g)
+     (project-dired "Dired" ?d)
+     (project-eshell "Eshell" ?e)
+     (magit-project-status "Magit" ?m)
+     (agent-shell "Agent shell" ?a)))
+  (project-vc-extra-root-markers
+   '(".dir-locals.el" "flake.nix" "package.json" "Cargo.toml" "pyproject.toml"))
+  (project-kill-buffers-display-buffer-list t)
+  :config
+  (project-forget-zombie-projects)
+
+  :hook (find-file . (lambda ()
+		       (when-let ((pr (project-current)))
+			 (project-remember-project pr))))
+  )
+
 ;;; --> Look and feel
 
 (use-package doom-themes
