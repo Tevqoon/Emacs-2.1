@@ -792,8 +792,200 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 (use-package company-box
   :hook company-mode)
 
-(use-package expand-region
-  :bind ("s-f" . er/expand-region))
+;; (use-package expand-region
+;;   :bind ("s-f" . er/expand-region))
+
+(use-package expreg
+  :custom
+  (expreg-restore-point-on-quit t)
+  :bind ("s-f" . expreg-expand)
+
+  :config
+
+  ;; -- helpers -------------------------------------------------------------
+
+  (defun js/expreg--paragraph ()
+    "Paragraph expansion without text-mode gate."
+    (ignore-errors
+      (save-excursion
+	(backward-paragraph)
+	(skip-syntax-forward "-")
+	(let ((beg (point)))
+          (forward-paragraph)
+          `((paragraph . ,(cons beg (point))))))))
+
+  (defun js/expreg--org-block ()
+    "Select contents then full org block."
+    (when (derived-mode-p 'org-mode)
+      (ignore-errors
+	(save-excursion
+          (let* ((block-begin
+                  (save-excursion
+                    (re-search-backward "^[ \t]*#\\+begin[_:]" nil t)
+                    (point)))
+		 (block-end
+                  (save-excursion
+                    (goto-char block-begin)
+                    (re-search-forward "^[ \t]*#\\+end[_:].*$" nil t)
+                    (point)))
+		 (inner-beg
+                  (save-excursion
+                    (goto-char block-begin)
+                    (end-of-line) (forward-char 1)
+                    (point)))
+		 (inner-end
+                  (save-excursion
+                    (goto-char block-end)
+                    (re-search-backward "^[ \t]*#\\+end[_:]")
+                    (point)))
+		 (preamble-beg
+                  (save-excursion
+                    (goto-char block-begin)
+                    (while (and (not (bobp))
+				(progn (forward-line -1)
+                                       (looking-at "^[ \t]*#\\+"))))
+                    (point))))
+            (when (and block-begin block-end
+                       (<= block-begin (point))
+                       (<= (point) block-end))
+              `((org-block-inner   . ,(cons inner-beg inner-end))
+		(org-block         . ,(cons block-begin block-end))
+		(org-block-preamble . ,(cons preamble-beg block-end)))))))))
+
+  (defun js/expreg--org-heading ()
+    "Expand through org structure: heading body → subtree → parent subtree → ...
+Produces multiple regions so expreg can step through them."
+    (when (derived-mode-p 'org-mode)
+      (ignore-errors
+	(let (regions)
+          (save-excursion
+            ;; 1. Body of current heading (heading line to first child/end, no subheadings)
+            (org-back-to-heading t)
+            (let ((heading-start (point))
+                  (body-end (save-excursion
+                              (outline-next-heading)
+                              (point))))
+              ;; body = from after the heading line to the first subheading
+              (forward-line 1)
+              (let ((body-start (point)))
+		(when (< body-start body-end)
+                  (push `(org-heading-body . ,(cons body-start body-end)) regions)))
+              ;; 2. Full subtree at this heading
+              (goto-char heading-start)
+              (let ((sub-beg heading-start)
+                    (sub-end (save-excursion
+                               (org-end-of-subtree t t)
+                               (point))))
+		(push `(org-subtree . ,(cons sub-beg sub-end)) regions))
+              ;; 3. Walk up to each ancestor, collecting their subtrees
+              (goto-char heading-start)
+              (while (org-up-heading-safe)
+		(let ((parent-beg (point))
+                      (parent-end (save-excursion
+                                    (org-end-of-subtree t t)
+                                    (point))))
+                  (push `(org-subtree-parent . ,(cons parent-beg parent-end)) regions)))))
+          (nreverse regions)))))
+
+  (defun js/expreg--latex ()
+    "Expand through LaTeX constructs."
+    (ignore-errors
+      (let (regions)
+	;; --- inline fragments via org-element-context (org-mode only) ---
+	(when (derived-mode-p 'org-mode)
+          (let* ((ctx (org-element-context))
+		 (type (org-element-type ctx)))
+            (when (eq type 'latex-fragment)
+              (let* ((beg (org-element-property :begin ctx))
+                     (end (save-excursion
+                            (goto-char (org-element-property :end ctx))
+                            (skip-chars-backward " \t")
+                            (point)))
+                     (inner-beg
+                      (save-excursion
+			(goto-char beg)
+			(cond ((looking-at "\\\\\\[") (+ beg 2))
+                              ((looking-at "\\\\(")   (+ beg 2))
+                              ((looking-at "\\$\\$")  (+ beg 2))
+                              ((looking-at "\\$")     (+ beg 1))
+                              (t beg))))
+                     (inner-end
+                      (save-excursion
+			(goto-char end)
+			(cond ((looking-back "\\\\\\]" 3) (- end 2))
+                              ((looking-back "\\\\)" 3)   (- end 2))
+                              ((looking-back "\\$\\$" 3)  (- end 2))
+                              ((looking-back "\\$" 2)     (- end 1))
+                              (t end)))))
+		(when (< inner-beg inner-end)
+                  (push `(latex-fragment-inner . ,(cons inner-beg inner-end)) regions))
+		(push `(latex-fragment . ,(cons beg end)) regions)))))
+
+	;; --- \begin{env}...\end{env} ---
+	(let* ((env-begin
+		(or
+		 ;; 1. point is somewhere on a \begin{...} line
+		 (save-excursion
+		   (goto-char (line-beginning-position))
+		   (when (looking-at org-element--latex-begin-environment)
+		     (cons (point) (match-string 1))))
+		 ;; 2. point is inside the environment body
+		 (save-excursion
+		   (when (re-search-backward
+			  org-element--latex-begin-environment nil t)
+		     (cons (point) (match-string 1))))))
+	       (env-name  (cdr env-begin))
+	       (env-start (car env-begin)))
+	  (when (and env-begin env-name)
+	    (save-excursion
+	      (goto-char env-start)
+	      (when (re-search-forward
+		     (format "\\\\end{%s}" (regexp-quote env-name)) nil t)
+		(let* ((full-end  (point))
+		       (full-beg  env-start)
+		       (inner-beg (save-excursion
+				    (goto-char full-beg)
+				    (end-of-line) (forward-char 1)
+				    (point)))
+		       (inner-end (save-excursion
+				    (re-search-backward
+				     (format "\\\\end{%s}"
+					     (regexp-quote env-name)))
+				    (point))))
+		  (when (< inner-beg inner-end)
+		    (push `(latex-env-inner . ,(cons inner-beg inner-end)) regions))
+		  (push `(latex-env . ,(cons full-beg full-end)) regions))))))
+
+	(nreverse regions))))
+  ;; -- wiring --------------------------------------------------------------
+
+  (defun js/expreg-setup-text ()
+    (add-to-list 'expreg-functions #'expreg--sentence t)
+    (add-to-list 'expreg-functions #'js/expreg--paragraph t))
+
+  (defun js/expreg-setup-org ()
+    (add-to-list 'expreg-functions #'expreg--sentence t)
+    (add-to-list 'expreg-functions #'js/expreg--paragraph t)
+    (add-to-list 'expreg-functions #'js/expreg--latex t)
+    (add-to-list 'expreg-functions #'js/expreg--org-block t)
+    (add-to-list 'expreg-functions #'js/expreg--org-heading t))
+
+  (defun js/expreg-setup-elfeed ()
+    (add-to-list 'expreg-functions #'expreg--sentence t)
+    (add-to-list 'expreg-functions #'js/expreg--paragraph t))
+
+  (defun js/expreg-setup-latex ()
+    (add-to-list 'expreg-functions #'expreg--sentence t)
+    (add-to-list 'expreg-functions #'js/expreg--paragraph t)
+    (add-to-list 'expreg-functions #'js/expreg--latex t))
+
+
+  :hook
+  (text-mode      . js/expreg-setup-text)
+  (org-mode       . js/expreg-setup-org)   ; org derives text-mode, both fire — ok, add-to-list dedupes
+  (latex-mode       . js/expreg-setup-latex)
+  (LaTeX-mode       . js/expreg-setup-latex)   ; AUCTeX uses capital-L
+  (elfeed-show-mode . js/expreg-setup-elfeed))
 
 (use-package phi-search)
 
