@@ -1758,9 +1758,35 @@ exactly like the old ace-jump integration."
   :custom
   (agent-shell-preferred-agent-config 'opencode)
   :bind
+  ("C-c g a a" . agent-shell)
   (:map agent-shell-mode-map
 	("M-<tab>" . agent-shell-cycle-session-mode)
 	("C-c C-f" . agent-shell-prompt-compose)))
+
+(use-package agent-shell-manager
+  :vc (:url "https://github.com/jethrokuan/agent-shell-manager"
+	    :rev :newest)
+  :after agent-shell
+  :bind ("C-c g a m" . agent-shell-manager-toggle)
+  :custom
+  (agent-shell-manager-side 'bottom))
+
+(use-package agent-shell-attention
+  :vc (:url "https://github.com/ultronozm/agent-shell-attention.el"
+	    :rev :newest)
+  :after agent-shell
+  :demand t
+  :bind (:map agent-shell-attention-mode-map
+              ("C-c g a j" . agent-shell-attention-jump))
+  :custom
+  (agent-shell-attention-render-function #'agent-shell-attention-render-active)
+  (agent-shell-attention-indicator-location 'global-mode-string)
+  (agent-shell-attention-notify-function
+   (lambda (_buffer title body)
+     (alert body :title title :category 'agent-shell)))
+
+  :config
+  (agent-shell-attention-mode 1))
 
 ;;; End of Agent shell block
 
