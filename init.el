@@ -7,10 +7,10 @@
 ;;; Using [[https://github.com/d12frosted/homebrew-emacs-plus][Emacs plus]]
 ;;;
 ;;; Build commands:
-;;; 
+;;;
 ;;; brew tap d12frosted/emacs-plus
 ;;; brew install emacs-plus@30 --with-native-comp --with-imagemagick --with-xwidgets
-;;; 
+;;;
 ;;;
 ;;; Code:
 ;;; --> Initialization
@@ -63,7 +63,7 @@
   (global-auto-revert-non-file-buffers t)
   (delete-by-moving-to-trash t)
   (sentence-end-double-space nil)
-  
+
   (auto-hscroll-mode t)
   (mouse-wheel-scroll-amount '(1 ((meta))
                                  ((control meta) . global-text-scale)
@@ -124,14 +124,14 @@ are defining or executing a macro."
   (kept-old-versions 10)
   (backup-directory-alist
    `((".*" . ,(expand-file-name "backups/" user-emacs-directory))))
-  
+
   ;; Auto-save settings
   (auto-save-default t)
   (auto-save-interval 50)           ; Every 50 keystrokes
   (auto-save-timeout 10)            ; Every 10 seconds
   (auto-save-file-name-transforms
    `((".*" ,(expand-file-name "auto-saves/" user-emacs-directory) t)))
-  
+
   ;; Create the directories if they don't exist
   :config
   (make-directory (expand-file-name "backups/" user-emacs-directory) t)
@@ -181,7 +181,7 @@ are defining or executing a macro."
   :custom
   (browse-url-browser-function 'browse-url-safari)
   (browse-url-secondary-browser-function 'browse-url-firefox)
-  
+
   (browse-url-handlers
    '(("\\`https?://\\(?:www\\.\\)?youtube\\.com" . browse-url-firefox)
      ("\\`https?://\\(?:www\\.\\)?youtu\\.be" . browse-url-firefox))
@@ -203,7 +203,7 @@ are defining or executing a macro."
     "File path where persistent variables will be saved when Emacs closes.
 This file stores variables specified in `closing-variables` to maintain state
 between Emacs sessions.")
-  
+
   (defun dump-vars-to-file (varlist filename)
     "Simplistic dumping of variables in VARLIST to a file FILENAME"
     (save-excursion
@@ -215,24 +215,24 @@ between Emacs sessions.")
           (kill-buffer)))))
   (defun dump-varlist (varlist buffer)
     "Insert into buffer the setq statement to recreate the variables in VARLIST"
-    (mapc (lambda (var) 
-            (print (list 'setq var (list 'quote (symbol-value var))) 
+    (mapc (lambda (var)
+            (print (list 'setq var (list 'quote (symbol-value var)))
                    buffer))
           varlist))
-  
+
   ;; Create directory if it doesn't exist
   (make-directory (file-name-directory closing-variables-filename) t)
-  
+
   ;; Ensure the file exists
   (unless (file-exists-p closing-variables-filename)
     (with-temp-file closing-variables-filename
       (insert ";; Persistent variables\n")))
-  
+
   ;; Load existing variables - with error handling
   (condition-case nil
       (load closing-variables-filename t t t)
     (error (message "Could not load %s, creating new file" closing-variables-filename)))
-  
+
   (defun dump-closing-variables ()
     "Writes all of the variables in the list closing-variables to the file closing-variables-filename"
     (interactive)
@@ -270,11 +270,11 @@ between Emacs sessions.")
   ;; Theme definitions
   (defvar my/light-theme 'doom-solarized-light)
   (defvar my/dark-theme 'doom-solarized-dark)
-  
+
   (defvar my/redshift? nil)
   (defvar my/light-theme-redshift 'modus-operandi)
   (defvar my/dark-theme-redshift 'modus-vivendi)
-  
+
   (defun my/apply-theme (appearance)
     "Load theme based on appearance and redshift? status."
     (interactive)
@@ -428,7 +428,7 @@ between Emacs sessions.")
 ;;; -> OS specific configuration
 
 (pcase system-type
-  ;;; MacOS Config 
+  ;;; MacOS Config
   ('darwin
    (setq ns-alternate-modifier 'meta)
    (setq ns-right-alternate-modifier 'meta)
@@ -466,7 +466,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
      (let ((process-connection-type nil))
        (apply fn args)))
 
-   
+
 
 ;;; NOTE: Might work as well: https://github.com/d12frosted/homebrew-emacs-plus/tree/master/community/patches/aggressive-read-buffering
 
@@ -493,12 +493,12 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
    (setq touch-screen-extend-selection t)
    (setq touch-screen-display-keyboard nil)
    (setq touch-screen-enable-hscroll nil)
-   
+
    (defun android-display-keyboard ()
      "Displays the Android on-screen keyboard for the current frame."
      (interactive)
      (android-toggle-on-screen-keyboard (selected-frame) nil))
-   
+
    (tool-bar-add-item
     "spell" ; icon
     'android-display-keyboard  ; function
@@ -519,18 +519,18 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
    (global-set-key (kbd "s-v") #'yank)
    (global-set-key (kbd "s-a") #'mark-whole-buffer)
    (global-set-key (kbd "s-c") #'kill-ring-save)
-   
+
    (defvar org-roam-directory "~/org")
    (defvar org-directory "~/org")
-   
-   
+
+
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
    (set-register ?p `(file . ,(concat org-directory "/journals/Journelly.org")))
    (set-register ?l '(file . "~/.stumpwm.d/init.lisp")) ;; StumpWM config
    (set-register ?n '(file . "/etc/nixos/configuration.nix")) ;; StumpWM config
    )
-  
+
   (_ (display-warning 'os "Unhandled operating system %s" system-type :warning))
   )
 
@@ -575,7 +575,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
        ("Noto Sans Old Turkic" . 140)         ; Old Turkic
        ("Noto Sans Imperial Aramaic" . 140)   ; Imperial Aramaic
        ("Symbola" . 140)))                    ; General symbol fallback
-   
+
    ;; Set up emoji and special character fonts
    (set-fontset-font t 'symbol "Apple Color Emoji" nil 'prepend)
    (set-fontset-font t '(#x1F300 . #x1FAD6) "Apple Color Emoji") ;; Emoji range
@@ -640,12 +640,12 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
    (defvar fallback-font-families
      '(("Symbola" . 140)                    ; Symbol coverage
        ("Noto Color Emoji" . 140)))         ; Emoji support
-   
+
    ;; Set up symbol ranges to use Symbola
    (set-fontset-font t 'symbol "Symbola" nil 'prepend)
    (set-fontset-font t '(#x2600 . #x27BF) "Symbola")  ;; Misc Symbols range
    (set-fontset-font t '(#x2500 . #x259F) "Symbola")  ;; Box Drawing range
-   
+
    ;; Add fallback fonts
    (dolist (font fallback-font-families)
      (set-fontset-font t nil (font-spec :family (car font)) nil 'append))
@@ -694,7 +694,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
    (set-fontset-font t 'symbol "Symbola" nil 'prepend)
    (set-fontset-font t '(#x2600 . #x27BF) "Symbola")  ;; Misc Symbols range
    (set-fontset-font t '(#x2500 . #x259F) "Symbola")  ;; Box Drawing range
-   
+
    ;; Add fallback fonts
    (dolist (font fallback-font-families)
      (set-fontset-font t nil (font-spec :family (car font)) nil 'append))
@@ -1056,7 +1056,7 @@ Produces multiple regions so expreg can step through them."
 	 (and (re-search-backward "\\\\begin{bprooftree}" nil t)
               (re-search-forward "\\\\end{bprooftree}" nil t)
               (> (point) pos))))))
-  
+
   (defun js/inside-logicproof-p ()
     "Return non-nil if point is inside a logicproof environment."
     (save-excursion
@@ -1123,7 +1123,7 @@ Produces multiple regions so expreg can step through them."
       (let ((inhibit-read-only t))
 	;; Make sure org is loaded
 	(require 'org)
-	
+
 	;; Find and process links
 	(save-excursion
           (goto-char (point-min))
@@ -1134,18 +1134,18 @@ Produces multiple regions so expreg can step through them."
                    (path (match-string-no-properties 1))
                    (desc (or (match-string-no-properties 2) path))
                    (overlay (make-overlay start end)))
-              
+
               ;; Apply the link face
               (overlay-put overlay 'face 'org-link)
               (overlay-put overlay 'mouse-face 'highlight)
-              
+
               ;; Make it clickable using org's machinery
-              (overlay-put overlay 'help-echo 
+              (overlay-put overlay 'help-echo
                            (concat "Link: " path "\nMouse-1: Open link"))
-              (overlay-put overlay 'keymap 
+              (overlay-put overlay 'keymap
                            (let ((map (make-sparse-keymap)))
-                             (define-key map [mouse-1] 
-					 (lambda () 
+                             (define-key map [mouse-1]
+					 (lambda ()
 					   (interactive)
 					   (save-excursion
 					     (org-link-open-from-string link-text))))
@@ -1155,7 +1155,7 @@ Produces multiple regions so expreg can step through them."
 					   (save-excursion
 					     (org-link-open-from-string link-text))))
                              map))
-              
+
               ;; Only display the description if different from path
               (when (and desc (not (string= desc path)))
 		(overlay-put overlay 'display desc))))))))
@@ -1183,7 +1183,7 @@ Produces multiple regions so expreg can step through them."
   ;; 2.  Replace ace-jump fallback with avy (keep the original name so the
   ;;     rest of jump-char doesn't care).
   (defun jump-char-switch-to-ace ()
-    "Use `avy-goto-char' in place of `ace-jump-char-mode'.  
+    "Use `avy-goto-char' in place of `ace-jump-char-mode'.
 If `jump-char-initial-char' is non-nil, reuse it so the hand-off feels
 exactly like the old ace-jump integration."
     (interactive)
@@ -1213,7 +1213,7 @@ exactly like the old ace-jump integration."
   :bind (("s-u" . counsel-ace-link)
          :map prog-mode-map
          ("M-o" . ace-link-addr)
-	 
+
          )
   :init
   (ace-link-setup-default)
@@ -1235,13 +1235,13 @@ exactly like the old ace-jump integration."
           (push (cons (match-string-no-properties 0)
                       (match-beginning 0))
 		link-candidates)))
-      
+
       ;; Use avy to let the user choose a link
       (setq pt (avy-with custom-ace-link-org-agenda
-		 (avy-process 
+		 (avy-process
                   (mapcar #'cdr (nreverse link-candidates))
                   (avy--style-fn avy-style))))
-      
+
       ;; Open the selected link
       (when pt
 	(goto-char pt)
@@ -1260,7 +1260,7 @@ exactly like the old ace-jump integration."
 	(goto-char (line-beginning-position))
 	(setq link-start (and (re-search-forward link-regex (line-end-position) t)
                               (match-beginning 0))))
-      
+
       (if link-start
           (progn
             (goto-char link-start)
@@ -1315,7 +1315,7 @@ exactly like the old ace-jump integration."
       (dolist (file files)
 	(tab-bar-new-tab)
 	(find-file file))))
-  
+
   (defun js/dired-smart-bol ()
     "Toggle point between beginning of filename and beginning of line."
     (interactive)
@@ -1393,7 +1393,7 @@ exactly like the old ace-jump integration."
     'casual-symbol-overlay-tmenu
     '(0 2 0)
     '("h" "Multiple-cursors" ar/mc-mark-all-symbol-overlays))
-  
+
   ;; Adapted from https://lmno.lol/alvaro/its-all-up-for-grabs-and-it-compounds
   (defun ar/mc-mark-all-symbol-overlays ()
     "Mark all symbol overlays using multiple cursors."
@@ -1507,7 +1507,7 @@ exactly like the old ace-jump integration."
          ("<KEYCODE_BUTTON_START>" . elfeed-search-fetch)
          ("<KEYCODE_BUTTON_SELECT>" . elfeed-search-clear-filter)
 	 ("<KEYCODE_BUTTON_MODE>" . elfeed-search-quit-window)
-         
+
          ;; Elfeed show mode bindings
          :map elfeed-show-mode-map
          ("<KEYCODE_BUTTON_B>" . elfeed-show-visit)  ; A
@@ -1521,7 +1521,7 @@ exactly like the old ace-jump integration."
          ("<KEYCODE_BUTTON_L2>" . beginning-of-buffer)
          ("<KEYCODE_BUTTON_R2>" . end-of-buffer)
 	 ("<KEYCODE_BUTTON_MODE>" . elfeed-kill-buffer)
-         
+
          ;; Org-agenda bindings
          ;; :map org-agenda-mode-map
          ;; ("<KEYCODE_BUTTON_A>" . org-agenda-goto)
@@ -1534,7 +1534,7 @@ exactly like the old ace-jump integration."
          ;; ("<KEYCODE_BUTTON_R2>" . org-agenda-forward-block)
          ;; ("<KEYCODE_BUTTON_SELECT>" . org-agenda-filter-by-tag)
          ;; ("<KEYCODE_BUTTON_START>" . org-agenda-redo)
-         
+
          ;; Dired bindings
          ;; :map dired-mode-map
          ;; ("<KEYCODE_BUTTON_A>" . dired-find-file)
@@ -1655,15 +1655,15 @@ exactly like the old ace-jump integration."
            (chatlog-dir (expand-file-name org-roam-chatlogs-directory org-roam-directory))
            (file-name (format-time-string "Chat-%Y-%m-%d_%H-%M.org"))
            (full-path (expand-file-name file-name chatlog-dir)))
-      
+
       (if existing-id
           (save-buffer)
-	
+
 	(unless (file-directory-p chatlog-dir)
           (make-directory chatlog-dir t))
-	
+
 	(write-file full-path)
-	
+
 	(goto-char (point-min))
 	(org-id-get-create)
 	(unless (save-excursion (re-search-forward "^#\\+title:" nil t))
@@ -1865,7 +1865,7 @@ exactly like the old ace-jump integration."
 
   :hook
   (org-mode . js/org-rename-buffer-to-title-enable)
-  
+
   :bind
   (("C-c l" . org-store-link)
    ("C-c C-l" . ar/org-insert-link-dwim)
@@ -1874,9 +1874,9 @@ exactly like the old ace-jump integration."
    ("C-c C-l" . ar/org-insert-link-dwim)
    ("C-'" . nil)
    ("C-," . nil)
-   
+
    )
-  
+
   :config
   ;; Exporting
 
@@ -1889,7 +1889,7 @@ exactly like the old ace-jump integration."
   (add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
   ;; Open links in the same window
   (setf (alist-get 'file org-link-frame-setup) #'find-file)
-  
+
   (defun js/org-rename-buffer-to-title ()
     "Rename buffer to value of #+TITLE:."
     (interactive)
@@ -1898,7 +1898,7 @@ exactly like the old ace-jump integration."
       (let ((title (cadar (org-collect-keywords '("title")))))
 	(when title (rename-buffer title)))))
 
-  
+
   (defun js/org-rename-buffer-to-title-enable ()
     "Enable buffer renaming for the current buffer.
 This function is expected to be hooked in org-mode."
@@ -1914,7 +1914,7 @@ This function is expected to be hooked in org-mode."
 	(list (org-element-property :type context)
 	      (org-element-property :raw-link context)
 	      (org-element-property :description context)))))
-  
+
   (defun js/get-link-title (url)
     "Get the title for a given `url' based on its type."
     (cond
@@ -1933,7 +1933,7 @@ This function is expected to be hooked in org-mode."
 		      (string-trim (dom-text (car (dom-by-tag dom 'title))))))
 		(kill-buffer buffer))))
 	(error nil)))
-     
+
      ((string-prefix-p "id:" url t)
       (let* ((id (string-remove-prefix "id:" url))
              (node (org-roam-node-from-id id)))
@@ -1950,7 +1950,7 @@ This function is expected to be hooked in org-mode."
             (if author
 		(format "%s - %s" title author)
 	      title)))))
-     
+
      (t nil)))  ; Return nil for unrecognized URL types
 
   (defun js/format-link (url)
@@ -1979,7 +1979,7 @@ This function is expected to be hooked in org-mode."
             (t (call-interactively 'org-insert-link)))))
 
   ;; Browser integration
-  
+
   (defun open-urls-at-point-or-region (&optional arg)
     "Open links in region or at point using configured browsers.
 If region is active, extract and open all URLs found in the region.
@@ -1995,7 +1995,7 @@ With prefix ARG, use secondary browser."
 		(urls '()))
             (with-temp-buffer
 	      (insert text)
-	      
+
 	      ;; 1. Collect org-mode links [[url][description]] and mark them
 	      (goto-char (point-min))
 	      (while (re-search-forward "\\[\\[\\([^]]+\\)\\]\\[[^]]*\\]\\]" nil t)
@@ -2004,7 +2004,7 @@ With prefix ARG, use secondary browser."
                     (push url urls))
                   ;; Replace the entire org link with a placeholder to avoid re-matching
                   (replace-match "" nil nil)))
-	      
+
 	      ;; 2. Collect Markdown links [description](url)
 	      (goto-char (point-min))
 	      (while (re-search-forward "\\[.*?\\](\\([^)]*\\))" nil t)
@@ -2012,7 +2012,7 @@ With prefix ARG, use secondary browser."
                   (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
                     (push url urls))
                   (replace-match "" nil nil)))
-	      
+
 	      ;; 3. Collect HTML href attributes
 	      (goto-char (point-min))
 	      (while (re-search-forward "href=[\"']\\([^\"']+\\)[\"']" nil t)
@@ -2020,7 +2020,7 @@ With prefix ARG, use secondary browser."
                   (when (string-match-p "^\\(https?://\\|www\\.\\)" url)
                     (push url urls))
                   (replace-match "" nil nil)))
-	      
+
 	      ;; 4. Collect plain text URLs (now that structured links are removed)
 	      (goto-char (point-min))
 	      (while (re-search-forward "\\(https?://\\|www\\.\\)[^\s\n\"]+" nil t)
@@ -2030,13 +2030,13 @@ With prefix ARG, use secondary browser."
                   (when (string-match "\\([.,:;\"']+\\)$" url)
                     (setq url (substring url 0 (match-beginning 1))))
                   (push url urls))))
-            
+
             ;; Remove duplicates and open all collected URLs
             (setq urls (delete-dups (nreverse urls)))
             (dolist (url urls)
 	      (browse-url url))
             (message "Opened %d URLs in browser" (length urls)))
-	
+
 	;; Otherwise just use the built-in browse-url for single URL
 	(save-excursion
           (cond
@@ -2189,13 +2189,13 @@ Automatically expands the heading if it's folded."
 	 :type 'src
 	 :language (nth 0 org-babel-info)
 	 :org-babel-info org-babel-info)))
-  
+
   ;; :hook org-mode
   )
 
 (use-package org-fragtog
   ;; :disabled ;; Seems like xenops is working again
-  ;; Not disabled but unhooked - I set some C-c C-x C-l stuff here 
+  ;; Not disabled but unhooked - I set some C-c C-x C-l stuff here
   :defer nil
   :after org
   :custom
@@ -2205,7 +2205,7 @@ Automatically expands the heading if it's folded."
      ('gnu/linux '(("" "/home/jure/.emacs.d/defaults/js" t)))
      ('darwin '(("" "/Users/jure/.emacs.d/defaults/js" t)))))
   (org-export-in-background nil)
-  
+
   :config
   (add-to-list
    'org-preview-latex-process-alist
@@ -2314,9 +2314,9 @@ Automatically expands the heading if it's folded."
 	 ("C-c n s d" . js/org-sort-siblings-by-todo)
          )
   :hook (org-roam-mode . visual-line-mode)
-  
+
   :custom
-  
+
   (org-roam-completion-everywhere t)
   (org-roam-dailies-directory "journals/")
   (org-roam-node-display-template
@@ -2340,7 +2340,7 @@ Automatically expands the heading if it's folded."
 			 :section-heading "Archived backlinks: "))
 	 ))
 
-  
+
 
   :config
   (defun js/org-roam-node-not-archived-p (node)
@@ -2404,15 +2404,15 @@ With prefix arg NO-LINK, leave nothing behind (original behavior)."
                   (org-link-make-string (concat "id:" id) title)
                   "\n")
           (forward-line -1)))))
-  
+
 ;;; -> org-roam -> Aesthetics
-  
+
   ;; Color roam links differently
   (defface org-roam-link
     '((t :foreground "orange" :underline t))
     "Face for Org-roam links."
     :group 'org-roam-faces)
-  
+
   (org-link-set-parameters "id" :face 'org-roam-link)
 
   ;; Fonfify links in filetags
@@ -2443,7 +2443,7 @@ and faces to work normally."
 only processes keywords listed in `js/org-keywords-with-links'."
     (let ((case-fold-search t)
           (keyword-regexp (concat "^[ \t]*#\\+\\("
-				  (mapconcat #'regexp-quote 
+				  (mapconcat #'regexp-quote
                                              js/org-keywords-with-links "\\|")
 				  "\\):[ \t]*\\(.*\\)$")))
       (when (re-search-forward keyword-regexp limit t)
@@ -2463,7 +2463,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
      'append))
 
   (add-hook 'org-mode-hook #'js/setup-specific-keyword-link-fontification)
-  
+
   ;; Folded backlink buffer
   (add-to-list 'magit-section-initial-visibility-alist (cons 'org-roam-node-section 'hide))
 
@@ -2473,7 +2473,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
   ;; Fuck it, when nothing else works, bring in a global variable
   (defvar org-roam-capture-content nil
     "Variable to pass content to capture templates.")
-  
+
   (setq org-roam-capture-templates
 	'(("d" "default" plain "%?"
            :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+startup: content")
@@ -2516,7 +2516,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
 
   (defvar org-roam-capture-body nil
     "Variable to pass body content to capture templates.")
-  
+
   ;;; TODO: Simplify the autocapture templates
   ;;; https://github.com/org-roam/org-roam/commit/ed94524964a0b03538a84ae03c89ec61527ffe7d
   ;;; These fucks added non-disablable ids to my fucking entries
@@ -2549,7 +2549,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
       )
     "A list of templates to use for automatic daily capture."
     )
-  
+
   (defun org-roam-dailies-autocapture-today (keys &optional contents body)
     "A function to automatically capture content into a daily template."
     (let* ((org-roam-directory (expand-file-name org-roam-dailies-directory org-roam-directory))
@@ -2658,7 +2658,7 @@ For emacsclient:
   emacsclient --eval \"(js/log-page :targets '(Log Wallabag))\"
 "
     (interactive)
-    
+
     ;; Get URL from specified source
     (let* ((url-source (or url
                            (when browser (js/retrieve-url browser))
@@ -2669,18 +2669,18 @@ For emacsclient:
                            (when (or interactive (not (or url browser)))
                              (js/retrieve-url (intern (completing-read "Select browser: " js/browsers nil t 'Safari))))))
            (results '()))
-      
+
       (when url-source
 	;; Apply each requested target
 	(dolist (target targets)
           (when-let* ((handler-fn (cdr (assq target js/url-targets)))
 		      (result (funcall handler-fn url-source)))
             (push result results)))
-	
+
 	;; Alert based on actions taken
 	(alert (format "URL %s!" (string-join results " and "))
 	       :title "URL Handler" :category 'debug)
-	
+
 	;; Return the URL source for potential chaining
 	url-source)))
 
@@ -2691,7 +2691,7 @@ With C-u prefix, prompt for existing node to add URL as ref to.
 Can optionally pass in your own `NODE-ID' which will get used as the target node.
 
 `POST-CLEANUP-FUNCTIONS' will be executed upon completion of the finalizer."
-    (interactive 
+    (interactive
      (when current-prefix-arg
        (list (org-roam-node-id (org-roam-node-read nil nil nil 'require-match)))))
     (let* ((context (org-element-context))
@@ -2741,7 +2741,7 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 	(_
 	 (message "No link found at point.")
 	 (return)))
-      
+
       ;; Single org-roam-capture- call (always runs when we have a capture-node)
       (when capture-node
 	(defun roamify-finalizer ()
@@ -2803,7 +2803,7 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
     (interactive "P")
     (require 'org-roam)
     (require 'org-archive)
-    (let* ((daily-file (expand-file-name 
+    (let* ((daily-file (expand-file-name
 			(format-time-string "%Y-%m-%d.org")
 			(expand-file-name org-roam-dailies-directory org-roam-directory)))
            (today (if (string= (buffer-file-name) daily-file)
@@ -2828,8 +2828,8 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
           (when (re-search-forward "^\\* Archived today" nil t)
             (let ((archive-end (save-excursion (org-end-of-subtree t t))))
 	      ;; Search for our heading within this subtree
-	      (when (re-search-forward 
-                     (format "^\\*\\* .*%s" (regexp-quote heading-title)) 
+	      (when (re-search-forward
+                     (format "^\\*\\* .*%s" (regexp-quote heading-title))
                      archive-end t)
 		(org-back-to-heading t)
 		(when (org-get-todo-state)
@@ -2848,58 +2848,58 @@ Uses ARCHIVE_NODE and ARCHIVE_OLPATH properties to restore the entry.
 Restores the original TODO state from ARCHIVE_TODO."
     (interactive)
     (require 'org-roam)
-    
+
     ;; Ensure we're at a heading
     (unless (org-at-heading-p)
       (org-back-to-heading t))
-    
+
     ;; Verify we're in an archive section
     (unless (member "ARCHIVE" (org-get-tags))
       (user-error "Current heading doesn't appear to be in an archive section"))
-    
+
     ;; Get archive metadata
     (let* ((archive-node-link (org-entry-get nil "ARCHIVE_NODE"))
            (archive-file (org-entry-get nil "ARCHIVE_FILE"))
            (archive-olpath (org-entry-get nil "ARCHIVE_OLPATH"))
            (archive-todo (org-entry-get nil "ARCHIVE_TODO")))
-      
+
       (unless archive-node-link
 	(user-error "No ARCHIVE_NODE property found. This doesn't appear to be an archived entry"))
-      
+
       ;; Extract node ID from the org-roam link
       (let* ((node-id (when (string-match "\\[\\[id:\\([^]]+\\)\\]" archive-node-link)
 			(match-string 1 archive-node-link)))
              (target-node (when node-id (org-roam-node-from-id node-id)))
              (target-file (or (when target-node (org-roam-node-file target-node))
 			      archive-file)))
-	
+
 	(unless target-file
-          (user-error "Could not determine target file from node %s or archive file %s" 
+          (user-error "Could not determine target file from node %s or archive file %s"
 		      archive-node-link archive-file))
-	
+
 	(unless (file-exists-p target-file)
           (user-error "Target file does not exist: %s" target-file))
-	
+
 	;; Store the current buffer and position
 	(let ((archive-buffer (current-buffer))
 	      (archive-point (point-marker))
 	      paste-level)
-          
+
           ;; Copy the subtree content (without cutting yet)
           (org-copy-subtree 1 nil)
-          
+
           ;; Navigate to target and paste
           (save-window-excursion
             (with-current-buffer (find-file-noselect target-file)
 	      (save-excursion
 		(goto-char (point-min))
-		
+
 		;; Navigate to the correct location
 		(if (and node-id (org-roam-id-find node-id))
                     (progn
 		      (org-id-goto node-id)
 		      (setq paste-level 1)
-		      
+
 		      ;; If we have an OLPATH, navigate through it
 		      (when (and archive-olpath (not (string-empty-p archive-olpath)))
 			(let ((path-components (split-string archive-olpath "/")))
@@ -2910,38 +2910,38 @@ Restores the original TODO state from ARCHIVE_TODO."
                     (let ((path-components (split-string archive-olpath "/")))
 		      (goto-char (org-roam-capture-find-or-create-olp path-components))
 		      (setq paste-level (+ 1 (length path-components))))))
-		
+
 		;; Move to end of current subtree for insertion
 		(org-end-of-subtree t t)
-		
+
 		;; Paste the subtree at the correct level
 		(org-paste-subtree paste-level)
-		
+
 		;; Move to the pasted subtree and clean up
 		(org-back-to-heading t)
-		
+
 		;; Restore TODO state before deleting properties
 		(when archive-todo
                   (org-todo archive-todo))
-		
+
 		;; Delete archive properties
-		(mapc #'org-delete-property 
-		      '("ARCHIVE_NODE" "ARCHIVE_TIME" "ARCHIVE_FILE" 
+		(mapc #'org-delete-property
+		      '("ARCHIVE_NODE" "ARCHIVE_TIME" "ARCHIVE_FILE"
 			"ARCHIVE_OLPATH" "ARCHIVE_CATEGORY" "ARCHIVE_ITAGS"
 			"ARCHIVE_TODO"))
-		
+
 		(save-buffer))))
-          
+
           ;; Now remove the original from archive buffer
           (goto-char archive-point)
           (org-back-to-heading t)
           (org-cut-subtree 1)
           (save-buffer)
-          
+
           ;; Success message
-          (message "Unarchived subtree to %s%s" 
+          (message "Unarchived subtree to %s%s"
                    target-file
-                   (if archive-olpath 
+                   (if archive-olpath
 		       (format " under %s" archive-olpath)
                      ""))))))
 
@@ -3036,7 +3036,7 @@ you can catch it with `condition-case'."
   :bind
   (("C-c n f" . js/org-node-find)
    ("C-c n i" . js/org-node-insert))
-  
+
   :custom
   (org-node-alter-candidates t) ; OLP support
 
@@ -3047,30 +3047,30 @@ you can catch it with `condition-case'."
   (org-node-creation-fn #'org-node-new-via-roam-capture)
   (org-node-file-slug-fn #'org-node-slugify-like-roam-default)
   (org-node-file-timestamp-format "%Y%m%d%H%M%S-")
-  
+
   ;; Directory configuration
   (org-id-locations-file-relative t)
-  (org-node-extra-id-dirs 
+  (org-node-extra-id-dirs
    (list org-roam-directory
          (expand-file-name org-roam-dailies-directory org-roam-directory)))
 
   ;; Customs
   (org-node-display-sort-fn #'org-node-sort-by-file-mtime)
-  
+
   :config
   ;; Your custom filtering logic
   (defun js/org-node-not-archived-p (node)
     "Return non-nil if NODE should be shown (not archived)."
     (not (member "ARCHIVE" (org-mem-tags node))))
-  
+
   (defun js/org-node-find (&optional arg)
     "Find and open an org-node, hiding archived by default.
 With C-u prefix, show all nodes including archived."
     (interactive "P")
-    (let ((org-node-filter-fn 
+    (let ((org-node-filter-fn
            (if arg nil #'js/org-node-not-archived-p)))
       (org-node-find)))
-  
+
   (defun js/org-node-insert (&optional arg)
     "Insert a link to an org-node, hiding archived by default.
 With C-u prefix, insert a transclusion instead."
@@ -3088,7 +3088,7 @@ see `org-node-insert-link*', or pass REGION-AS-INITIAL-INPUT t.
 
 Argument NOVISIT for use by `org-node-insert-link-novisit'."
     (interactive "@*" org-mode)
-    
+
     ;; (unless (derived-mode-p 'org-mode)
     ;;   (user-error "Only works in org-mode buffers"))
     (org-node-cache-ensure)
@@ -3143,7 +3143,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
       ;; TODO: Respect `org-node-stay-in-source-buffer'
       (unless node
 	(org-node-create input id))))
-  
+
   ;; Initialize the cache
   (org-node-cache-mode)
   (org-node-cache-ensure)
@@ -3236,7 +3236,7 @@ Ignores headlines under ARCHIVE-tagged ancestors."
     (add-to-list 'org-tags-exclude-from-inheritance tag))
 
   (add-to-list 'org-tags-exclude-from-inheritance "interesting")
-  
+
   (defvar tags/tag-added-hook nil
     "Hook run when a tag is added to a file.
 Each function is called with two arguments: the tag and the buffer.")
@@ -3251,7 +3251,7 @@ Each function is called with two arguments: the tag and the buffer.")
 	 (string-prefix-p
           (expand-file-name (file-name-as-directory org-roam-directory))
           (file-name-directory buffer-file-name))))
-  
+
   (defun tags/org-update-tag (tcpair)
     "Update \\='(tag . checker) tag in the current buffer."
     (when (and (not (member (buffer-name) prune/ignored-files))
@@ -3263,20 +3263,20 @@ Each function is called with two arguments: the tag and the buffer.")
 	       (tags (vulpea-buffer-tags-get))
 	       (original-tags tags)
 	       (had-tag (member tag-name tags)))
-          
+
           ;; Run checker and modify tags
           (if (funcall (cdr tcpair))
 	      (setq tags (cons tag-name tags))
             (setq tags (remove tag-name tags)))
-          
+
           ;; Cleanup duplicates
           (setq tags (seq-uniq tags))
-          
+
           ;; Update tags if changed
           (when (or (seq-difference tags original-tags)
                     (seq-difference original-tags tags))
             (apply #'vulpea-buffer-tags-set tags)
-            
+
             ;; Run appropriate hooks
             (let ((now-has-tag (member tag-name tags)))
 	      (cond
@@ -3310,7 +3310,7 @@ Each function is called with two arguments: the tag and the buffer.")
 
   (defvar tags/tag-pause nil
     "Global flag to pause tag updating during certain operations.")
-  
+
   (defun tags/maybe-update-tags ()
     "Update tags if enabled for the current buffer."
     (when (and tags/update-tags-enabled
@@ -3338,7 +3338,7 @@ Each function is called with two arguments: the tag and the buffer.")
     (save-buffer))
 
   (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
-  
+
   :hook
   (org-mode . tags/enable-tag-updating)
 
@@ -3370,10 +3370,10 @@ Each function is called with two arguments: the tag and the buffer.")
 
   (defun anki/my/after-snippet-tag-handler ()
     "Select or create an Anki tag, prioritizing recent tags."
-    (let* ((tag (completing-read "Enter tag: " 
+    (let* ((tag (completing-read "Enter tag: "
 				 (delete-dups (cons "" anki-tag-list))
-				 nil 
-				 nil 
+				 nil
+				 nil
 				 (car anki-tag-list))))
       (when (not (string-empty-p tag))
 	(setq anki-tag-list (delete nil (cons tag (remove tag anki-tag-list)))))
@@ -3382,7 +3382,7 @@ Each function is called with two arguments: the tag and the buffer.")
   (tags/make-db-searcher "flashcards")
 
   ;;; -> Org mode -> Anki -> Overrides
-  
+
   ;; Define environments that should always use Anki builtin LaTeX
   (defcustom anki-editor-builtin-latex-environments '("tikzcd" "bprooftree" "prooftree" "logicproof")
     "LaTeX environments that will always be translated using Anki's built-in LaTeX.
@@ -3392,8 +3392,8 @@ This is useful for environments not supported by MathJax."
   ;; Helper function to detect if code contains a builtin-only environment
   (defun anki-editor--contains-builtin-env (latex-code)
     "Check if LATEX-CODE contains any environment that should use builtin LaTeX."
-    (cl-some (lambda (env) 
-	       (string-match-p (format "\\\\begin{%s}" env) latex-code)) 
+    (cl-some (lambda (env)
+	       (string-match-p (format "\\\\begin{%s}" env) latex-code))
              anki-editor-builtin-latex-environments))
 
   ;; Override the ox-latex function to handle special environments
@@ -3403,25 +3403,25 @@ CONTENTS is nil. INFO is a plist holding contextual information."
     (let* ((code (org-remove-indentation (org-element-property :value latex)))
            (original-style anki-editor-latex-style)
            (contains-special-env (anki-editor--contains-builtin-env code)))
-      
+
       ;; Temporarily override style if needed
       (when (and (eq original-style 'mathjax) contains-special-env)
 	(setq anki-editor-latex-style 'builtin))
-      
+
       ;; Process the LaTeX code
       (setq code (cl-ecase (org-element-type latex)
                    (latex-fragment (anki-editor--translate-latex-fragment code))
                    (latex-environment (anki-editor--translate-latex-env code))))
-      
+
       ;; Restore original style
       (setq anki-editor-latex-style original-style)
-      
+
       ;; Return processed code
       (if anki-editor-break-consecutive-braces-in-latex
           (replace-regexp-in-string "}}" "} } " code)
 	code)))
 
-  
+
   (defun anki-editor-note-at-point ()
     "Make a note struct from current entry with modified field handling.
 The front of the note will be the heading unless a '** Front' subheading exists.
@@ -3442,7 +3442,7 @@ All other subheadings will be ignored."
            (back-field nil)
            (hint-field nil)
            (fields '()))
-      
+
       ;; Look for Front, Back, and Hint subheadings
       (save-excursion
 	(when (org-goto-first-child)
@@ -3452,7 +3452,7 @@ All other subheadings will be ignored."
                              (org-element-property :raw-value element))
            for begin = (save-excursion (anki-editor--skip-drawer element))
            for end = (org-element-property :contents-end element)
-           for content = (and begin end 
+           for content = (and begin end
 			      (buffer-substring-no-properties
 			       begin (min (point-max) end)))
            when (string= subheading "Front")
@@ -3462,24 +3462,24 @@ All other subheadings will be ignored."
            when (string= subheading "Hint")
            do (setq hint-field content)
            while (org-get-next-sibling))))
-      
+
       ;; If Front/Back not explicitly defined, use defaults
       (unless front-field
 	(setq front-field heading))
       (unless back-field
 	(setq back-field content-before-subheading))
-      
+
       ;; Build fields alist for Basic note type with Hint
       (setq fields (list (cons "Front" front-field)
 			 (cons "Back" back-field)
 			 (cons "Hint" (or hint-field ""))))
-      
+
       ;; Sort fields
       (setq fields (sort fields (lambda (a b) (string< (car a) (car b)))))
-      
+
       (unless deck (user-error "Missing deck"))
       (unless note-type (user-error "Missing note type"))
-      
+
       (make-anki-editor-note :id note-id
                              :model note-type
                              :deck deck
@@ -3490,7 +3490,7 @@ All other subheadings will be ignored."
 
   ;;; -> Org mode -> Anki -> Flashcard Queue System
   (defvar anki-flashcard-queue-file
-    (expand-file-name "anki-flashcard-queue.el" 
+    (expand-file-name "anki-flashcard-queue.el"
 		      (expand-file-name "lisp" user-emacs-directory))
     "File to save the flashcard queue between Emacs sessions.")
 
@@ -3521,7 +3521,7 @@ All other subheadings will be ignored."
     (let ((dir (file-name-directory anki-flashcard-queue-file)))
       (unless (file-exists-p dir)
 	(make-directory dir t)))
-    
+
     (with-temp-file anki-flashcard-queue-file
       (insert ";; Anki flashcard queue - DO NOT EDIT MANUALLY\n")
       (insert ";; This file is auto-generated by Emacs\n\n")
@@ -3625,7 +3625,7 @@ All other subheadings will be ignored."
           (anki-flashcard-queue-load)
           (anki-flashcard-clear-error-buffer)
           (save-buffer) ;; Ensure buffer is saved
-          
+
           (if (my/anki-flashcard-push-file (anki-flashcard-make-relative-path (buffer-file-name)))
 	      (progn
 		(anki-flashcard-queue-remove (buffer-file-name))
@@ -3638,13 +3638,13 @@ All other subheadings will be ignored."
     (interactive)
     (anki-flashcard-queue-load)
     (anki-flashcard-clear-error-buffer)
-    
+
     (if anki-flashcard-queue
 	(let ((success-count 0)
 	      (error-count 0)
 	      (total (length anki-flashcard-queue))
 	      (queue-copy (copy-sequence anki-flashcard-queue)))
-          
+
           ;; Process each file and track results
           (dolist (file queue-copy)
             (if (my/anki-flashcard-push-file file)
@@ -3652,10 +3652,10 @@ All other subheadings will be ignored."
                   (setq success-count (1+ success-count))
                   (setq anki-flashcard-queue (delete file anki-flashcard-queue)))
 	      (setq error-count (1+ error-count))))
-          
+
           ;; Save updated queue
           (anki-flashcard-queue-save)
-          
+
           ;; Provide feedback
           (if (> error-count 0)
 	      (progn
@@ -3698,7 +3698,7 @@ All other subheadings will be ignored."
 		(progn
                   (dolist (file anki-flashcard-queue)
                     (let ((abs-path (anki-flashcard-make-absolute-path file)))
-		      (insert (format "- %s%s\n" file 
+		      (insert (format "- %s%s\n" file
 				      (if (file-exists-p abs-path)
                                           ""
 					" (FILE MISSING)")))))
@@ -3720,7 +3720,7 @@ All other subheadings will be ignored."
           (anki-flashcard-queue-mode) ;; This applies the keymap
           (anki-flashcard-queue-refresh)
           (display-buffer buffer)))))
-  
+
   (defun anki-flashcard-queue-clear ()
     "Clear the flashcard queue."
     (interactive)
@@ -3756,9 +3756,9 @@ All other subheadings will be ignored."
   :defer t
   :custom
   (org-todo-keywords
-   '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)" 
+   '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)"
 	       "TODO(t)" "FINISH(f)" "PROCESS(p)" "EXPLORE(e)" "IDEA(I)" "HOLD(h)"
-	       "|" 
+	       "|"
 	       "DONE(d)" "CANCELLED(c)" "FAILED(F)" "NAREDU(N)")))
 
   (org-agenda-start-with-log-mode t)
@@ -3783,7 +3783,7 @@ All other subheadings will be ignored."
      (search . " %i %-12:c")))
   (org-agenda-hide-tags-regexp
    (regexp-opt '("lecture-notes" "noexport")))
-  
+
   :bind (("C-c a" . open-org-agenda)
 	 :map org-agenda-mode-map
 	 ("o" . my/ace-link-agenda-current-line)
@@ -3798,7 +3798,7 @@ All other subheadings will be ignored."
 	 ("R" . js/agenda-refile)
 	 ("O" . js/agenda-roamify)
 	 )
-  
+
   :config
   (add-to-list 'warning-suppress-types '(org-element))
   (tags/make-db-searcher "project")
@@ -3811,7 +3811,7 @@ All other subheadings will be ignored."
 
   ;; Automatically update the agenda files to those roam entries with the `project' tag.
   (advice-add 'org-agenda :before #'roam-agenda-files-update)
-  
+
   (defun open-org-agenda (&optional arg)
     (interactive "P")
     (if arg
@@ -3876,7 +3876,7 @@ All other subheadings will be ignored."
 		 ((todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")
 				   (org-agenda-sorting-strategy '(category-up alpha-up))))))
 
-		
+
 		("d" "Daily agenda and all TODOs"
 		 ((tags "PRIORITY=\"A\""
 			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
@@ -3894,9 +3894,9 @@ All other subheadings will be ignored."
 		  (todo "COURSE" ((org-agenda-overriding-header "* Active courses: ")))
 		  (todo "EXAM" ((org-agenda-overriding-header "* Looming exams: ")
 				(org-agenda-sorting-strategy '(deadline-up))))
-		  
+
 		  (todo "PROJECT" ((org-agenda-overriding-header "* Projects: ")))
-		  
+
 		  ;; (agenda "" ((org-agenda-span 'week)))
 		  (agenda "" ((org-agenda-span 'week)
 			      (org-agenda-skip-function
@@ -3918,7 +3918,7 @@ All other subheadings will be ignored."
 		  (todo "HOLD" ((org-agenda-overriding-header "* Currently on hold: ")))
 		  (todo "EXPLORE" ((org-agenda-overriding-header "* Things to explore: ")))
 		  )))))
-  
+
   ;;; -> Org mode -> Agenda -> Refiling integration
 
   (defun js/agenda-refile ()
@@ -3931,14 +3931,14 @@ All other subheadings will be ignored."
 
   (defun js/agenda-refile ()
     "Refile marked entries or the entry at point into the selected org-roam node.
-  
+
 If there are marked entries, refile all of them. Otherwise, refile
 the current entry at point and move to the next line."
     (interactive)
     ;; If no marks exist, mark the current entry for single-entry refile
     (if (not org-agenda-bulk-marked-entries)
 	(save-excursion (org-agenda-bulk-mark)))
-    
+
     (let ((dest-node (org-roam-node-read nil nil nil 'require-match)))
       (dolist (marker (reverse org-agenda-bulk-marked-entries))
 	;; Navigate to each marked entry and refile it
@@ -3949,18 +3949,18 @@ the current entry at point and move to the next line."
           (with-current-buffer (marker-buffer marker)
             (goto-char (marker-position marker))
             (org-roam-refile dest-node)))))
-    
+
     ;; Clear marks and move cursor
     (org-agenda-bulk-unmark-all)
     (next-line))
-  
+
   (defun js/agenda-roamify ()
     "Roamify URL at point from agenda."
     (interactive)
     (org-agenda-with-point-at-orig-entry nil
       (end-of-line)
       (call-interactively #'js/roamify-url-at-point)))
-  
+
   )
 
 ;;; End of org agenda package block
@@ -3979,7 +3979,7 @@ the current entry at point and move to the next line."
   (require 'org-tempo)
   (require 'ob-haskell)
 
-  
+
 
   (org-babel-do-load-languages
    'org-babel-load-languages
@@ -4025,34 +4025,34 @@ the current entry at point and move to the next line."
   (js-checklist-cli-command "checklist")              ; if globally installed
   ;; (js-checklist-cli-command "npm run dev")         ; if running from project dir
   ;; (js-checklist-cli-command "/full/path/to/checklist") ; custom path
-  
+
   ;; Output and behavior settings
   (js-checklist-auto-open-pdf t)                      ; auto-open PDFs after generation
   (js-checklist-default-output-dir nil)               ; nil = same dir as input, or set path like "~/Downloads/"
-  
+
   ;; :bind
   ;; (:map org-mode-map
   ;;  ;; Main export functions
   ;;  ;; ("C-c C-e c"   . js/checklist-export-buffer)       ; Export current buffer
   ;;  ;; ("C-c C-e C-c" . js/checklist-export-with-preview) ; Preview then export
-  
+
   ;;  ;; Additional utility functions
   ;;  ;; ("C-c C-e C-p" . js/checklist-show-filtered-content) ; Preview filtered content only
   ;;  ;; ("C-c C-e C-f" . js/checklist-export-file)         ; Export specific file
   ;; 	)
-  
+
   :commands
   (js/checklist-export-buffer
    js/checklist-export-file
    js/checklist-filter-content
    js/checklist-show-filtered-content
    js/checklist-export-with-preview)
-  
+
   :config
   ;; Optional: Add to org export dispatcher
   ;; (with-eval-after-load 'ox
   ;;   (add-to-list 'org-export-backends 'checklist t))
-  
+
   ;; Optional: Set up automatic export for specific tags
   ;; (add-hook 'org-mode-hook
   ;;           (lambda ()
@@ -4079,13 +4079,13 @@ the current entry at point and move to the next line."
   (org-static-blog-enable-tags t)
   (org-export-with-toc nil)
 
-  ;; This is destructive. 
+  ;; This is destructive.
   ;; (org-export-with-section-numbers nil)
 
   (org-static-blog-use-preview t)
   (org-static-blog-enable-tag-rss t)
   (org-static-blog-enable-og-tags t)
-  
+
   (org-static-blog-page-header
    "<meta name=\"author\" content=\"Jure Smolar\">
 <meta name=\"referrer\" content=\"no-referrer\">
@@ -4118,7 +4118,7 @@ the current entry at point and move to the next line."
   ;;   the blog posts
   (org-static-blog-index-front-matter ;; Between preamble and blog posts on index page
    "Recent posts.")
-  
+
   :config
   (defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page" "draft")
     "Tags used for file management that shouldn't appear on the blog.")
@@ -4126,7 +4126,7 @@ the current entry at point and move to the next line."
   ;; These tags should not be inherited to facilitate future subtree publishing
   (add-to-list 'org-tags-exclude-from-inheritance "blog")
   (add-to-list 'org-tags-exclude-from-inheritance "note")
-  
+
   ;; Override to use org-roam query instead of subfolders
   (defun org-static-blog-get-post-filenames ()
     "Get blog posts from org-roam :blog: tag."
@@ -4137,7 +4137,7 @@ the current entry at point and move to the next line."
 		      :inner-join tags
 		      :on (= tags:node-id nodes:id)
 		      :where (= tags:tag "blog")])))
-  
+
   (defun org-static-blog-get-draft-filenames ()
     "Get static pages from org-roam :page: tag."
     (mapcar #'car
@@ -4148,7 +4148,7 @@ the current entry at point and move to the next line."
 		      :on (= tags:node-id nodes:id)
 		      :where (or (= tags:tag "blog-static-page")
 				 (= tags:tag "draft"))])))
-  
+
   (defun org-static-blog-get-tags (post-filename)
     "Extract tags from POST-FILENAME, excluding management tags."
     (let ((case-fold-search t)
@@ -4216,11 +4216,11 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
              (svg-dir (expand-file-name js/tikzcd-svg-directory org-dir))
              (output-path (expand-file-name svg-file svg-dir))
              (relative-link (concat js/tikzcd-svg-directory svg-file)))
-	
+
 	;; Create output directory if it doesn't exist
 	(unless (file-exists-p svg-dir)
           (make-directory svg-dir t))
-	
+
 	;; Write LaTeX file
 	(with-temp-file temp-tex
           (insert "\\documentclass[border=2pt]{standalone}\n")
@@ -4230,26 +4230,26 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
           (insert "\n\\begin{document}\n")
           (insert tikzcd-code)
           (insert "\n\\end{document}\n"))
-	
+
 	;; Compile to PDF in temp directory
 	(message "Compiling LaTeX...")
 	(shell-command (format "cd %s && pdflatex -interaction=nonstopmode diagram.tex"
 			       temp-dir))
-	
+
 	;; Convert to SVG and copy to destination
 	(if (file-exists-p temp-pdf)
             (progn
 	      (message "Converting to SVG...")
 	      (shell-command (format "pdf2svg %s %s" temp-pdf temp-svg))
-	      
+
 	      (if (file-exists-p temp-svg)
                   (progn
                     ;; Copy SVG to destination
                     (copy-file temp-svg output-path t)
-                    
+
                     ;; Cleanup entire temp directory
                     (delete-directory temp-dir t)
-                    
+
                     ;; Insert link
                     (goto-char end)
                     (insert (format "\n\n[[file:%s]]\n" relative-link))
@@ -4265,7 +4265,7 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
     "Sync blog to muffalo server."
     (interactive)
     (compile "rsync -avz --delete ~/Documents/blog/ jure@muffalo:~/blog/"))
-  
+
   )
 
 ;;; End of org-static-blog code block.
@@ -4306,7 +4306,7 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
           (let ((props (org-entry-properties nil 'standard)))
             (setq lat (cdr (assoc "LATITUDE" props)))
             (setq lon (cdr (assoc "LONGITUDE" props))))
-          
+
           (if (and lat lon)
 	      (progn
 		;; Convert to numbers if they contain commas (European format)
@@ -4314,7 +4314,7 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
                   (setq lat (replace-regexp-in-string "," "." lat)))
 		(when (string-match "," lon)
                   (setq lon (replace-regexp-in-string "," "." lon)))
-		
+
 		(message "Opening coordinates: %s, %s" lat lon)
 		(osm-goto (string-to-number lat) (string-to-number lon) 15))
             (message "No coordinates found in heading properties"))))))
@@ -4352,7 +4352,7 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
 
 	 ("V" . elpapers-ingest-full)
 	 ("K" . elpapers-semantic-search)
-	 
+
          :map elfeed-show-mode-map
          ("SPC" . elfeed-scroll-up-command)
          ("S-SPC" . elfeed-scroll-down-command)
@@ -4385,7 +4385,7 @@ If multiple entries are selected, concatenates their content."
     (interactive)
     nil
     )
-  
+
   ;; Variables
   (setq-default elfeed-search-filter "-trash -asmr @7-days-ago +unread")
 
@@ -4420,7 +4420,7 @@ If multiple entries are selected, concatenates their content."
                     (adjusted-delta (/ delta 5)))  ;; Adjust this divisor as needed
           (unless (zerop adjusted-delta)
             (previous-line (max 1 (abs adjusted-delta))))))
-      
+
       (defun my/elfeed-next-line (event)
 	(interactive "e")
 	;; Extract the delta from the event
@@ -4430,12 +4430,12 @@ If multiple entries are selected, concatenates their content."
                     (adjusted-delta (/ delta 4)))  ;; Adjust this divisor as needed
           (unless (zerop adjusted-delta)
             (next-line (max 1 (abs adjusted-delta))))))
-      
+
       ;; Define our local wheel bindings with adjusted sensitivity
       (define-key map (kbd "<wheel-up>") #'my/elfeed-previous-line)
       (define-key map (kbd "<wheel-down>") #'my/elfeed-next-line)
       (define-key map (kbd "<mouse-2>") #'elfeed-search-browse-url)
-      
+
       ;; Override the mode-specific map
       (setq-local minor-mode-overriding-map-alist
                   (cons (cons pixel-scroll-precision-mode map)
@@ -4445,7 +4445,7 @@ If multiple entries are selected, concatenates their content."
   ;; Helps with an inbox zero approach to elfeed.
   (advice-add 'elfeed-search-clear-filter
 	      :after (lambda () (message "Clearing filter.")))
-  
+
   (defun elfeed-filter-maker (filter &optional message)
     "Sets the elfeed search filter and displays a message if there is one."
     (elfeed-search-set-filter filter)
@@ -4598,12 +4598,12 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
 		(wallabag-add-entry url "")
 		(cl-incf added-count))
             (message "No URL found for entry: %s" title))))
-      
+
       ;; Sync changes to server if we added anything
       (when (> added-count 0)
 	(message "Syncing %d entries to wallabag server..." added-count)
 	(run-with-timer 2 nil #'wallabag-request-and-synchronize-entries))
-      
+
       (message "Added %d entries to wallabag" added-count)))
 
   ;;; -> Elfeed -> Podcastify integration
@@ -4616,7 +4616,7 @@ Falls back to 'default' feed if no rules match.
 Example configuration:
   (setq my/elfeed-podcastify-feed-rules
     '((\"asmr\" . my/elfeed-entry-has-asmr-tag-p)
-      (\"tech-channels\" . (lambda (entry) 
+      (\"tech-channels\" . (lambda (entry)
                             (my/elfeed-entry-from-channel-p entry '(\"TechChannel\" \"CodeTube\"))))
       (\"music\" . (lambda (entry)
                      (string-match-p \"music\\\\|song\\\\|audio\"
@@ -4625,11 +4625,11 @@ Example configuration:
   (defun my/elfeed-entry-has-asmr-tag-p (entry)
     "Return t if elfeed ENTRY has asmr tag."
     (member 'asmr (elfeed-entry-tags entry)))
-  
+
   (setq my/elfeed-podcastify-feed-rules
 	'(("asmr" . my/elfeed-entry-has-asmr-tag-p)
 	  ))
-  
+
 
   (defun my/podcastify-determine-feed (entry)
     "Determine which feed an elfeed ENTRY should go to based on feed rules.
@@ -4665,8 +4665,8 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
                   ;; If prompt-for-feed (C-u was used), prompt user
                   (prompt-for-feed
                    (let* ((rule-feeds (mapcar 'car my/elfeed-podcastify-feed-rules))
-                          (all-feeds (cl-remove-duplicates 
-				      (append rule-feeds '("default")) 
+                          (all-feeds (cl-remove-duplicates
+				      (append rule-feeds '("default"))
 				      :test 'string=)))
                      (completing-read "Podcastify feed: " all-feeds nil nil nil nil "default")))
                   ;; If feed-name was explicitly provided, use it
@@ -4675,11 +4675,11 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
                   (t (my/podcastify-determine-feed (car entries)))))
            (added-count 0)
            (failed-count 0))
-      
+
       ;; Show which feed is being used
-      (unless prompt-for-feed 
+      (unless prompt-for-feed
         (message "Using podcastify feed: %s" feed))
-      
+
       ;; Process each entry
       (dolist (entry entries)
 	(let ((url (elfeed-entry-link entry))
@@ -4690,37 +4690,37 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
                     (message "Adding to podcastify: %s" title)
                     ;; Send to podcastify API
                     (url-retrieve
-                     (format "http://localhost:8081/add?url=%s&feed=%s" 
-                             (url-encode-url url) 
+                     (format "http://localhost:8081/add?url=%s&feed=%s"
+                             (url-encode-url url)
                              (url-encode-url feed))
                      (lambda (status)
 		       (if (plist-get status :error)
-                           (message "Failed to add %s to podcastify: %s" 
+                           (message "Failed to add %s to podcastify: %s"
                                     title (plist-get status :error))
 			 (message "Successfully added %s to podcastify" title)))
                      nil nil t)
-                    
+
                     ;; Mark entry as read in elfeed
                     (elfeed-untag entry 'unread)
                     (elfeed-tag entry 'podcastify)
-                    
+
                     ;; Move point to next entry in search mode
                     (when (derived-mode-p 'elfeed-search-mode)
 		      (forward-line 1))
-                    
+
                     (cl-incf added-count))
 		(error
 		 (message "Error processing %s: %s" title (error-message-string err))
 		 (cl-incf failed-count)))
             (message "Skipping non-YouTube entry: %s" title))))
-      
+
       ;; Update elfeed display
       (when (derived-mode-p 'elfeed-search-mode)
 	(elfeed-search-update--force))
-      
+
       ;; Show summary
       (if (> failed-count 0)
-          (message "Added %d entries to podcastify (feed: %s), %d failed" 
+          (message "Added %d entries to podcastify (feed: %s), %d failed"
                    added-count feed failed-count)
 	(message "Added %d entries to podcastify (feed: %s)" added-count feed))))
 
@@ -4730,23 +4730,23 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
     (interactive)
     (let* ((url (read-string "Enter URL to add to podcastify: "))
            (rule-feeds (mapcar 'car my/elfeed-podcastify-feed-rules))
-           (all-feeds (cl-remove-duplicates 
-		       (append rule-feeds '("default")) 
+           (all-feeds (cl-remove-duplicates
+		       (append rule-feeds '("default"))
 		       :test 'string=))
            (feed (completing-read "Podcastify feed: " all-feeds nil nil nil nil "default")))
-      
+
       (if (string-empty-p url)
           (message "URL cannot be empty")
         (condition-case err
             (progn
 	      (message "Adding %s to podcastify feed: %s" url feed)
 	      (url-retrieve
-	       (format "http://localhost:8081/add?url=%s&feed=%s" 
-		       (url-encode-url url) 
+	       (format "http://localhost:8081/add?url=%s&feed=%s"
+		       (url-encode-url url)
 		       (url-encode-url feed))
 	       (lambda (status)
                  (if (plist-get status :error)
-                     (message "Failed to add to podcastify: %s" 
+                     (message "Failed to add to podcastify: %s"
 			      (plist-get status :error))
                    (message "Successfully added to podcastify")))
 	       nil nil t))
@@ -4757,7 +4757,7 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
 
   (defvar deluge-watch-dir (expand-file-name "~/Downloads/")
     "The folder into which to download the .torrent files.")
-  
+
   (defun js/elfeed-entries-to-deluge (&optional entries)
     "Download .torrent files from elfeed entries to Deluge watch folder.
 If ENTRIES is provided, use those instead of the selected entries.
@@ -4771,13 +4771,13 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
             (t (user-error "Not in an Elfeed buffer or no entries provided"))))
           (total-count (length entries))
           (completed-count 0))
-      
+
       ;; Ensure the watch directory exists
       (unless (file-directory-p deluge-watch-dir)
 	(user-error "Deluge watch directory does not exist: %s" deluge-watch-dir))
-      
+
       (message "Starting download of %d torrent(s)..." total-count)
-      
+
       ;; Process each entry asynchronously
       (dolist (entry entries)
 	(let ((url (elfeed-entry-link entry))
@@ -4786,9 +4786,9 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
 	      (let* ((safe-title (replace-regexp-in-string "[^A-Za-z0-9._-]" "_" title))
                      (filename (concat safe-title ".torrent"))
                      (filepath (expand-file-name filename deluge-watch-dir)))
-		
+
 		(message "Starting download: %s" title)
-		
+
 		;; Use url-retrieve for non-blocking download
 		(url-retrieve
 		 url
@@ -4801,14 +4801,14 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
 			 ;; Move past HTTP headers
 			 (goto-char (point-min))
 			 (re-search-forward "\n\n" nil t)
-			 
+
 			 ;; Write the torrent data to file
 			 (write-region (point) (point-max) filepath nil 'quiet)
 			 (message "Downloaded torrent: %s" title)
-			 
+
 			 ;; Mark as read in elfeed
 			 (elfeed-untag entry 'unread)))
-                     
+
                      ;; Update completion counter
                      (cl-incf completed-count)
                      (when (= completed-count total-count)
@@ -4823,7 +4823,7 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
 		 (list entry title filepath completed-count total-count)
 		 nil t))  ; silent, no-cookies
             (message "No URL found for entry: %s" title))))))
-  
+
 ;;; -> Elfeed -> Multi-Device Syncing
 
 ;;; Core Variables
@@ -4854,16 +4854,16 @@ This is attached directly to database modification functions."
     "Schedule a database save after inactivity period."
     (when my/elfeed-debug
       (message "Elfeed: Scheduling save in %s seconds" my/elfeed-save-delay))
-    
+
     (unless my/elfeed-save-timer
       (message "Elfeed: Timer started."))
-    
+
     (when my/elfeed-save-timer
       (when my/elfeed-debug
 	(message "Elfeed: Cancelling existing save timer"))
       (cancel-timer my/elfeed-save-timer)
       (setq my/elfeed-save-timer nil))
-    
+
     (setq my/elfeed-save-timer
           (run-with-timer my/elfeed-save-delay nil #'my/elfeed-save-if-modified))
     (when my/elfeed-debug
@@ -4873,7 +4873,7 @@ This is attached directly to database modification functions."
     "Save the database if it has unsaved changes."
     (when my/elfeed-debug
       (message "Elfeed: Save timer triggered. Modified: %s" my/elfeed-db-modified))
-    
+
     (when my/elfeed-db-modified
       (message "Elfeed: Saving database changes...")
       (elfeed-db-save)
@@ -4885,34 +4885,34 @@ This is attached directly to database modification functions."
     "Load the database from disk if no unsaved changes exist."
     (when my/elfeed-debug
       (message "Elfeed: Load DB called. Modified: %s" my/elfeed-db-modified))
-    
+
     (unless my/elfeed-db-modified
       (message "Elfeed: Loading database from disk...")
       (elfeed-db-load)
       (when my/elfeed-debug
 	(message "Elfeed: Database loaded, updating search buffer..."))
-      
+
       (when-let ((buffer (get-buffer "*elfeed-search*")))
 	(with-current-buffer buffer
           (elfeed-search-update t))) ; Force update
-      
+
       (message "Elfeed: Database loaded.")))
 
 ;;; Setup hooks for buffer activation
   (defun my/elfeed-setup-local-activation-hooks ()
     "Set up buffer-local hooks for database reloading on activation."
     (when my/elfeed-debug
-      (message "Elfeed: Setting up local activation hooks in buffer: %s" 
+      (message "Elfeed: Setting up local activation hooks in buffer: %s"
 	       (current-buffer)))
-    
+
     (add-hook 'focus-in-hook #'my/elfeed-load-db nil t)
-    (add-hook 'tab-bar-tab-post-select-functions 
-	      (lambda (&rest _) 
+    (add-hook 'tab-bar-tab-post-select-functions
+	      (lambda (&rest _)
 		(when my/elfeed-debug
                   (message "Elfeed: Tab selection triggered db load"))
 		(my/elfeed-load-db))
 	      nil t)
-    
+
     (when my/elfeed-debug
       (message "Elfeed: Local activation hooks installed.")))
 
@@ -4921,23 +4921,23 @@ This is attached directly to database modification functions."
     "Setup database synchronization by attaching to core DB functions."
     (when my/elfeed-debug
       (message "Elfeed: Setting up sync system..."))
-    
+
     ;; Monitor actual database modification functions
     (advice-add 'elfeed-tag :after #'my/elfeed-mark-db-modified)
     (advice-add 'elfeed-untag :after #'my/elfeed-mark-db-modified)
     (advice-add 'elfeed-db-add :after #'my/elfeed-mark-db-modified)
-    
+
     ;; Load on entering/focusing Elfeed
     (advice-add 'elfeed :before #'my/elfeed-load-db)
-    
+
     ;; Add the local hooks to elfeed modes
     (add-hook 'elfeed-search-mode-hook #'my/elfeed-setup-local-activation-hooks)
     (add-hook 'elfeed-show-mode-hook #'my/elfeed-setup-local-activation-hooks)
-    
+
     ;; Ensure save on exit
     (advice-add 'elfeed-search-quit-window :before #'my/elfeed-save-if-modified)
     (add-hook 'kill-emacs-hook #'my/elfeed-save-if-modified)
-    
+
     (when my/elfeed-debug
       (message "Elfeed: Setup complete!")))
 
@@ -4945,23 +4945,23 @@ This is attached directly to database modification functions."
     "Disable database synchronization by removing hooks and advice."
     (when my/elfeed-debug
       (message "Elfeed: Disabling sync system..."))
-    
+
     ;; Remove advice from core functions
     (advice-remove 'elfeed-tag #'my/elfeed-mark-db-modified)
     (advice-remove 'elfeed-untag #'my/elfeed-mark-db-modified)
     (advice-remove 'elfeed-db-add #'my/elfeed-mark-db-modified)
-    
+
     ;; Remove load on entering/focusing Elfeed
     (advice-remove 'elfeed #'my/elfeed-load-db)
-    
+
     ;; Remove the local hooks from elfeed modes
     (remove-hook 'elfeed-search-mode-hook #'my/elfeed-setup-local-activation-hooks)
     (remove-hook 'elfeed-show-mode-hook #'my/elfeed-setup-local-activation-hooks)
-    
+
     ;; Remove save on exit
     (advice-remove 'elfeed-search-quit-window #'my/elfeed-save-if-modified)
     (remove-hook 'kill-emacs-hook #'my/elfeed-save-if-modified)
-    
+
     (when my/elfeed-debug
       (message "Elfeed: Sync system disabled!")))
 
@@ -4981,8 +4981,8 @@ This is attached directly to database modification functions."
   (defun my/elfeed-sync-status ()
     "Display the current status of the Elfeed sync system."
     (interactive)
-    (message "Elfeed Status: Modified: %s, Timer: %s" 
-             my/elfeed-db-modified 
+    (message "Elfeed Status: Modified: %s, Timer: %s"
+             my/elfeed-db-modified
              (if my/elfeed-save-timer "Active" "Inactive")))
 
   ;; Command to toggle debug mode
@@ -4990,7 +4990,7 @@ This is attached directly to database modification functions."
     "Toggle verbose debug messages for Elfeed sync."
     (interactive)
     (setq my/elfeed-debug (not my/elfeed-debug))
-    (message "Elfeed: Debug mode %s" 
+    (message "Elfeed: Debug mode %s"
              (if my/elfeed-debug "enabled" "disabled")))
 
 
@@ -5010,7 +5010,7 @@ This is attached directly to database modification functions."
   ;; Optional: Adjust timing parameters if default values don't suit your workflow
   ;; (setq my/elfeed-save-delay 10)      ;; Save after 10 seconds of inactivity
   ;; (setq my/elfeed-load-throttle 3)    ;; Allow loading at most once every 3 seconds
-  
+
   ;; Optional: Add keybindings for the utility functions
   :bind (:map elfeed-search-mode-map
 	      ;; ("s" . my/elfeed-manual-save)
@@ -5034,10 +5034,10 @@ This is attached directly to database modification functions."
   :after elfeed
   :custom
   (rmh-elfeed-org-files (list (concat org-roam-directory "/elfeed.org")))
-  
+
   :config
   (elfeed-org)
-  
+
   (require 'elfeed-link)
 
   (org-link-set-parameters "elfeed" :export #'elfeed-link-export-link)
@@ -5077,7 +5077,7 @@ This is attached directly to database modification functions."
     "Wrapper for elfeed entry logger for elfeed-search-show-entry"
     (interactive (list (elfeed-search-selected :ignore-region)))
     (js/log-elfeed-entries nil (list entry)))
-  
+
   (defun get-elfeed-entry-author (entry)
     "Extract the (first) author name from an Elfeed entry."
     (let* ((meta (elfeed-entry-meta entry))
@@ -5110,7 +5110,7 @@ This is attached directly to database modification functions."
           (feed-id (car (elfeed-entry-id entry))))
       (and (not (seq-intersection tags js/elfeed-skipped-tags))
            (not (member feed-id js/elfeed-skipped-feed-ids)))))
-  
+
   (defun js/log-elfeed-entries (&optional arg r keys)
     "Log unlogged elfeed entries to the daily file and mark them as logged.
 R can be a list of entries to log.
@@ -5254,7 +5254,7 @@ If the file doesn't exist, removes the +downloaded tag and skips it."
             ;; Tag the entry as "downloaded"
             (elfeed-tag entry 'downloaded))
 	(message "yt-dlp encountered an error for %s. Check *yt-dlp-output* for details." (elfeed-entry-title entry)))))
-  
+
   (defun create-single-entry-sentinel (entry base-filename)
     `(lambda (proc event)
        (yt-dlp-sentinel proc event ',entry ',base-filename)))
@@ -5393,7 +5393,7 @@ tags it `manually-added' + `unread'."
 ;;   :vc (:url "https://github.com/Tevqoon/org-readwise" :rev :newest)
 ;;   :custom
 ;;   ;; Output location - single file in readwise subfolder
-;;   (org-readwise-output-directory 
+;;   (org-readwise-output-directory
 ;;    (expand-file-name "readwise" org-roam-directory))
 
 ;;   ;; Sync both classic Readwise highlights and Reader documents
@@ -5401,7 +5401,7 @@ tags it `manually-added' + `unread'."
 ;;   (org-readwise-sync-reader t)
 
 ;;   ;; Track last sync time
-;;   (org-readwise-last-sync-time-file 
+;;   (org-readwise-last-sync-time-file
 ;;    (expand-file-name ".org-readwise-last-sync" user-emacs-directory))
 
 ;;   ;; Debug level (set to 0 once working)
@@ -5434,75 +5434,75 @@ tags it `manually-added' + `unread'."
          :map wallabag-search-mode-map
          ;; Basic navigation and viewing
          ("SPC" . wallabag-view)
-         ("b" . wallabag-browse-url)                  
-         ("B" . wallabag-browse-url-firefox)          
-         ("n" . wallabag-next-entry)                 
-         ("p" . wallabag-previous-entry)               
-         ("q" . wallabag-search-quit)                 
-         
+         ("b" . wallabag-browse-url)
+         ("B" . wallabag-browse-url-firefox)
+         ("n" . wallabag-next-entry)
+         ("p" . wallabag-previous-entry)
+         ("q" . wallabag-search-quit)
+
          ;; Filtering and display options
          ("c" . my/wallabag-show-unarchived)          ; Mirror elfeed's clear filter - show default view
          ("s" . my/wallabag-show-all)                 ; Show all entries including archived
          ("S" . wallabag-search-live-filter)          ; Search functionality
-         
+
          ;; Tag and status management
-         ("+" . wallabag-add-tags)                    
-         ("-" . wallabag-remove-tag)                  
-         ("t" . wallabag-delete-entry)                
-         ("f" . wallabag-update-entry-starred)        
-         
+         ("+" . wallabag-add-tags)
+         ("-" . wallabag-remove-tag)
+         ("t" . wallabag-delete-entry)
+         ("f" . wallabag-update-entry-starred)
+
          ;; Other functions
-         ("y" . wallabag-org-link-copy)               
-         ("i" . wallabag-add-entry)                   
+         ("y" . wallabag-org-link-copy)
+         ("i" . wallabag-add-entry)
          ("g" . wallabag-search-refresh-and-clear-filter)
          ("G" . wallabag-search-update-and-clear-filter)
 	 ("R" . wallabag-search-synchronize-and-clear-filter)
 	 ("Y" . wallabag-full-update)
          ("r" . wallabag-update-entry-archive)
 	 ("R" . js/wallabag-roamify-entry)
-         
+
          :map wallabag-entry-mode-map
          ;; Entry mode keys (same as before)
-         ("SPC" . scroll-up-command)                  
+         ("SPC" . scroll-up-command)
          ("S-SPC" . scroll-down-command)
          ("M-o" . ace-link-safari)
-         ("b" . wallabag-browse-url)                  
-         ("+" . wallabag-add-tags)                    
-         ("-" . wallabag-remove-tag)                  
-         ("q" . wallabag-entry-quit)                  
-         ("n" . wallabag-next-entry)                  
-         ("p" . wallabag-previous-entry)              
-         ("g" . wallabag-view)                        
-         ("t" . wallabag-delete-entry)                
-         ("<" . beginning-of-buffer)                  
-         (">" . end-of-buffer)                        
-         ("y" . wallabag-org-link-copy)               
-         ("f" . wallabag-update-entry-starred)        
+         ("b" . wallabag-browse-url)
+         ("+" . wallabag-add-tags)
+         ("-" . wallabag-remove-tag)
+         ("q" . wallabag-entry-quit)
+         ("n" . wallabag-next-entry)
+         ("p" . wallabag-previous-entry)
+         ("g" . wallabag-view)
+         ("t" . wallabag-delete-entry)
+         ("<" . beginning-of-buffer)
+         (">" . end-of-buffer)
+         ("y" . wallabag-org-link-copy)
+         ("f" . wallabag-update-entry-starred)
          ("x" . wallabag-update-entry-archive)
 	 ("r" . wallabag-update-entry-archive)
 	 ("R" . js/wallabag-roamify-entry))
   :init
   ;; contains the wallabag info
   (load "~/.emacs.d/private-config.el")
-  
+
   :custom
   (wallabag-search-print-items '("title" "domain" "tag" "reading-time" "date"))
   (wallabag-search-page-max-rows 32)
   (url-automatic-caching t) ;; for image caching
-  
+
   ;; Set default filter to unarchived only
   (wallabag-search-filter "Unread")
-  
+
   :hook
   (wallabag-after-render-hook . my/wallabag-initialize-view)
-  
+
   :config
   (setq wallabag-show-entry-switch #'switch-to-buffer)
 
   ;; Set up our custom parsers
   (advice-add 'wallabag-parse-entry-as-string :override
 	      #'my/wallabag-parse-entry-as-string-with-archive-status)
-  
+
   ;; Initialize with unarchived view
   (advice-add 'wallabag :after #'my/wallabag-initialize-view)
 
@@ -5534,9 +5534,9 @@ tags it `manually-added' + `unread'."
     (pcase item
       ("date" (propertize
 	       (let* ((created-at (alist-get 'created_at entry))
-		      (created-at-days (string-to-number 
-					(format-seconds "%d" (+ (float-time 
-								 (time-subtract (current-time) 
+		      (created-at-days (string-to-number
+					(format-seconds "%d" (+ (float-time
+								 (time-subtract (current-time)
 										(encode-time (parse-time-string created-at))))
 								86400)))))
 		 (cond ((< created-at-days 7)
@@ -5548,12 +5548,12 @@ tags it `manually-added' + `unread'."
 		       (t
 			(format "%sy" (/ created-at-days 365)))))
 	       'face 'wallabag-date-face))
-      ("domain" (propertize (or (alist-get 'domain_name entry) "") 
+      ("domain" (propertize (or (alist-get 'domain_name entry) "")
                             'face 'wallabag-domain-name-face))
       ("tag" (let ((tag (alist-get 'tag entry)))
 	       (format (if (string-empty-p tag) "" "(%s)" )
 		       (propertize tag 'face 'wallabag-tag-face))))
-      ("reading-time" (propertize (concat (number-to-string (alist-get 'reading_time entry)) " min") 
+      ("reading-time" (propertize (concat (number-to-string (alist-get 'reading_time entry)) " min")
 				  'face 'wallabag-reading-time-face))
       ("seperator" (format "\n%s" (make-string (window-width) ?-)))
       (_ item)))
@@ -5576,12 +5576,12 @@ tags it `manually-added' + `unread'."
 							  'face 'shadow
 							  'mouse-face 'wallabag-mouse-face
 							  'help-echo "Archived entry")))))
-      
+
       ;; Concatenate items with their formatted values
       (mapconcat #'identity
 		 (cl-loop for item in wallabag-search-print-items
                           collect (pcase item
-                                    ("title" (format "%s%s%s" 
+                                    ("title" (format "%s%s%s"
                                                      star
                                                      archive-indicator
                                                      (if (= is-archived 0)
@@ -5661,7 +5661,7 @@ Creates a new node with:
 In search mode, operates on the entry at point.
 In entry mode, operates on the current entry."
     (interactive)
-    
+
     ;; Get the current entry depending on the mode
     (let ((entry
            (pcase major-mode
@@ -5672,26 +5672,26 @@ In entry mode, operates on the current entry."
 	      ;; In search mode, get the entry at point
 	      (wallabag-find-candidate-at-point))
              (_ (user-error "Not in a wallabag buffer")))))
-      
+
       (unless entry
 	(user-error "No wallabag entry found"))
-      
+
       (let* ((id (alist-get 'id entry))
              (title (alist-get 'title entry))
              (source-url (alist-get 'url entry))
              (domain (alist-get 'domain_name entry))
-             
+
              ;; Create the wallabag link with ID format
              (wallabag-link (format "wallabag:%s" id))
-             
+
              ;; Create descriptive title with domain if available
-             (working-title (if domain 
+             (working-title (if domain
 				(format "%s (%s)" title domain)
 			      title))
-             
+
              ;; Create a new node
              (capture-node (org-roam-node-create :title working-title)))
-	
+
 	;; Define the finalizer function
 	(defun wallabag-roamify-finalizer ()
           "Add both wallabag link and source URL as refs after capture."
@@ -5707,7 +5707,7 @@ In entry mode, operates on the current entry."
                   (org-roam-ref-add source-url)
                   (save-buffer)
                   (message "Created node: %s" working-title))))))
-	
+
 	;; Create the node via org-roam-capture
 	(org-roam-capture-
 	 :keys "d"
@@ -5993,8 +5993,8 @@ In entry mode, operates on the current entry."
 
   :config
   (setq-default TeX-master nil)
-  
-  
+
+
   :hook
   (LaTeX-mode . turn-on-reftex)
   (LaTeX-mode . visual-line-mode)
@@ -6014,7 +6014,7 @@ When pressed twice, make the sub/superscript roman."
 	(progn
           (insert "\\mathrm{}")
           (backward-char 1))
-      (if (cdlatex-number-of-backslashes-is-odd) 
+      (if (cdlatex-number-of-backslashes-is-odd)
           ;; Quoted - insert raw character
           (insert (event-basic-type last-command-event))
 	;; Check if we are in math mode (ignore the outside-math-mode setting)
@@ -6033,7 +6033,7 @@ When pressed twice, make the sub/superscript roman."
     (interactive)
     (unless (yas-expand)
       (cdlatex-tab)))
-  
+
   ;; Replace cdlatex's TAB binding with our integrated version
   (define-key cdlatex-mode-map (kbd "TAB") #'js/yas-cdlatex-tab)
 
@@ -6045,11 +6045,11 @@ When pressed twice, make the sub/superscript roman."
   :custom
   (cdlatex-takeover-parenthesis nil)
   (cdlatex-takeover-dollar nil)
-  
+
   (cdlatex-command-alist
    '(("al" "Insert aligned environment" "" cdlatex-environment ("aligned") nil t)
      ("bm" "Insert bmatrix environment" "" cdlatex-environment ("bmatrix") nil t)
-     
+
      ("se" "Insert a nice subseteq" "\\subseteq" nil nil nil t)
      ("sse" "Insert a nice supseteq" "\\supseteq" nil nil nil t)
      ("sne" "Insert a nice subsetneq" "\\subsetneq" nil nil nil t)
@@ -6067,8 +6067,8 @@ When pressed twice, make the sub/superscript roman."
 
      ("or" "text or in math" "\\text{ or }" nil nil nil t)
      ("and" "text and in math" "\\text{ and }" nil nil nil t)
-     
-     
+
+
      ("capd" "Inserts cap dots" "\\cap \\cdots \\cap " nil nil nil t)
      ("cupd" "Inserts cup dots" "\\cup \\cdots \\cup " nil nil nil t)
      ("plusd" "Inserts plus dots" "+ \\cdots + " nil nil nil t)
@@ -6082,7 +6082,7 @@ When pressed twice, make the sub/superscript roman."
      ("ssned" "Inserts supersetneq dots" "\\supsetneq \\cdots \\supsetneq " nil nil nil t)
      ("leqd" "Inserts leq dots" "\\leq \\cdots \\leq " nil nil nil t)
      ("geqd" "Inserts geq dots" "\\geq \\cdots \\geq " nil nil nil t)
-     
+
 
      ("osuml"       "Insert \\bigoplus\\limits_{}^{}"
       "\\bigoplus\\limits_{?}^{}"  cdlatex-position-cursor nil nil t)
@@ -6100,7 +6100,7 @@ When pressed twice, make the sub/superscript roman."
       "\\bigwedge\\limits_{?}^{}"  cdlatex-position-cursor nil nil t)
      ("veel"       "Insert \\bigvee\\limits_{}^{}"
       "\\bigvee\\limits_{?}^{}"  cdlatex-position-cursor nil nil t)
-     
+
      ("bin"       "Insert \\binom{}{}"
       "\\binom{?}{}"  cdlatex-position-cursor nil nil t)
      ("oper"       "Insert \\operatorname{}"
@@ -6385,7 +6385,7 @@ Shows the remaining time in HH:MM format suitable for a physical timer.
 Accepts time in HH:MM format or military time (HHMM, e.g., 1800 for 18:00).
 If more than 100 hours remain, shows days + hours instead."
   (interactive)
-  
+
   (let* ((date (org-read-date nil nil nil "Select target date: "))
          (time-input (read-string "Enter time (HH:MM or HHMM military, default 23:59): " nil nil "23:59"))
          ;; Convert military time format if needed
@@ -6405,26 +6405,26 @@ If more than 100 hours remain, shows days + hours instead."
          (target-time (date-to-time target-datetime))
          (time-diff (time-subtract target-time current-time))
          (diff-seconds (float-time time-diff)))
-    
+
     (if (< diff-seconds 0)
         (message "Target time is in the past!")
       (let* ((total-minutes (floor (/ diff-seconds 60)))
              (hours (floor (/ total-minutes 60)))
              (minutes (mod total-minutes 60)))
-        
+
         (cond
          ;; If less than or equal to 100 hours, show HH:MM format for timer
          ((<= hours 100)
           (let ((result (format "%02d:%02d" hours minutes)))
-            (message "Time until %s %s: %s (set timer to %s)" 
+            (message "Time until %s %s: %s (set timer to %s)"
                      date time result result)
             result))
-         
+
          ;; If more than 100 hours, show days and remaining hours
          ((> hours 100)
           (let* ((days (floor (/ hours 24)))
                  (remaining-hours (mod hours 24)))
-            (message "Time until %s %s: %d days, %d hours, %d minutes (beyond 100h timer limit)" 
+            (message "Time until %s %s: %d days, %d hours, %d minutes (beyond 100h timer limit)"
                      date time days remaining-hours minutes)
             (format "%dd %02dh %02dm" days remaining-hours minutes))))))))
 
