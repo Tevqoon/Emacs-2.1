@@ -1595,7 +1595,6 @@ exactly like the old ace-jump integration."
 (use-package gptel
   :functions
   org/enable-gptel-for-chatlog-buffer
-  my/gptel-enable-tool-results-in-org-mode
   :defer t
   :after org
   :bind
@@ -1606,10 +1605,6 @@ exactly like the old ace-jump integration."
    ("C-c g /" . gptel-menu)
    ("C-c g w" . org/save-gptel-chat-as-node)
    ("C-c g g" . gptel)
-   ("C-c g e" . elysium-query)
-   ("C-c g b" . my/gptel-toggle-tool-results-local)
-   ("C-c g T" . my/gptel-translate-to-english)
-   ("C-c g f" . my/gptel-finish)
    ("C-c g C" . copilot-mode)
    (:map gptel-mode-map
 	 ("C-c g t o" . gptel-org-set-topic))
@@ -1641,7 +1636,7 @@ exactly like the old ace-jump integration."
   ;;; -> GPTel -> Tool use
   ;; Don't include tool and reasoning blocks by default
   (setq-default gptel-include-reasoning nil)
-  (setq-default gptel-include-tool-results nil)
+  (setq-default gptel-include-tool-results 'auto)
 
   (require 'gptel-integrations) ; MCP
 
@@ -1676,25 +1671,14 @@ exactly like the old ace-jump integration."
           (when (re-search-forward "^:END:$" nil t)
             (forward-line 1)
             (insert (format "#+title: %s\n" title))))
-	
+
 	(save-buffer)
 	(org-roam-db-sync)
-	
+
 	(let* ((node-id (org-id-get))
                (link (org-roam-link-make-string node-id title)))
           (org-roam-dailies-autocapture-today "c" link)
           (message "Chat saved as '%s' and linked in today's journal." title)))))
-
-  ;;; -> GPTel -> Rewrite utilities
-  (defun my/gptel-translate-to-english ()
-    "Rewrite the current buffer's text to English while preserving Org IDs and links."
-    (interactive)
-    (gptel--suffix-rewrite "Translate this text to English while keeping Org IDs and links intact."))
-
-  (defun my/gptel-finish ()
-    "Finalize the content at point or in the current buffer while preserving Org IDs and links."
-    (interactive)
-    (gptel--suffix-rewrite "Finish this content while keeping Org IDs and links intact."))
 
   )
 
@@ -1780,6 +1764,7 @@ exactly like the old ace-jump integration."
   ((opencode . "npm install -g opencode-ai"))
   :custom
   (agent-shell-preferred-agent-config 'opencode)
+  (agent-shell-opencode-default-model-id "github-copilot/gpt-5-mini")
   :bind
   ("C-c g a a" . agent-shell)
   (:map agent-shell-mode-map
