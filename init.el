@@ -1305,6 +1305,8 @@ exactly like the old ace-jump integration."
 	      )
   :custom
   (dired-listing-switches "-lagGFDh")
+  (insert-directory-program "gls")
+  (dired-use-ls-dired t)
   :config
   (defun js/dired-find-marked-files-in-tabs ()
     "Open each marked file in a new tab."
