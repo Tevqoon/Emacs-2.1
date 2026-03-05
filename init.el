@@ -3422,71 +3422,71 @@ CONTENTS is nil. INFO is a plist holding contextual information."
 	code)))
 
 
+  (require 'js-anki-body-converter
+           (expand-file-name "lisp/js-anki-body-converter.el" user-emacs-directory))
+
   (defun anki-editor-note-at-point ()
-    "Make a note struct from current entry with modified field handling.
-The front of the note will be the heading unless a '** Front' subheading exists.
-The back field will be only the content before any subheadings unless a '** Back' subheading exists.
-The hint field will be empty unless a '** Hint' subheading exists.
-All other subheadings will be ignored."
-    (let* ((deck (org-entry-get-with-inheritance anki-editor-prop-deck))
-           (note-id (org-entry-get nil anki-editor-prop-note-id))
-           (hash (org-entry-get nil anki-editor-prop-note-hash))
+    "Make a note struct from current entry using block-aware field extraction.
+
+Field sources, in priority order:
+
+  Front : '** Front' subheading > #+attr_latex :options on primary block > heading
+  Hint  : '** Hint' subheading  > first definition block > first theorem/lemma/etc block
+  Back  : '** Back' subheading  > proof/solution blocks + residual text > raw body
+
+See `js/anki-derive-fields' for full hierarchy details."
+    ()
+    (let* ((deck      (org-entry-get-with-inheritance anki-editor-prop-deck))
+           (note-id   (org-entry-get nil anki-editor-prop-note-id))
+           (hash      (org-entry-get nil anki-editor-prop-note-hash))
            (note-type (or (org-entry-get nil anki-editor-prop-note-type)
                           anki-editor-default-note-type))
-           (tags (cl-set-difference (anki-editor--get-tags)
-                                    anki-editor-ignored-org-tags
-                                    :test #'string=))
-           (heading (substring-no-properties (org-get-heading t t t t)))
-           (content-before-subheading (anki-editor--note-contents-before-subheading))
-           (front-field nil)
-           (back-field nil)
-           (hint-field nil)
-           (fields '()))
+           (tags      (cl-set-difference (anki-editor--get-tags)
+                                         anki-editor-ignored-org-tags
+                                         :test #'string=))
+           (heading   (substring-no-properties (org-get-heading t t t t)))
+           (body      (anki-editor--note-contents-before-subheading))
+           ;; Explicit subheading overrides — populated by the loop below
+           (explicit-front nil)
+           (explicit-hint  nil)
+           (explicit-back  nil))
 
-      ;; Look for Front, Back, and Hint subheadings
+      ;; Scan immediate children for Front / Hint / Back override subheadings.
+      ;; Any other subheadings are silently ignored.
       (save-excursion
-	(when (org-goto-first-child)
+        (when (org-goto-first-child)
           (cl-loop
-           for element = (org-element-at-point)
+           for element    = (org-element-at-point)
            for subheading = (substring-no-properties
                              (org-element-property :raw-value element))
-           for begin = (save-excursion (anki-editor--skip-drawer element))
-           for end = (org-element-property :contents-end element)
-           for content = (and begin end
-			      (buffer-substring-no-properties
-			       begin (min (point-max) end)))
-           when (string= subheading "Front")
-           do (setq front-field content)
-           when (string= subheading "Back")
-           do (setq back-field content)
-           when (string= subheading "Hint")
-           do (setq hint-field content)
+           for begin      = (save-excursion (anki-editor--skip-drawer element))
+           for end        = (org-element-property :contents-end element)
+           for content    = (and begin end
+                                 (buffer-substring-no-properties
+                                  begin (min (point-max) end)))
+           when (string= subheading "Front") do (setq explicit-front content)
+           when (string= subheading "Hint")  do (setq explicit-hint  content)
+           when (string= subheading "Back")  do (setq explicit-back  content)
            while (org-get-next-sibling))))
 
-      ;; If Front/Back not explicitly defined, use defaults
-      (unless front-field
-	(setq front-field heading))
-      (unless back-field
-	(setq back-field content-before-subheading))
+      ;; Derive fields via block-aware converter
+      (let* ((derived (js/anki-derive-fields
+                       heading body explicit-front explicit-hint explicit-back))
+             (fields (sort (list (cons "Front" (plist-get derived :front))
+                                 (cons "Hint"  (plist-get derived :hint))
+                                 (cons "Back"  (plist-get derived :back)))
+                           (lambda (a b) (string< (car a) (car b))))))
 
-      ;; Build fields alist for Basic note type with Hint
-      (setq fields (list (cons "Front" front-field)
-			 (cons "Back" back-field)
-			 (cons "Hint" (or hint-field ""))))
+        (unless deck      (user-error "Missing deck"))
+        (unless note-type (user-error "Missing note type"))
 
-      ;; Sort fields
-      (setq fields (sort fields (lambda (a b) (string< (car a) (car b)))))
-
-      (unless deck (user-error "Missing deck"))
-      (unless note-type (user-error "Missing note type"))
-
-      (make-anki-editor-note :id note-id
-                             :model note-type
-                             :deck deck
-                             :tags tags
-                             :fields fields
-                             :hash hash
-                             :marker (point-marker))))
+        (make-anki-editor-note :id     note-id
+                               :model  note-type
+                               :deck   deck
+                               :tags   tags
+                               :fields fields
+                               :hash   hash
+                               :marker (point-marker)))))
 
   ;;; -> Org mode -> Anki -> Flashcard Queue System
   (defvar anki-flashcard-queue-file
