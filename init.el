@@ -6128,6 +6128,7 @@ When pressed twice, make the sub/superscript roman."
      (?V ("\\vdash" "\\dashv"))
      (?4 ("\\quad" "\\qquad"))
      (?j ("\\iota" "\\jmath"))
+     (?I ("\\mid" "\\Im"))
      ))
 
   :hook
