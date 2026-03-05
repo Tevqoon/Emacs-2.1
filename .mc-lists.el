@@ -46,6 +46,7 @@
 	elfeed-search-untag-all
 	end-of-visual-line
 	eval-last-sexp
+	expreg-expand
 	forward-whitespace
 	god-local-mode
 	god-mode-self-insert

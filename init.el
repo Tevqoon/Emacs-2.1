@@ -815,6 +815,47 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 (use-package company-box
   :hook company-mode)
 
+(use-package hydra)
+
+(use-package smerge-mode
+  :bind
+  (:map smerge-mode-map
+	("C-c ^ ^" . unpackaged/smerge-hydra/body))
+  :config
+  (defhydra unpackaged/smerge-hydra
+    (:color pink :hint nil :post (smerge-auto-leave))
+    "
+^Move^       ^Keep^               ^Diff^                 ^Other^
+^^-----------^^-------------------^^---------------------^^-------
+_n_ext       _b_ase               _<_: upper/base        _C_ombine
+_p_rev       _u_pper              _=_: upper/lower       _r_esolve
+^^           _l_ower              _>_: base/lower        _k_ill current
+^^           _a_ll                _R_efine
+^^           _RET_: current       _E_diff
+"
+    ("n" smerge-next)
+    ("p" smerge-prev)
+    ("b" smerge-keep-base)
+    ("u" smerge-keep-upper)
+    ("l" smerge-keep-lower)
+    ("a" smerge-keep-all)
+    ("RET" smerge-keep-current)
+    ("\C-m" smerge-keep-current)
+    ("<" smerge-diff-base-upper)
+    ("=" smerge-diff-upper-lower)
+    (">" smerge-diff-base-lower)
+    ("R" smerge-refine)
+    ("E" smerge-ediff)
+    ("C" smerge-combine-with-next)
+    ("r" smerge-resolve)
+    ("k" smerge-kill-current)
+    ("ZZ" (lambda ()
+            (interactive)
+            (save-buffer)
+            (bury-buffer))
+     "Save and bury buffer" :color blue)
+    ("q" nil "cancel" :color blue)))
+
 ;; (use-package expand-region
 ;;   :bind ("s-f" . er/expand-region))
 
@@ -1878,12 +1919,12 @@ exactly like the old ace-jump integration."
    )
 
   :config
-  ;; Exporting
+  ;; Org Exporting
 
-  ;; (defun js/org-export-configure-numbering (backend)
-  ;;   (pcase backend
-  ;;     ('latex (setq-local org-export-with-section-numbers t))
-  ;;     ('html  (setq-local org-export-with-section-numbers nil))))
+  (defun js/org-export-configure-numbering (backend)
+    (pcase backend
+      ('latex (setq-local org-export-with-section-numbers t))
+      ('html  (setq-local org-export-with-section-numbers nil))))
   (setq org-export-with-section-numbers nil)
 
   (add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
@@ -2158,6 +2199,56 @@ Automatically expands the heading if it's folded."
 	(goto-char (point-min))
 	(org-sort-entries nil ?o))))
   )
+
+;;; -> Org mode -> spliced exporting
+
+(use-package js-ox-strip-heading
+  :load-path "~/.emacs.d/lisp/"
+  :after ox
+  )
+
+(use-package ox
+  :ensure nil
+  :config
+  (defun js/ox-html-special-block (special-block contents info)
+    "Transcode SPECIAL-BLOCK to HTML, injecting a title from :parameters if present."
+    (let* ((type  (downcase (org-element-property :type special-block)))
+           (title (org-element-property :parameters special-block))
+           (id    (org-export-get-reference special-block info))
+           (inner (or contents "")))
+      (format "<div class=\"%s\" id=\"%s\">\n%s%s</div>"
+              type id
+              (if title (format "<span class=\"block-title\">%s</span>\n" title) "")
+              inner)))
+
+  (defun js/ox-latex-special-block (special-block contents info)
+    "Transcode SPECIAL-BLOCK to LaTeX, using :parameters for the optional title.
+Falls back to #+attr_latex :options for backwards compatibility."
+    (let* ((type  (org-element-property :type special-block))
+           (params (org-element-property :parameters special-block))
+           (opt   (or (and params (format "[%s]" params))
+                      (org-export-read-attribute :attr_latex special-block :options)
+                      ""))
+           (caption (org-latex--caption/label-string special-block info))
+           (caption-above-p (org-latex--caption-above-p special-block info)))
+      (concat (format "\\begin{%s}%s\n" type opt)
+              (and caption-above-p caption)
+              contents
+              (and (not caption-above-p) caption)
+              (format "\\end{%s}" type))))
+
+  (with-eval-after-load 'ox-html
+    (setf (alist-get 'special-block
+                     (org-export-backend-transcoders
+                      (org-export-get-backend 'html)))
+          #'js/ox-html-special-block))
+
+  (with-eval-after-load 'ox-latex
+    (setf (alist-get 'special-block
+                     (org-export-backend-transcoders
+                      (org-export-get-backend 'latex)))
+          #'js/ox-latex-special-block)))
+
 ;;; End of org-mode package block
 
 (use-package org-download)
@@ -4013,6 +4104,10 @@ the current entry at point and move to the next line."
   (add-to-list 'org-structure-template-alist '("abst" . "abstract"))
   (add-to-list 'org-structure-template-alist '("ex" . "lexample"))
   (add-to-list 'org-structure-template-alist '("item" . "itemize"))
+  (add-to-list 'org-structure-template-alist '("cor" . "corollary"))
+  (add-to-list 'org-structure-template-alist '("def" . "definition"))
+  (add-to-list 'org-structure-template-alist '("rem" . "remark"))
+  (add-to-list 'org-structure-template-alist '("ax" . "axiom"))  ; you have several axioms
   )
 
 ;;; -> Org Mode -> Checklists

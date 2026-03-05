@@ -57,22 +57,18 @@ Returns a plist:
               :type :options :content
   :residual — trimmed concatenation of all text NOT inside any block
 
-The #+attr_latex :options value is extracted from affiliated keywords
-preceding each block, which is how LaTeX theorem titles are specified:
+The block title is taken from the :parameters of the block, i.e. the
+text after the block type on the #+begin_ line:
 
-  #+attr_latex: :options [Fermat's Last Theorem]
-  #+begin_theorem
+  #+begin_theorem Fermat's Last Theorem
   ...
   #+end_theorem"
   (let (blocks residual-parts)
     (with-temp-buffer
-      ;; org-element requires org-mode for correct parsing of affiliated keywords
       (let ((org-inhibit-startup t))
         (org-mode))
       (insert body)
       (let* ((tree (org-element-parse-buffer 'element))
-             ;; The tree is org-data > section > elements.
-             ;; Handle both cases: body may or may not produce a section wrapper.
              (section (car (org-element-contents tree)))
              (all-elements
               (if (eq (org-element-type section) 'section)
@@ -81,20 +77,10 @@ preceding each block, which is how LaTeX theorem titles are specified:
 
         (dolist (elem all-elements)
           (if (eq (org-element-type elem) 'special-block)
-              ;; --- Special block: extract type, attr_latex options, content ---
-              (let* ((type (downcase (org-element-property :type elem)))
-                     ;; org-export-read-attribute reads the :attr_latex plist.
-                     ;; Requires ox to be loaded (it is, via anki-editor).
-                     (attr-latex (org-export-read-attribute :attr_latex elem))
-                     (options-raw (plist-get attr-latex :options))
-                     ;; Strip surrounding brackets: [Title] -> Title
-                     (options
-                      (when options-raw
-                        (if (string-match "^\\[\\(.*\\)\\]$" options-raw)
-                            (match-string 1 options-raw)
-                          options-raw)))
-                     (cbeg (org-element-property :contents-begin elem))
-                     (cend (org-element-property :contents-end elem))
+              (let* ((type    (downcase (org-element-property :type elem)))
+                     (options (org-element-property :parameters elem))
+                     (cbeg    (org-element-property :contents-begin elem))
+                     (cend    (org-element-property :contents-end elem))
                      (content (if (and cbeg cend)
                                   (string-trim
                                    (buffer-substring-no-properties cbeg cend))
@@ -104,7 +90,6 @@ preceding each block, which is how LaTeX theorem titles are specified:
                             :content content)
                       blocks))
 
-            ;; --- Non-block element: accumulate as residual ---
             (let* ((beg  (org-element-property :begin elem))
                    (end  (org-element-property :end elem))
                    (text (string-trim (buffer-substring-no-properties beg end))))
