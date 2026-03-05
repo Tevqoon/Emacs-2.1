@@ -2209,7 +2209,88 @@ Automatically expands the heading if it's folded."
 
 (use-package ox
   :ensure nil
+  :custom
+  (org-export-allow-bind-keywords t)
   :config
+  (defcustom js/ox-html-collapsible-headlines t
+    "If non-nil, export org headlines as collapsible <details> elements."
+    :type 'boolean
+    :group 'js-ox)
+
+  (defcustom js/ox-html-collapsible-blocks nil
+    "If non-nil, export theorem-style special blocks as collapsible <details> elements."
+    :type 'boolean
+    :group 'js-ox)
+
+  (defcustom js/ox-html-headlines-open-by-default t
+    "If non-nil, collapsible headlines start in the open state."
+    :type 'boolean
+    :group 'js-ox)
+
+  (defcustom js/ox-html-blocks-open-by-default nil
+    "If non-nil, collapsible theorem blocks start in the open state."
+    :type 'boolean
+    :group 'js-ox)
+
+  (defun js/ox-html-headline (headline contents info)
+    "Transcode HEADLINE to HTML, optionally wrapping in <details>."
+    (unless (org-element-property :footnote-section-p headline)
+      (let* ((numberedp  (org-export-numbered-headline-p headline info))
+             (numbers    (org-export-get-headline-number headline info))
+             (level      (+ (org-export-get-relative-level headline info)
+                            (1- (plist-get info :html-toplevel-hlevel))))
+             (todo       (and (plist-get info :with-todo-keywords)
+                              (let ((todo (org-element-property :todo-keyword headline)))
+                                (and todo (org-export-data todo info)))))
+             (todo-type  (and todo (org-element-property :todo-type headline)))
+             (priority   (and (plist-get info :with-priority)
+                              (org-element-property :priority headline)))
+             (text       (org-export-data (org-element-property :title headline) info))
+             (tags       (and (plist-get info :with-tags)
+                              (org-export-get-tags headline info)))
+             (full-text  (funcall (plist-get info :html-format-headline-function)
+                                  todo todo-type priority text tags info))
+             (contents   (or contents ""))
+             (id         (org-html--reference headline info))
+             (formatted-text
+              (if (plist-get info :html-self-link-headlines)
+                  (format "<a href=\"#%s\">%s</a>" id full-text)
+                full-text)))
+        (if (org-export-low-level-p headline info)
+            ;; Deep subtree: delegate to default list-item rendering
+            (org-html-headline headline contents info)
+          ;; Standard headline
+          (let* ((extra-class   (org-element-property :HTML_CONTAINER_CLASS headline))
+                 (headline-class (org-element-property :HTML_HEADLINE_CLASS headline))
+                 (first-content (car (org-element-contents headline)))
+                 (section-contents
+                  (if (org-element-type-p first-content 'section)
+                      contents
+                    (concat (org-html-section first-content "" info) contents)))
+                 (open-attr (if js/ox-html-headlines-open-by-default " open" "")))
+            (if js/ox-html-collapsible-headlines
+                (format "<%s id=\"%s\" class=\"%s\">\n<details%s>\n<summary>\n<h%d id=\"%s\"%s>%s</h%d>\n</summary>\n%s\n</details>\n</%s>\n"
+                        (org-html--container headline info)
+                        (format "outline-container-%s" id)
+                        (concat (format "outline-%d" level)
+                                (and extra-class " ")
+                                extra-class)
+                        open-attr
+                        level
+                        id
+                        (if headline-class (format " class=\"%s\"" headline-class) "")
+                        (concat
+                         (and numberedp
+                              (format "<span class=\"section-number-%d\">%s</span> "
+                                      level
+                                      (concat (mapconcat #'number-to-string numbers ".") ".")))
+                         formatted-text)
+                        level
+                        section-contents
+                        (org-html--container headline info))
+              ;; Collapsible disabled: fall through to default
+              (org-html-headline headline contents info)))))))
+
   (defun js/ox-html-special-block (special-block contents info)
     "Transcode SPECIAL-BLOCK to HTML, injecting a title from :parameters if present."
     (let* ((type  (downcase (org-element-property :type special-block)))
@@ -2237,17 +2318,26 @@ Falls back to #+attr_latex :options for backwards compatibility."
               (and (not caption-above-p) caption)
               (format "\\end{%s}" type))))
 
+
+
   (with-eval-after-load 'ox-html
     (setf (alist-get 'special-block
                      (org-export-backend-transcoders
                       (org-export-get-backend 'html)))
-          #'js/ox-html-special-block))
+          #'js/ox-html-special-block)
+    (setf (alist-get 'headline
+                     (org-export-backend-transcoders
+                      (org-export-get-backend 'html)))
+          #'js/ox-html-headline)
+    )
 
   (with-eval-after-load 'ox-latex
     (setf (alist-get 'special-block
                      (org-export-backend-transcoders
                       (org-export-get-backend 'latex)))
-          #'js/ox-latex-special-block)))
+          #'js/ox-latex-special-block))
+
+  )
 
 ;;; End of org-mode package block
 
@@ -4190,6 +4280,27 @@ the current entry at point and move to the next line."
 <link rel=\"icon\" href=\"static/favicon.ico\">
 <script src=\"static/mathjax-config.js\"></script>
 <script id=\"MathJax-script\" async src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const btn = document.createElement('button');
+  btn.className = 'js-toggle-headings';
+  btn.textContent = 'expand all';
+
+  let allOpen = false;
+  btn.addEventListener('click', function () {
+    allOpen = !allOpen;
+    document.querySelectorAll('details').forEach(function (d) {
+      allOpen ? d.setAttribute('open', '') : d.removeAttribute('open');
+    });
+    btn.textContent = allOpen ? 'collapse all' : 'expand all';
+  });
+
+  // Insert after the first h1 on the page
+  const h1 = document.querySelector('h1');
+  if (h1) h1.insertAdjacentElement('afterend', btn);
+});
+</script>
 ")
 
   (org-static-blog-page-preamble
