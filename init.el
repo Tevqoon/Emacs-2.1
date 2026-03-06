@@ -1344,8 +1344,6 @@ exactly like the old ace-jump integration."
 	      ("C-a" . js/dired-smart-bol)
               ("C-e" . js/dired-smart-eol)
 	      )
-  :custom
-
   :config
   (when (eq system-type 'darwin)
     (dired-listing-switches "-lagGFDh")
