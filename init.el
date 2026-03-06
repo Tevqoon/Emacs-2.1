@@ -1345,10 +1345,13 @@ exactly like the old ace-jump integration."
               ("C-e" . js/dired-smart-eol)
 	      )
   :custom
-  (dired-listing-switches "-lagGFDh")
-  (insert-directory-program "gls")
-  (dired-use-ls-dired t)
+
   :config
+  (when (eq system-type 'darwin)
+    (dired-listing-switches "-lagGFDh")
+    (insert-directory-program "gls")
+    (dired-use-ls-dired t))
+
   (defun js/dired-find-marked-files-in-tabs ()
     "Open each marked file in a new tab."
     (interactive)
@@ -6335,6 +6338,7 @@ When pressed twice, make the sub/superscript roman."
      (?4 ("\\quad" "\\qquad"))
      (?j ("\\iota" "\\jmath"))
      (?I ("\\mid" "\\Im"))
+     (?_ ("\\downarrow" "\\Downarrow"))
      ))
 
   :hook

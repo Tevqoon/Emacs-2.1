@@ -65,6 +65,7 @@
 	lean4-tab-indent
 	markdown-outdent-or-delete
 	math-delimiters-insert
+	my/org-wrap-or-toggle
 	open-link-in-safari
 	org-agenda-archive-default
 	org-agenda-priority-down
