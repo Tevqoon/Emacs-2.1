@@ -1807,6 +1807,7 @@ exactly like the old ace-jump integration."
   :custom
   (agent-shell-preferred-agent-config 'opencode)
   (agent-shell-opencode-default-model-id "github-copilot/gpt-5-mini")
+  (agent-shell-prefer-viewport-interaction t)
   :bind
   ("C-c g a a" . agent-shell)
   (:map agent-shell-mode-map
@@ -4337,22 +4338,19 @@ document.addEventListener('DOMContentLoaded', function () {
   ;; Override to use org-roam query instead of subfolders
   (defun org-static-blog-get-post-filenames ()
     "Get blog posts from org-roam :blog: tag."
-    (mapcar #'car
-            (org-roam-db-query
-             [:select [nodes:file]
-		      :from nodes
-		      :inner-join tags
-		      :on (= tags:node-id nodes:id)
-		      :where (= tags:tag "blog")])))
+    (delete-dups
+     (mapcar #'car
+             (org-roam-db-query
+              [:select :distinct [nodes:file] :from nodes
+		       :inner-join tags :on (= tags:node-id nodes:id)
+		       :where (= tags:tag "blog")]))))
 
   (defun org-static-blog-get-draft-filenames ()
     "Get static pages from org-roam :page: tag."
     (mapcar #'car
             (org-roam-db-query
-             [:select [nodes:file]
-		      :from nodes
-		      :inner-join tags
-		      :on (= tags:node-id nodes:id)
+             [:select :distinct [nodes:file] :from nodes
+		      :inner-join tags :on (= tags:node-id nodes:id)
 		      :where (or (= tags:tag "blog-static-page")
 				 (= tags:tag "draft"))])))
 
