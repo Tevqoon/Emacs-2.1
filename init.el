@@ -4549,7 +4549,6 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
 	 ("O" . js/elfeed-entries-to-podcastify)
 	 ("<wheel-up>" . previous-line)
 	 ("<wheel-down>" . next-line)
-	 ("a" . js/elfeed-add-url)
 
 	 ("y" . nil)
 	 ("y y" . elfeed-search-yank)
@@ -5525,40 +5524,6 @@ Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
       (error
        (message "js/elfeed-fetch-youtube-metadata: %s" err)
        nil)))
-
-  (defun js/elfeed-add-url (url)
-    "Add URL as a manually-added entry in the elfeed database.
-Synchronously fetches title and channel, creates the entry under
-the channel's feed (using its real RSS feed ID if available), and
-tags it `manually-added' + `unread'."
-    (interactive "sYouTube URL: ")
-    (elfeed-db-ensure)
-    (let* ((meta       (or (js/elfeed-fetch-youtube-metadata url)
-                           (list :title url :channel-name "Unknown Channel" :channel-id nil)))
-           (title      (plist-get meta :title))
-           (ch-name    (plist-get meta :channel-name))
-           (ch-id      (plist-get meta :channel-id))
-           ;; Use real RSS URL as feed-id when we have a channel-id, so it
-           ;; merges with the channel if you subscribe to it later
-           (feed-id    (if ch-id
-                           (format "https://www.youtube.com/feeds/videos.xml?channel_id=%s" ch-id)
-			 (concat "manually-added/" ch-name)))
-           (feed       (elfeed-db-get-feed feed-id))
-           (id         (cons feed-id url))
-           (entry      (elfeed-entry--create
-			:id      id
-			:title   title
-			:link    url
-			:date    (float-time)
-			:feed-id feed-id
-			:tags    '(manually-added unread))))
-      (unless (elfeed-feed-title feed)
-	(setf (elfeed-feed-title feed) ch-name))
-      (elfeed-db-add (list entry))
-      (when (fboundp 'elfeed-tube-fetch)
-	(elfeed-tube-fetch (list entry)))
-      (elfeed-search-update :force)
-      (message "Added \"%s\" by %s to elfeed." title ch-name)))
 
   ) ;;
 ;;; End of elfeed-tube package block
