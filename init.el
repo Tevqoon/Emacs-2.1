@@ -1346,9 +1346,9 @@ exactly like the old ace-jump integration."
 	      )
   :config
   (when (eq system-type 'darwin)
-    (dired-listing-switches "-lagGFDh")
-    (insert-directory-program "gls")
-    (dired-use-ls-dired t))
+    (setq dired-listing-switches "-lagGFDh")
+    (setq insert-directory-program "gls")
+    (setq dired-use-ls-dired t))
 
   (defun js/dired-find-marked-files-in-tabs ()
     "Open each marked file in a new tab."
