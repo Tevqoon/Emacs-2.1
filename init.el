@@ -1769,8 +1769,10 @@ exactly like the old ace-jump integration."
              ;; ("fetch" . (:command "uvx" :args ("mcp-server-fetch"))) ; Seems like DDG has its own fetch tool.
 	     ("duckduckgo" . (:command "uvx" :args ("duckduckgo-mcp-server")))
 	     ("emacs-mcp-tool-server" .
-	      (:command "~/.emacs.d/emacs-mcp-stdio.sh"
-			:args ("--init-function=emacs-mcp-tool-start-server" "--stop-function=emacs-mcp-tool-stop-server", "--server-id=default")))
+	      (:command ,(expand-file-name "~/.emacs.d/emacs-mcp-stdio.sh")
+			:args ("--init-function=emacs-mcp-tool-start-server"
+			       "--stop-function=emacs-mcp-tool-stop-server"
+			       "--server-id=default")))
              ))
   :config
   (require 'mcp-hub)
