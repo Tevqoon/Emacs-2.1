@@ -4583,6 +4583,23 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
   (elfeed-search-mode . my/setup-elfeed-scroll)
   ;; (elfeed-search-mode . my/elfeed-setup-local-activation-hooks)
   :config
+  ;; Note: the following function looks useless since deleting an item will just refetch it.
+  ;; I'm using it for testing some RSS feeds and such.
+  (defun js/elfeed-delete-selected-entries ()
+    "Delete selected elfeed entries from the database."
+    (interactive)
+    (elfeed-db-ensure)
+    (let ((entries (elfeed-search-selected)))
+      (dolist (entry entries)
+	(let ((id (elfeed-entry-id entry)))
+          ;; avl-tree-delete first: its comparator (elfeed-db-compare)
+          ;; calls elfeed-db-get-entry, so the hash must still have the entry
+          (avl-tree-delete elfeed-db-index id)
+          (remhash id elfeed-db-entries)))
+      (elfeed-db-save)
+      (elfeed-search-update :force)
+      (message "Deleted %d entries" (length entries))))
+
   (defun js/elfeed-yank-entry-content ()
     "Yank the full content of the current entry or selected entries.
 In elfeed-search-mode, works on selected entries (or entry at point).
