@@ -4468,10 +4468,26 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
             (delete-directory temp-dir t)
             (error "PDF compilation failed"))))))
 
-  (defun js/sync-blog ()
-    "Sync blog to muffalo server."
-    (interactive)
-    (compile "rsync -avz --delete ~/Documents/blog/ jure@muffalo:~/blog/"))
+  (defun js/sync-blog (arg)
+  "Sync blog to muffalo server.
+
+No prefix: do not update the 'static/' directory on the remote.
+With C-u: include the 'static/' directory (push local static to remote).
+With C-u C-u: pull the 'static/' directory from the remote to local."
+  (interactive "P")
+  (let* ((local (expand-file-name "~/Documents/blog/"))
+         (remote "jure@muffalo:~/blog/")
+         (cmd (cond
+               ((null arg)
+                ;; Default: exclude static/
+                (format "rsync -avz --delete --exclude 'static/' %s %s" local remote))
+               ((and arg (= (prefix-numeric-value arg) 16))
+                ;; C-u C-u: pull static/ from remote to local
+                (format "rsync -avz --delete %s %s" (concat remote "static/") (concat local "static/")))
+               (t
+                ;; Any other prefix (e.g. single C-u): include static/ (push)
+                (format "rsync -avz --delete %s %s" local remote)))))
+    (compile cmd)))
 
   )
 

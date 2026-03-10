@@ -4,7 +4,7 @@
 # --
 :PROPERTIES:
 :ANKI_NOTE_TYPE: Basic
-:ANKI_DECK: Math::${1:`(or (anki/my/after-snippet-tag-handler) "Math")`}
+:ANKI_DECK: Math::${1:`(or (anki/my/after-snippet-tag-handler) "Math")`}::Lecture${2:00}
 :ANKI_TAGS: $1
 :END:
 $0
