@@ -1810,6 +1810,8 @@ exactly like the old ace-jump integration."
   (agent-shell-preferred-agent-config 'opencode)
   (agent-shell-opencode-default-model-id "github-copilot/gpt-5-mini")
   (agent-shell-prefer-viewport-interaction t)
+  (agent-shell-session-strategy 'new)
+  (agent-shell-show-usage-at-turn-end t)
   :bind
   ("C-c g a a" . agent-shell)
   (:map agent-shell-mode-map
@@ -4469,25 +4471,25 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
             (error "PDF compilation failed"))))))
 
   (defun js/sync-blog (arg)
-  "Sync blog to muffalo server.
+    "Sync blog to muffalo server.
 
 No prefix: do not update the 'static/' directory on the remote.
 With C-u: include the 'static/' directory (push local static to remote).
 With C-u C-u: pull the 'static/' directory from the remote to local."
-  (interactive "P")
-  (let* ((local (expand-file-name "~/Documents/blog/"))
-         (remote "jure@muffalo:~/blog/")
-         (cmd (cond
-               ((null arg)
-                ;; Default: exclude static/
-                (format "rsync -avz --delete --exclude 'static/' %s %s" local remote))
-               ((and arg (= (prefix-numeric-value arg) 16))
-                ;; C-u C-u: pull static/ from remote to local
-                (format "rsync -avz --delete %s %s" (concat remote "static/") (concat local "static/")))
-               (t
-                ;; Any other prefix (e.g. single C-u): include static/ (push)
-                (format "rsync -avz --delete %s %s" local remote)))))
-    (compile cmd)))
+    (interactive "P")
+    (let* ((local (expand-file-name "~/Documents/blog/"))
+           (remote "jure@muffalo:~/blog/")
+           (cmd (cond
+		 ((null arg)
+                  ;; Default: exclude static/
+                  (format "rsync -avz --delete --exclude 'static/' %s %s" local remote))
+		 ((and arg (= (prefix-numeric-value arg) 16))
+                  ;; C-u C-u: pull static/ from remote to local
+                  (format "rsync -avz --delete %s %s" (concat remote "static/") (concat local "static/")))
+		 (t
+                  ;; Any other prefix (e.g. single C-u): include static/ (push)
+                  (format "rsync -avz --delete %s %s" local remote)))))
+      (compile cmd)))
 
   )
 
@@ -5918,6 +5920,45 @@ In entry mode, operates on the current entry."
 	 :keys "d"
 	 :node capture-node
 	 :props (list :finalize #'wallabag-roamify-finalizer)))))
+
+  ;; Raw import
+  (defun my/escape-html (s)
+    "Minimal HTML-escape for S."
+    (let ((s (replace-regexp-in-string "&" "&amp;" s)))
+      (setq s (replace-regexp-in-string "<" "&lt;" s))
+      (setq s (replace-regexp-in-string ">" "&gt;" s)))
+    (replace-regexp-in-string "\"" "&quot;" s))
+
+  (defun my/wallabag-buffer-to-html-string ()
+    "Return region or buffer as an HTML string.
+If in org-mode use org export; if in markdown-mode try pandoc; otherwise wrap in <pre>."
+    (let* ((beg (if (use-region-p) (region-beginning) (point-min)))
+           (end (if (use-region-p) (region-end) (point-max)))
+           (txt (buffer-substring-no-properties beg end)))
+      (cond
+       ((derived-mode-p 'org-mode)
+	(require 'ox)
+	(org-export-string-as txt 'html t nil))
+       ((derived-mode-p 'markdown-mode)
+	(if (executable-find "pandoc")
+            (with-temp-buffer
+              (insert txt)
+              (call-process-region (point-min) (point-max) "pandoc" t t nil "-f" "markdown" "-t" "html")
+              (buffer-string))
+          (concat "<pre>" (my/escape-html txt) "</pre>")))
+       (t
+	(concat "<pre>" (my/escape-html txt) "</pre>")))))
+
+  (defun my/wallabag-add-buffer-or-region-as-entry (&optional url title)
+    "Add current region (or whole buffer) to wallabag as CONTENT (HTML).
+Prompts for optional URL and TITLE; falls back to buffer name as title."
+    (interactive
+     (list (read-string "URL (optional): " "")
+           (read-string "Title: " (buffer-name))))
+    (let ((content (my/wallabag-buffer-to-html-string)))
+      (wallabag-insert-entry (unless (string= url "") url)
+                             (unless (string= title "") title)
+                             content)))
   )
 
 ;;; -> Verb for HTTP Requests
