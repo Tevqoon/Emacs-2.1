@@ -6317,6 +6317,7 @@ When pressed twice, make the sub/superscript roman."
      (?a    "\\norm"          nil        t   nil nil )
      (?h    "\\ch"          nil        t   nil nil )
      (?t "\\text" nil t nil nil)
+     ( ?l    "\\operatorname"                   "\\textsl" t   nil nil )
      (?o "\\mathring" nil t nil nil)
      ( ?C    "\\mathcal"           nil        t   nil nil )
      ( ?B    "\\mathbb"            nil t   nil nil )
@@ -6341,6 +6342,7 @@ When pressed twice, make the sub/superscript roman."
   (org-mode . org-cdlatex-mode)
   (LaTeX-mode . turn-on-cdlatex)
   )
+
 ;;; -> Programming -> LaTeX -> Math delimiters
 
 (use-package math-delimiters
