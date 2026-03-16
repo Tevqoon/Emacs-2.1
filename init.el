@@ -3944,7 +3944,7 @@ See `js/anki-derive-fields' for full hierarchy details."
   :custom
   (org-todo-keywords
    '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)"
-	       "TODO(t)" "FINISH(f)" "PROCESS(p)" "EXPLORE(e)" "IDEA(I)" "HOLD(h)"
+	       "TODO(t)" "FINISH(f)" "PROCESS(p)" "EXPLORE(e)" "IDEA(I)" "HOLD(h)" "PACT(A)"
 	       "|"
 	       "DONE(d)" "CANCELLED(c)" "FAILED(F)" "NAREDU(N)")))
 
@@ -4075,6 +4075,8 @@ See `js/anki-derive-fields' for full hierarchy details."
 				(org-agenda-overriding-header "* Up next: ")))
 		  (todo "ACTIVE" ((org-agenda-overriding-header "* Active projects: ")
 				  (org-agenda-sorting-strategy '(deadline-up))))
+		  (todo "PACT" ((org-agenda-overriding-header "* Pacts: ")
+				  (org-agenda-sorting-strategy '(deadline-up))))
 		  (tags "PRIORITY=\"B\""
 			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
 			 (org-agenda-overriding-header "* Lower-priority:")))
@@ -4098,7 +4100,7 @@ See `js/anki-derive-fields' for full hierarchy details."
 				     (air-org-skip-subtree-if-priority ?B)
                                      (air-org-skip-if-blocked)
 				     (org-agenda-skip-if nil '(scheduled deadline))
-				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISH"))
+				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISH" "PACT"))
 				     (js/org-skip-if-ancestor-blocked)))
 			       (org-agenda-overriding-header "* All normal priority tasks:")))
 		  (todo "IDEA" ((org-agenda-overriding-header "* Ideas: ")))
@@ -4231,7 +4233,239 @@ the current entry at point and move to the next line."
   ;;  ;; ("C-c C-e C-p" . js/checklist-show-filtered-content) ; Preview filtered content only
   ;;  ;; ("C-c C-e C-f" . js/checklist-export-file)         ; Export specific file
   ;; 	)
+  (use-package org-static-blog
+    :after org-roam
+    :custom
+    (org-static-blog-publish-title "My Blog")
+    (org-static-blog-publish-url "https://www.jure-smolar.com/")
+    (org-static-blog-publish-directory "~/Documents/blog/")
+    (org-static-blog-posts-directory org-roam-directory)
+    (org-static-blog-drafts-directory org-roam-directory)
+    (org-static-blog-enable-tags t)
+    (org-export-with-toc nil)
 
+    ;; This is destructive.
+    ;; (org-export-with-section-numbers nil)
+
+    (org-static-blog-use-preview t)
+    (org-static-blog-enable-tag-rss t)
+    (org-static-blog-enable-og-tags t)
+
+    (org-static-blog-page-header
+     "<meta name=\"author\" content=\"Jure Smolar\">
+<meta name=\"referrer\" content=\"no-referrer\">
+<meta name=\"viewport\" content=\"initial-scale=1,width=device-width,minimum-scale=1\">
+<link href=\"static/sakura.css\" rel=\"stylesheet\" type=\"text/css\" />
+<link href=\"static/custom.css\" rel=\"stylesheet\" type=\"text/css\" />
+<link rel=\"icon\" href=\"static/favicon.ico\">
+<script src=\"static/mathjax-config.js\"></script>
+<script id=\"MathJax-script\" async src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const btn = document.createElement('button');
+  btn.className = 'js-toggle-headings';
+  btn.textContent = 'expand all';
+
+  let allOpen = false;
+  btn.addEventListener('click', function () {
+    allOpen = !allOpen;
+    document.querySelectorAll('details').forEach(function (d) {
+      allOpen ? d.setAttribute('open', '') : d.removeAttribute('open');
+    });
+    btn.textContent = allOpen ? 'collapse all' : 'expand all';
+  });
+
+  // Insert after the first h1 on the page
+  const h1 = document.querySelector('h1');
+  if (h1) h1.insertAdjacentElement('afterend', btn);
+});
+</script>
+")
+
+    (org-static-blog-page-preamble
+     "<div style=\"display:none\">\\(\\newenvironment{bprooftree}{\\begin{prooftree}}{\\end{prooftree}}\\)</div>
+<nav class=\"header\">
+  <div class=\"header-left\">
+    <a href=\"/\">Home</a>
+    <a href=\"/archive.html\">Archive</a>
+    <a href=\"/tags.html\">Tags</a>
+    <a href=\"/rss.xml\">RSS</a>
+  </div>
+  <div class=\"header-right\">
+    <a href=\"/about.html\">About</a>
+  </div>
+</nav>")
+
+    (org-static-blog-page-postamble ;; End of <body> on every page
+     nil)
+
+    ;; This HTML code is inserted into the index page between the preamble and
+    ;;   the blog posts
+    (org-static-blog-index-front-matter ;; Between preamble and blog posts on index page
+     "Recent posts.")
+
+    :config
+    (defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page" "draft")
+      "Tags used for file management that shouldn't appear on the blog.")
+
+    ;; These tags should not be inherited to facilitate future subtree publishing
+    (add-to-list 'org-tags-exclude-from-inheritance "blog")
+    (add-to-list 'org-tags-exclude-from-inheritance "note")
+
+    ;; Override to use org-roam query instead of subfolders
+    (defun org-static-blog-get-post-filenames ()
+      "Get blog posts from org-roam :blog: tag."
+      (delete-dups
+       (mapcar #'car
+               (org-roam-db-query
+		[:select :distinct [nodes:file] :from nodes
+			 :inner-join tags :on (= tags:node-id nodes:id)
+			 :where (= tags:tag "blog")]))))
+
+    (defun org-static-blog-get-draft-filenames ()
+      "Get static pages from org-roam :page: tag."
+      (mapcar #'car
+              (org-roam-db-query
+               [:select :distinct [nodes:file] :from nodes
+			:inner-join tags :on (= tags:node-id nodes:id)
+			:where (or (= tags:tag "blog-static-page")
+				   (= tags:tag "draft"))])))
+
+    (defun org-static-blog-get-tags (post-filename)
+      "Extract tags from POST-FILENAME, excluding management tags."
+      (let ((case-fold-search t)
+            (all-tags nil))
+	(with-temp-buffer
+          (insert-file-contents post-filename)
+          (goto-char (point-min))
+          (when (or (search-forward-regexp "^\\#\\+filetags:[ ]*:\\(.*\\):$" nil t)
+                    (search-forward-regexp "^\\#\\+filetags:[ ]*\\(.+\\)$" nil t))
+            (setq all-tags (if (match-string 1)
+                               (split-string (match-string 1) ":")
+                             (split-string (match-string 1))))))
+	;; Filter out ignored tags
+	(cl-remove-if (lambda (tag)
+			(member (downcase tag) orb-ignored-tags))
+                      all-tags)))
+
+    (defun my/org-static-blog-link (link desc info)
+      "Transcode ID links to proper blog post URLs.
+Falls back to standard org-html-link for other link types."
+      (if (not (string= (org-element-property :type link) "id"))
+	  (org-html-link link desc info)
+	(let* ((id (org-element-property :path link))
+               (node (org-roam-node-from-id id))
+               (tags (and node (org-roam-node-tags node)))
+               (published-p (and tags (seq-intersection tags '("blog" "blog-static-page" "note"))))
+               (fallback-desc (if node (org-roam-node-title node) id)))
+	  (if published-p
+              (format "<a href=\"/%s\">%s</a>"
+                      (org-static-blog-get-post-public-path (org-roam-node-file node))
+                      (or desc (org-roam-node-title node)))
+            (format "<a href=\"broken-link.html\" class=\"broken-link\">%s</a>"
+                    (or desc fallback-desc))))))
+
+    ;; Redefine the backend every time before rendering
+    (defun my/setup-blog-backend (&rest _args)
+      "Ensure our custom link and tikzcd handlers are in the backend."
+      (org-export-define-derived-backend 'org-static-blog-post-bare 'html
+	:translate-alist '((template . (lambda (contents info) contents))
+			   (link . my/org-static-blog-link)
+			   )))
+
+
+    ;; Hook into the render function
+    (advice-add 'org-static-blog-render-post-content :before #'my/setup-blog-backend)
+
+    (defvar js/tikzcd-svg-directory "diagrams/"
+      "Directory for tikzcd SVG files, relative to org file.")
+
+    (defun js/tikzcd-to-svg ()
+      "Render tikzcd environment at point to SVG and insert link.
+Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
+      (interactive)
+      (save-excursion
+	(let* ((start (progn (search-backward "\\begin{tikzcd}") (point)))
+               (end (progn (search-forward "\\end{tikzcd}") (point)))
+               (tikzcd-code (buffer-substring-no-properties start end))
+               (filename (read-string "SVG filename (without extension): "))
+               (svg-file (concat filename ".svg"))
+               (temp-dir (make-temp-file "tikzcd" t))
+               (temp-tex (expand-file-name "diagram.tex" temp-dir))
+               (temp-pdf (expand-file-name "diagram.pdf" temp-dir))
+               (temp-svg (expand-file-name "diagram.svg" temp-dir))
+               (org-dir (file-name-directory (buffer-file-name)))
+               (svg-dir (expand-file-name js/tikzcd-svg-directory org-dir))
+               (output-path (expand-file-name svg-file svg-dir))
+               (relative-link (concat js/tikzcd-svg-directory svg-file)))
+
+	  ;; Create output directory if it doesn't exist
+	  (unless (file-exists-p svg-dir)
+            (make-directory svg-dir t))
+
+	  ;; Write LaTeX file
+	  (with-temp-file temp-tex
+            (insert "\\documentclass[border=2pt]{standalone}\n")
+            (insert "\\usepackage{tikz-cd}\n")
+            (insert "\\usepackage{amsmath}\n")
+            (insert "\\usepackage{amssymb}\n")
+            (insert "\n\\begin{document}\n")
+            (insert tikzcd-code)
+            (insert "\n\\end{document}\n"))
+
+	  ;; Compile to PDF in temp directory
+	  (message "Compiling LaTeX...")
+	  (shell-command (format "cd %s && pdflatex -interaction=nonstopmode diagram.tex"
+				 temp-dir))
+
+	  ;; Convert to SVG and copy to destination
+	  (if (file-exists-p temp-pdf)
+              (progn
+		(message "Converting to SVG...")
+		(shell-command (format "pdf2svg %s %s" temp-pdf temp-svg))
+
+		(if (file-exists-p temp-svg)
+                    (progn
+                      ;; Copy SVG to destination
+                      (copy-file temp-svg output-path t)
+
+                      ;; Cleanup entire temp directory
+                      (delete-directory temp-dir t)
+
+                      ;; Insert link
+                      (goto-char end)
+                      (insert (format "\n\n[[file:%s]]\n" relative-link))
+                      (message "Created %s" output-path))
+		  (progn
+                    (delete-directory temp-dir t)
+                    (error "SVG conversion failed"))))
+            (progn
+              (delete-directory temp-dir t)
+              (error "PDF compilation failed"))))))
+
+    (defun js/sync-blog (arg)
+      "Sync blog to muffalo server.
+
+No prefix: do not update the 'static/' directory on the remote.
+With C-u: include the 'static/' directory (push local static to remote).
+With C-u C-u: pull the 'static/' directory from the remote to local."
+      (interactive "P")
+      (let* ((local (expand-file-name "~/Documents/blog/"))
+             (remote "jure@muffalo:~/blog/")
+             (cmd (cond
+		   ((null arg)
+                    ;; Default: exclude static/
+                    (format "rsync -avz --delete --exclude 'static/' %s %s" local remote))
+		   ((and arg (= (prefix-numeric-value arg) 16))
+                    ;; C-u C-u: pull static/ from remote to local
+                    (format "rsync -avz --delete %s %s" (concat remote "static/") (concat local "static/")))
+		   (t
+                    ;; Any other prefix (e.g. single C-u): include static/ (push)
+                    (format "rsync -avz --delete %s %s" local remote)))))
+	(compile cmd)))
+
+    )
   :commands
   (js/checklist-export-buffer
    js/checklist-export-file
@@ -5313,6 +5547,7 @@ This is attached directly to database modification functions."
   (advice-add 'js/elfeed-entries-to-wallabag :before #'js/log-elfeed-entries)
   (advice-add 'js/elfeed-entries-to-podcastify :before #'js/log-elfeed-entries)
   (advice-add 'js/elfeed-entries-to-deluge :before #'js/log-elfeed-entries)
+  ;; (advice-add 'open-downloaded-youtube-in-iina :before #'js/log-elfeed-entries)
 
   (defun js/elfeed-search-logger (entry)
     "Wrapper for elfeed entry logger for elfeed-search-show-entry"
@@ -5533,6 +5768,40 @@ If the file doesn't exist, removes the +downloaded tag and skips it."
         ;; Use the constructed sentinel for each entry
         (set-process-sentinel process (eval (create-single-entry-sentinel entry base-filename)))))
     (message "Downloading selected YouTube videos..."))
+
+  (defun js/elfeed-delete-downloaded-videos ()
+    "Delete downloaded video files for selected entries from the filesystem.
+Works on the region if active, otherwise the entry at point.
+Entries without the `downloaded' tag are silently skipped.
+If none of the selected entries are downloaded, a message is shown."
+    (interactive)
+    (let* ((entries (cond
+                     ((derived-mode-p 'elfeed-show-mode)
+                      (list elfeed-show-entry))
+                     ((derived-mode-p 'elfeed-search-mode)
+                      (elfeed-search-selected))
+                     (t (user-error "Not in an Elfeed buffer"))))
+           (downloaded (seq-filter (lambda (e)
+                                     (member 'downloaded (elfeed-entry-tags e)))
+                                   entries)))
+      (if (null downloaded)
+          (message "No downloaded items found in selection.")
+	(when (yes-or-no-p (format "Delete %d downloaded video file(s)? "
+                                   (length downloaded)))
+          (dolist (entry downloaded)
+            (let* ((base-filename (elfeed-meta entry :filename)))
+              (if (null base-filename)
+                  (message "Warning: entry \"%s\" tagged `downloaded' but has no :filename metadata; skipping."
+                           (elfeed-entry-title entry))
+		(let ((full-path (expand-file-name base-filename yt-dlp-folder)))
+                  (if (not (file-exists-p full-path))
+                      (message "Warning: file not found: %s; skipping." full-path)
+                    (delete-file full-path)
+                    (elfeed-untag entry 'downloaded)
+                    (elfeed-meta--put entry :filename nil)
+                    (elfeed-search-update-entry entry))))))
+          (message "Deleted %d video file(s)." (length downloaded))
+          (elfeed-db-save)))))
 
   (defun elfeed-filter-downloaded ()
     (interactive)
