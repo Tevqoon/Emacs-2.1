@@ -4076,7 +4076,7 @@ See `js/anki-derive-fields' for full hierarchy details."
 		  (todo "ACTIVE" ((org-agenda-overriding-header "* Active projects: ")
 				  (org-agenda-sorting-strategy '(deadline-up))))
 		  (todo "PACT" ((org-agenda-overriding-header "* Pacts: ")
-				  (org-agenda-sorting-strategy '(deadline-up))))
+				(org-agenda-sorting-strategy '(deadline-up))))
 		  (tags "PRIORITY=\"B\""
 			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
 			 (org-agenda-overriding-header "* Lower-priority:")))
@@ -6504,7 +6504,8 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
   (texmathp-tex-commands
    '(("prooftree" env-on)
      ("tikzcd" env-on)
-     ("logicproof" env-on)))
+     ("logicproof" env-on)
+     ("forest" env-on)))
 
   :config
   (setq-default TeX-master nil)
