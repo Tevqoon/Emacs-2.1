@@ -144,6 +144,10 @@ are defining or executing a macro."
   (setq auto-save-visited-interval 30)  ; Save every 30 seconds
   )
 
+(use-package gcmh
+  :ensure t
+  :init
+  (gcmh-mode 1))
 
 (use-package benchmark-init
   :config
