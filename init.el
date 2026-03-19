@@ -3694,7 +3694,7 @@ See `js/anki-derive-fields' for full hierarchy details."
     "Push all flashcard files (via org-roam tag index) to Anki."
     (interactive)
     (anki-flashcard-clear-error-buffer)
-    (let* ((files (org-flashcard-files))
+    (let* ((files (org-flashcards-files))
            (total (length files))
            (success 0))
       (dolist (file files)
