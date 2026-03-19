@@ -3542,9 +3542,8 @@ Each function is called with two arguments: the tag and the buffer.")
   :if (not (eq system-type 'android))
   :bind
   (:map org-mode-map
-	("C-c n p" . my/anki-flashcard-push-current-buffer)
-	("C-c n n p" . my/anki-flashcard-push-all)
-	("C-c n q" . anki-flashcard-queue-display))
+        ("C-c n p" . my/anki-flashcard-push-current-buffer)
+        ("C-c n n p" . my/anki-flashcard-push-all))
   :after org
   :defer nil
   :vc (:url "https://github.com/anki-editor/anki-editor" :rev :newest)
@@ -3556,62 +3555,48 @@ Each function is called with two arguments: the tag and the buffer.")
   (defvar anki-tag-list '()
     "Keeps track of the most recently used flashcard tags.")
 
-  ;; Ensure it's saved on exit
   (add-to-list 'closing-variables 'anki-tag-list)
 
   (defun anki/my/after-snippet-tag-handler ()
     "Select or create an Anki tag, prioritizing recent tags."
     (let* ((tag (completing-read "Enter tag: "
-				 (delete-dups (cons "" anki-tag-list))
-				 nil
-				 nil
-				 (car anki-tag-list))))
+                                 (delete-dups (cons "" anki-tag-list))
+                                 nil nil
+                                 (car anki-tag-list))))
       (when (not (string-empty-p tag))
-	(setq anki-tag-list (delete nil (cons tag (remove tag anki-tag-list)))))
+        (setq anki-tag-list (delete nil (cons tag (remove tag anki-tag-list)))))
       tag))
 
   (tags/make-db-searcher "flashcards")
 
   ;;; -> Org mode -> Anki -> Overrides
 
-  ;; Define environments that should always use Anki builtin LaTeX
   (defcustom anki-editor-builtin-latex-environments '("tikzcd" "bprooftree" "prooftree" "logicproof")
     "LaTeX environments that will always be translated using Anki's built-in LaTeX.
 This is useful for environments not supported by MathJax."
     :type '(repeat string))
 
-  ;; Helper function to detect if code contains a builtin-only environment
   (defun anki-editor--contains-builtin-env (latex-code)
     "Check if LATEX-CODE contains any environment that should use builtin LaTeX."
     (cl-some (lambda (env)
-	       (string-match-p (format "\\\\begin{%s}" env) latex-code))
+               (string-match-p (format "\\\\begin{%s}" env) latex-code))
              anki-editor-builtin-latex-environments))
 
-  ;; Override the ox-latex function to handle special environments
   (defun anki-editor--ox-latex (latex _contents _info)
     "Transcode LATEX from Org to HTML.
 CONTENTS is nil. INFO is a plist holding contextual information."
     (let* ((code (org-remove-indentation (org-element-property :value latex)))
            (original-style anki-editor-latex-style)
            (contains-special-env (anki-editor--contains-builtin-env code)))
-
-      ;; Temporarily override style if needed
       (when (and (eq original-style 'mathjax) contains-special-env)
-	(setq anki-editor-latex-style 'builtin))
-
-      ;; Process the LaTeX code
+        (setq anki-editor-latex-style 'builtin))
       (setq code (cl-ecase (org-element-type latex)
                    (latex-fragment (anki-editor--translate-latex-fragment code))
                    (latex-environment (anki-editor--translate-latex-env code))))
-
-      ;; Restore original style
       (setq anki-editor-latex-style original-style)
-
-      ;; Return processed code
       (if anki-editor-break-consecutive-braces-in-latex
           (replace-regexp-in-string "}}" "} } " code)
-	code)))
-
+        code)))
 
   (require 'js-anki-body-converter
            (expand-file-name "lisp/js-anki-body-converter.el" user-emacs-directory))
@@ -3637,13 +3622,9 @@ See `js/anki-derive-fields' for full hierarchy details."
                                          :test #'string=))
            (heading   (substring-no-properties (org-get-heading t t t t)))
            (body      (anki-editor--note-contents-before-subheading))
-           ;; Explicit subheading overrides — populated by the loop below
            (explicit-front nil)
            (explicit-hint  nil)
            (explicit-back  nil))
-
-      ;; Scan immediate children for Front / Hint / Back override subheadings.
-      ;; Any other subheadings are silently ignored.
       (save-excursion
         (when (org-goto-first-child)
           (cl-loop
@@ -3659,18 +3640,14 @@ See `js/anki-derive-fields' for full hierarchy details."
            when (string= subheading "Hint")  do (setq explicit-hint  content)
            when (string= subheading "Back")  do (setq explicit-back  content)
            while (org-get-next-sibling))))
-
-      ;; Derive fields via block-aware converter
       (let* ((derived (js/anki-derive-fields
                        heading body explicit-front explicit-hint explicit-back))
              (fields (sort (list (cons "Front" (plist-get derived :front))
                                  (cons "Hint"  (plist-get derived :hint))
                                  (cons "Back"  (plist-get derived :back)))
                            (lambda (a b) (string< (car a) (car b))))))
-
         (unless deck      (user-error "Missing deck"))
         (unless note-type (user-error "Missing note type"))
-
         (make-anki-editor-note :id     note-id
                                :model  note-type
                                :deck   deck
@@ -3679,66 +3656,11 @@ See `js/anki-derive-fields' for full hierarchy details."
                                :hash   hash
                                :marker (point-marker)))))
 
-  ;;; -> Org mode -> Anki -> Flashcard Queue System
-  (defvar anki-flashcard-queue-file
-    (expand-file-name "anki-flashcard-queue.el"
-		      (expand-file-name "lisp" user-emacs-directory))
-    "File to save the flashcard queue between Emacs sessions.")
-
-  (defvar anki-flashcard-queue nil
-    "List of files with flashcard changes that need to be pushed to Anki.")
+  ;;; -> Org mode -> Anki -> Push functions
 
   (defvar anki-flashcard-error-buffer "*Anki Flashcard Errors*"
     "Buffer name for displaying Anki flashcard push errors.")
 
-  ;; Path conversion functions
-  (defun anki-flashcard-make-relative-path (file)
-    "Convert FILE to a path relative to `org-roam-directory`."
-    (file-relative-name (expand-file-name file) org-roam-directory))
-
-  (defun anki-flashcard-make-absolute-path (file)
-    "Convert relative FILE to absolute path from `org-roam-directory`."
-    (expand-file-name file org-roam-directory))
-
-  ;; Queue management functions
-  (defun anki-flashcard-queue-load ()
-    "Load the flashcard queue from file."
-    (when (file-exists-p anki-flashcard-queue-file)
-      (load-file anki-flashcard-queue-file)))
-
-  (defun anki-flashcard-queue-save ()
-    "Save the flashcard queue to file."
-    ;; Create directory if it doesn't exist
-    (let ((dir (file-name-directory anki-flashcard-queue-file)))
-      (unless (file-exists-p dir)
-	(make-directory dir t)))
-
-    (with-temp-file anki-flashcard-queue-file
-      (insert ";; Anki flashcard queue - DO NOT EDIT MANUALLY\n")
-      (insert ";; This file is auto-generated by Emacs\n\n")
-      (insert "(setq anki-flashcard-queue\n")
-      (insert "  '(\n")
-      (dolist (file anki-flashcard-queue)
-	(insert (format "    %S\n" file)))
-      (insert "  ))\n")))
-
-  (defun anki-flashcard-queue-add (file)
-    "Add FILE to flashcard queue if not already present."
-    (anki-flashcard-queue-load) ;; Ensure we have the latest queue
-    (let ((rel-path (anki-flashcard-make-relative-path file)))
-      (unless (member rel-path anki-flashcard-queue)
-	(push rel-path anki-flashcard-queue)
-	(anki-flashcard-queue-save))))
-
-  (defun anki-flashcard-queue-remove (file)
-    "Remove FILE from flashcard queue."
-    (anki-flashcard-queue-load) ;; Ensure we have the latest queue
-    (let ((rel-path (anki-flashcard-make-relative-path file)))
-      (when (member rel-path anki-flashcard-queue)
-	(setq anki-flashcard-queue (delete rel-path anki-flashcard-queue))
-	(anki-flashcard-queue-save))))
-
-  ;; Error handling functions
   (defun anki-flashcard-clear-error-buffer ()
     "Clear the error buffer or create it if it doesn't exist."
     (with-current-buffer (get-buffer-create anki-flashcard-error-buffer)
@@ -3751,194 +3673,42 @@ See `js/anki-derive-fields' for full hierarchy details."
       (goto-char (point-max))
       (insert (format "ERROR pushing %s:\n%s\n\n" file error-msg))))
 
-  ;; Save hook function for flashcard buffers
-  (defun anki-flashcard-save-hook ()
-    "Function to run on save for buffers with flashcards tag."
-    (when (buffer-file-name)
-      (anki-flashcard-queue-add (buffer-file-name))
-      (message "Added to Anki flashcard queue: %s" (buffer-file-name))))
-
-  (defun anki-flashcard-setup-buffer ()
-    "Set up the current buffer for flashcards if it has the 'flashcards' tag."
-    (when (and (buffer-file-name)
-	       (member "flashcards" (vulpea-buffer-tags-get)))
-      ;; Add to local hook
-      (add-hook 'after-save-hook #'anki-flashcard-save-hook nil t)))
-
-  ;; Add this function to org-mode-hook
-  (add-hook 'org-mode-hook #'anki-flashcard-setup-buffer)
-
-  ;; Hook functions for tag changes
-  (defun anki-flashcard-tag-added (tag buffer)
-    "Add save hook when TAG 'flashcards' is added to BUFFER."
-    (when (string= tag "flashcards")
-      (with-current-buffer buffer
-	;; Add to local hook
-	(add-hook 'after-save-hook #'anki-flashcard-save-hook nil t)
-	;; Add to queue if file already exists
-	(when (buffer-file-name)
-          (anki-flashcard-queue-add (buffer-file-name))))))
-
-  (defun anki-flashcard-tag-removed (tag buffer)
-    "Remove save hook when TAG 'flashcards' is removed from BUFFER."
-    (when (string= tag "flashcards")
-      (with-current-buffer buffer
-	;; Remove the local hook
-	(remove-hook 'after-save-hook #'anki-flashcard-save-hook t))))
-
-  ;; Pushing functions
-  (defun my/anki-flashcard-push-file (file)
-    "Push FILE to Anki and handle errors. Returns t on success, nil on failure."
-    (let ((abs-path (anki-flashcard-make-absolute-path file)))
-      (if (file-exists-p abs-path)
-          (condition-case err
-	      (progn
-		;; Load the file
-		(with-current-buffer (find-file-noselect abs-path)
-                  (message "Pushing %s to Anki..." abs-path)
-                  (save-excursion
-                    (anki-editor-push-notes 'file))
-                  t))
-            (error
-             (anki-flashcard-report-error file (error-message-string err))
-             (message "Error pushing %s to Anki (see *Anki Flashcard Errors*)" abs-path)
-             nil))
-	(progn
-          (anki-flashcard-report-error file "File does not exist")
-          (message "Error pushing to Anki: File %s does not exist" abs-path)
-          nil))))
-
   (defun my/anki-flashcard-push-current-buffer ()
-    "Push current buffer to Anki if it's a flashcard file."
+    "Push current buffer's flashcards to Anki."
     (interactive)
     (if (buffer-file-name)
-	(progn
-          (anki-flashcard-queue-load)
+        (progn
           (anki-flashcard-clear-error-buffer)
-          (save-buffer) ;; Ensure buffer is saved
-
-          (if (my/anki-flashcard-push-file (anki-flashcard-make-relative-path (buffer-file-name)))
-	      (progn
-		(anki-flashcard-queue-remove (buffer-file-name))
-		(message "Successfully pushed %s to Anki" (buffer-file-name)))
-            (message "Failed to push %s to Anki" (buffer-file-name))))
+          (save-buffer)
+          (condition-case err
+              (progn
+                (save-excursion (anki-editor-push-notes 'file))
+                (message "Successfully pushed %s to Anki" (buffer-file-name)))
+            (error
+             (anki-flashcard-report-error (buffer-file-name) (error-message-string err))
+             (message "Failed to push %s to Anki — see %s"
+                      (buffer-file-name) anki-flashcard-error-buffer))))
       (message "Buffer is not visiting a file")))
 
   (defun my/anki-flashcard-push-all ()
-    "Push all files in the flashcard queue to Anki."
+    "Push all flashcard files (via org-roam tag index) to Anki."
     (interactive)
-    (anki-flashcard-queue-load)
     (anki-flashcard-clear-error-buffer)
-
-    (if anki-flashcard-queue
-	(let ((success-count 0)
-	      (error-count 0)
-	      (total (length anki-flashcard-queue))
-	      (queue-copy (copy-sequence anki-flashcard-queue)))
-
-          ;; Process each file and track results
-          (dolist (file queue-copy)
-            (if (my/anki-flashcard-push-file file)
-		(progn
-                  (setq success-count (1+ success-count))
-                  (setq anki-flashcard-queue (delete file anki-flashcard-queue)))
-	      (setq error-count (1+ error-count))))
-
-          ;; Save updated queue
-          (anki-flashcard-queue-save)
-
-          ;; Provide feedback
-          (if (> error-count 0)
-	      (progn
-		(message "Pushed %d/%d files to Anki with %d errors. See *Anki Flashcard Errors*"
-			 success-count total error-count)
-		(display-buffer anki-flashcard-error-buffer))
-            (message "Successfully pushed all %d files to Anki" total)))
-      (message "No files in Anki flashcard queue")))
-
-  ;; Define keymap first, before the mode that uses it
-  (defvar anki-flashcard-queue-mode-map
-    (let ((map (make-sparse-keymap)))
-      (define-key map (kbd "g") #'anki-flashcard-queue-refresh)
-      (define-key map (kbd "p") #'my/anki-flashcard-push-all)
-      (define-key map (kbd "c") #'anki-flashcard-queue-clear)
-      (define-key map (kbd "q") #'quit-window)
-      map)
-    "Keymap for `anki-flashcard-queue-mode'.")
-
-  ;; Now define the mode with explicit keymap assignment
-  (define-derived-mode anki-flashcard-queue-mode special-mode "Anki Queue"
-    "Major mode for displaying the Anki flashcard queue."
-    :group 'anki-editor
-    (use-local-map anki-flashcard-queue-mode-map) ;; Explicitly set the keymap
-    (setq buffer-read-only t)
-    (buffer-disable-undo))
-
-  (defun anki-flashcard-queue-refresh ()
-    "Refresh the Anki flashcard queue display."
-    (interactive)
-    (let ((buffer (get-buffer "*Anki Flashcard Queue*")))
-      (when buffer
-	(with-current-buffer buffer
-          (let ((inhibit-read-only t)
-		(pos (point)))
-            (erase-buffer)
-            (anki-flashcard-queue-load)
-            (insert "Files with flashcard changes pending to be pushed to Anki:\n\n")
-            (if anki-flashcard-queue
-		(progn
-                  (dolist (file anki-flashcard-queue)
-                    (let ((abs-path (anki-flashcard-make-absolute-path file)))
-		      (insert (format "- %s%s\n" file
-				      (if (file-exists-p abs-path)
-                                          ""
-					" (FILE MISSING)")))))
-                  (insert "\n\nCommands:\n")
-                  (insert "  g - Refresh this display\n")
-                  (insert "  p - Push all files to Anki\n")
-                  (insert "  c - Clear the queue\n")
-                  (insert "  q - Quit this window"))
-	      (insert "No files in queue.\n"))
-            (goto-char (min pos (point-max))))))))
-
-  (defun anki-flashcard-queue-display ()
-    "Display the current flashcard queue with refresh capability."
-    (interactive)
-    (let ((buffer (get-buffer-create "*Anki Flashcard Queue*")))
-      (with-current-buffer buffer
-	(let ((inhibit-read-only t))
-          (erase-buffer)
-          (anki-flashcard-queue-mode) ;; This applies the keymap
-          (anki-flashcard-queue-refresh)
-          (display-buffer buffer)))))
-
-  (defun anki-flashcard-queue-clear ()
-    "Clear the flashcard queue."
-    (interactive)
-    (anki-flashcard-queue-load)
-    (when (yes-or-no-p "Clear the entire Anki flashcard queue? ")
-      (setq anki-flashcard-queue nil)
-      (anki-flashcard-queue-save)
-      (message "Anki flashcard queue cleared")))
-
-  ;; Initialize existing flashcard buffers
-  (defun anki-flashcard-setup-existing-buffers ()
-    "Set up save hooks for existing buffers with flashcards tag."
-    (dolist (buffer (buffer-list))
-      (with-current-buffer buffer
-	(when (and (buffer-file-name)
-                   (member "flashcards" (vulpea-buffer-tags-get)))
-          (add-hook 'after-save-hook #'anki-flashcard-save-hook nil t)))))
-
-  ;; Initialize
-  (anki-flashcard-queue-load)
-  (anki-flashcard-setup-existing-buffers)
-
-  ;; Hook into vulpea tag system
-  (add-hook 'tags/tag-added-hook #'anki-flashcard-tag-added)
-  (add-hook 'tags/tag-removed-hook #'anki-flashcard-tag-removed)
-
-  )
+    (let* ((files (org-flashcard-files))
+           (total (length files))
+           (success 0))
+      (dolist (file files)
+        (condition-case err
+            (with-current-buffer (find-file-noselect file)
+              (save-excursion (anki-editor-push-notes 'file))
+              (cl-incf success))
+          (error (anki-flashcard-report-error file (error-message-string err)))))
+      (if (< success total)
+          (progn
+            (message "Pushed %d/%d, %d errors — see %s"
+                     success total (- total success) anki-flashcard-error-buffer)
+            (display-buffer anki-flashcard-error-buffer))
+        (message "Pushed all %d flashcard files" total)))))
 
 ;;; -> Org mode -> Agenda
 
