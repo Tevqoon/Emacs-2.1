@@ -6548,14 +6548,151 @@ When pressed twice, make the sub/superscript roman."
           ;; Not in math mode - just insert raw character
           (insert (event-basic-type last-command-event))))))
 
+  (defun cdlatex-tab ()
+    "Extended cdlatex-tab that also stops inside non-empty brace groups.
+
+This function is intended to do many cursor movements.
+It is bound to the tab key since tab does nothing useful in a TeX file.
+
+This function first calls all functions in `cdlatex-tab-hook', which see.
+
+If none of those functions returns t, the command  first tries to expand
+any command keyword before point.
+
+If there is none, it cleans up short subscripts and superscripts at point.
+I.e. it changes a^{2} into a^2, since this is more readable.  This feature
+can be disabled by setting `cdlatex-simplify-sub-super-scripts' to nil.
+
+Then it jumps to the next point in a LaTeX text where one would reasonably
+expect that more input can be put in.
+To do that, the cursor is moved according to the following rules:
+
+The cursor stops...
+- before closing brackets if `preceding-char' is any of -({[]})
+- after  closing brackets, but not if `following-char' is any of ({[_^
+- just after $, if the cursor was before that $.
+- at end of non-empty lines
+- at the beginning of empty lines
+- before a SPACE at beginning of line
+- after first of several SPACE
+
+Sounds strange?  Try it out!"
+    (interactive)
+    (catch 'stop
+
+      ;; try hook stuff
+      (let ((funcs cdlatex-tab-hook))
+	(while funcs (if (funcall (pop funcs)) (throw 'stop t))))
+
+      ;; try command expansion
+      (let ((pos (point)) exp math-mode)
+	(backward-word 1)
+	(while (eq (following-char) ?$) (forward-char 1))
+	(setq exp (buffer-substring-no-properties (point) pos))
+	(setq exp (assoc exp cdlatex-command-alist-comb))
+	(when exp
+          (setq math-mode (cdlatex--texmathp))
+          (when (or (and (not math-mode) (nth 5 exp))
+                    (and math-mode (nth 6 exp)))
+            (delete-char (- pos (point)))
+            (insert (nth 2 exp))
+            (and (nth 3 exp)
+		 (if (nth 4 exp)
+                     (apply (nth 3 exp) (nth 4 exp))
+                   (funcall (nth 3 exp))))
+            (throw 'stop t)))
+	(goto-char pos))
+
+      ;; Check for simplification of sub and superscripts
+      (cond
+       ((looking-at "}\\|\\]\\|)")
+	(forward-char -3)
+	(if (and (looking-at "[_^]{[-+0-9a-zA-Z]}")
+		 cdlatex-simplify-sub-super-scripts)
+            (progn (forward-char 1)
+                   (delete-char 1)
+                   (forward-char 1)
+                   (delete-char 1))
+          (forward-char 4))
+	(if (looking-at "[^_^({[]")
+            (throw 'stop t)))
+       ((= (following-char) ?$)
+	(while (= (following-char) ?$) (forward-char 1))
+	(throw 'stop t))
+       ((= (following-char) ?\ )
+	(forward-char 1)
+	(re-search-forward "[^ ]")
+	(if (/= (preceding-char) ?\n) (forward-char -1)))
+       (t
+	(forward-char 1)))
+
+      ;; move to next possible stopping site and check out the place
+      (while (re-search-forward "[ )}{\n]\\|\\]" (point-max) t)  ; added {
+	(forward-char -1)
+	(cond
+	 ((= (following-char) ?\ )
+          (if (not (bolp)) (forward-char 1)) (throw 'stop t))
+	 ((= (following-char) ?\n)
+          (if (and (bolp) (not (eobp)))
+              (throw 'stop t)
+            (if (equal "\\\\" (buffer-substring-no-properties
+                               (- (point) 2) (point)))
+		(forward-char 1)
+              (throw 'stop t))))
+	 ((= (following-char) ?{)                ; new case
+          (forward-char 1)                       ; step inside {
+          (unless (= (following-char) ?})        ; skip empty {}
+            (throw 'stop t))
+          (forward-char -1))                     ; was empty, back up and continue
+	 (t
+          (if (or (= (char-syntax (preceding-char)) ?\()
+                  (= (char-syntax (preceding-char)) ?\))
+                  (= (preceding-char) ?-))
+              (throw 'stop t)
+            (forward-char 1)
+            (if (looking-at "[^_^({[]")
+		(throw 'stop t))))))))
+
   (defun js/yas-cdlatex-tab ()
     "Try yasnippet expansion first, then fall back to cdlatex-tab."
     (interactive)
     (unless (yas-expand)
-      (cdlatex-tab)))
+      (js/cdlatex-tab)))
 
   ;; Replace cdlatex's TAB binding with our integrated version
   (define-key cdlatex-mode-map (kbd "TAB") #'js/yas-cdlatex-tab)
+
+  ;; cdlatex backtab support
+  (defvar-local js/cdlatex-tab-history nil
+    "Stack of positions before cdlatex-tab jumps, for backtab navigation.")
+
+  (defun js/cdlatex-tab-record-and-jump ()
+    "Push current position, then run cdlatex-tab."
+    (push (point-marker) js/cdlatex-tab-history))
+
+  (advice-add 'cdlatex-tab :before #'js/cdlatex-tab-record-and-jump)
+
+  (defun js/cdlatex-backtab ()
+    "Jump to the previous position visited by cdlatex-tab."
+    (interactive)
+    (if js/cdlatex-tab-history
+	(let ((marker (pop js/cdlatex-tab-history)))
+          (goto-char marker)
+          (set-marker marker nil))
+      (message "No previous cdlatex-tab position")))
+
+  (defun js/org-cdlatex-backtab ()
+    "In a LaTeX fragment with history, go back. Otherwise, org-shifttab."
+    (interactive)
+    (if (and org-cdlatex-mode
+             (org-inside-LaTeX-fragment-p)
+             js/cdlatex-tab-history)
+	(js/cdlatex-backtab)
+      (org-shifttab)))
+
+  (define-key org-cdlatex-mode-map (kbd "<backtab>") #'js/org-cdlatex-backtab)
+  ;; Also bind in cdlatex-mode-map for .tex buffers if you want parity:
+  (define-key cdlatex-mode-map (kbd "<backtab>") #'js/cdlatex-backtab)
 
 
   ;; Bind the custom function to ^ and _
@@ -6634,7 +6771,7 @@ When pressed twice, make the sub/superscript roman."
      (?t "\\text" nil t nil nil)
      ( ?l    "\\operatorname"                   "\\textsl" t   nil nil )
      (?o "\\mathring" nil t nil nil)
-     ( ?C    "\\mathcal"           nil        t   nil nil )
+     ( ?C    "\\Class"           nil        t   nil nil )
      ( ?B    "\\mathbb"            nil t   nil nil )
      ))
 
