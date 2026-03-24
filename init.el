@@ -328,6 +328,10 @@ between Emacs sessions.")
   (LaTeX-mode . js/fix-angle-bracket-syntax)
   (org-mode . js/fix-angle-bracket-syntax))
 
+(use-package surround
+  :ensure t
+  :bind-keymap ("M-'" . surround-keymap))
+
 (use-package rainbow-delimiters
   :defer t
   :hook prog-mode)
