@@ -50,6 +50,7 @@
 	forward-whitespace
 	god-local-mode
 	god-mode-self-insert
+	gptel-rewrite
 	haskell-indentation-common-electric-command
 	haskell-indentation-newline-and-indent
 	haskell-interactive-mode-return
@@ -82,6 +83,7 @@
 	org-force-self-insert
 	org-id-get-create
 	org-kill-line
+	org-mark-subtree
 	org-metadown
 	org-metaleft
 	org-metaright

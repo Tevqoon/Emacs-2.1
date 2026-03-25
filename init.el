@@ -3947,34 +3947,27 @@ the current entry at point and move to the next line."
 
   )
 
-;; js-triage-session.el (no hydra required)
-;; TODO: This should be integrated into the actual package - a triage session
-;; (defun js/session-process ()
-;;   (interactive)
-;;   (js/triage-session-start "PROCESS" "process" #'js/triage--due-p)
-;;   (use-local-map js/triage-map))
-
 ;; In init.el with use-package:
 (use-package js-triage-session
   :after org-agenda
   :load-path "~/.emacs.d/lisp"
   :bind
   (("C-c n j b p" . js/session-process)
-   ("C-c n j b k" . js/session-keyword)
+   ("C-c n j b P" . js/session-project)
+   ;; TODO: Keywords don't work since they have the keybind
+   ;; ("C-c n j b k" . js/session-keyword)
    ("C-c n j b r" . js/session-review)
    ("C-c n j b a" . js/session-all)
 
-   ("C-c n j n" . js/triage-goto-next)
+   ("C-c n j n" . js/triage-next)
+   ("C-c n j p" . js/triage-goto-prev)
    ("C-c n j d" . js/triage-done)
    ("C-c n j c" . js/triage-cancel)
    ("C-c n j s" . js/triage-snooze)
    ("C-c n j S" . js/triage-manual)
-
-   ("C-c n j t" . org-todo)
-   ("C-c n j r" . org-roam-refile)
-   ("C-c n j R" . js/roamify-url-at-point)
-   ("C-c n j o" . open-urls-at-point-or-region)
    ("C-c n j q" . js/triage-quit)
+   ("C-c n j ." . js/triage-goto-current)
+   ("C-c n j ," . js/triage-status)
 
    ("C-c n j j" . js/triage-hydra/body)
    )
@@ -3992,6 +3985,7 @@ _s_nooze
 _S_manual
 "
     ("." js/triage-goto-current)
+    ("," js/triage-status)
     ("n" js/triage-next)
     ("p" js/triage-goto-prev)
     ("d" js/triage-done)

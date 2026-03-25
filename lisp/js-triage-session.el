@@ -202,6 +202,12 @@ Returns a list of live markers."
   (interactive)
   (js/triage-session-start "PROCESS" "process" #'js/triage--due-p))
 
+(defun js/session-project ()
+  "Triage unscheduled (due) PROJECT and ACTIVE items across all agenda files."
+  (interactive)
+  (js/triage-session-start
+   '("PROJECT" "ACTIVE") "Projects" #'js/triage--due-p))
+
 (defun js/session-keyword (keyword)
   "Triage all items with a specific TODO KEYWORD.
 When called interactively, prompts for the keyword."
