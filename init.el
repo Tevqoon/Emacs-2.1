@@ -3256,7 +3256,7 @@ you can catch it with `condition-case'."
   :config
   ;; Your custom filtering logic
   (defun js/org-node-not-archived-p (node)
-    "Return non-nil if NODE should be shown (not archived)."
+    "Return t if NODE should be shown (not archived)."
     (not (member "ARCHIVE" (org-mem-tags node))))
 
   (defun js/org-node-find (&optional arg)
@@ -3736,8 +3736,8 @@ See `js/anki-derive-fields' for full hierarchy details."
   (org-agenda-skip-deadline-if-done t)
   (org-agenda-skip-timestamp-if-done t)
   (org-agenda-todo-list-sublevels t)
-  (org-agenda-dim-blocked-tasks t)
   (org-enforce-todo-dependencies t)
+  (org-agenda-dim-blocked-tasks t)
   (org-agenda-window-setup 'current-window)
   (org-agenda-sticky t)
   (org-priority-default ?C)
@@ -3816,7 +3816,18 @@ See `js/anki-derive-fields' for full hierarchy details."
 	  next-headline
 	nil)))
 
-  (defvar js/org-ancestor-block-states '("HOLD" "CANCELLED" "FAILED" "PROCESS" "EXPLORE")
+  ;; I'll help you complete this function. Let me first check the Emacs org-mode functions for skipping and scheduling:Now let me look at the relevant functions to understand how to implement this:Now I understand. Here's the completed function:
+
+  (defun js/org-skip-if-future ()
+    "Skip the current task if it is scheduled in the future."
+    (let ((next-headline (save-excursion
+                           (or (outline-next-heading) (point-max))))
+          (scheduled (org-get-scheduled-time (point))))
+      (if (and scheduled (> (time-to-seconds scheduled) (time-to-seconds (current-time))))
+          next-headline
+	nil)))
+
+  (defvar js/org-ancestor-block-states '("HOLD" "DONE" "CANCELLED" "FAILED" "PROCESS" "EXPLORE")
     "TODO states that hide their descendants from agenda views.")
 
   (defun js/org-skip-if-ancestor-blocked (&optional extra-states)
@@ -3870,18 +3881,19 @@ EXTRA-STATES is an optional list of additional states to block on."
 		  ;; (agenda "" ((org-agenda-span 'week)))
 		  (agenda "" ((org-agenda-span 'week)
 			      (org-agenda-skip-function
-			       '(org-agenda-skip-entry-if 'todo 'done))))
+			       '(or (org-agenda-skip-entry-if 'todo 'done)
+				    (org-agenda-skip-entry-if 'todo '("PROCESS"))))))
 		  (todo "FINISH" ((org-agenda-overriding-header "* Items to finish up:  ")
 				  (org-agenda-sorting-strategy '(scheduled-up category-up alpha-up))))
 		  (todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")
 				   (org-agenda-sorting-strategy '(scheduled-up category-up alpha-up))
+				   (org-agenda-skip-function '(or (js/org-skip-if-future)))
 				   ))
 		  (alltodo "" ((org-agenda-skip-function
 				'(or (air-org-skip-subtree-if-habit)
 				     (air-org-skip-subtree-if-priority ?A)
 				     (air-org-skip-subtree-if-priority ?B)
                                      (air-org-skip-if-blocked)
-				     (org-agenda-skip-if nil '(scheduled deadline))
 				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISH" "PACT"))
 				     (js/org-skip-if-ancestor-blocked '("ACTIVE" "PROJECT"))
 				     ))
@@ -3936,19 +3948,61 @@ the current entry at point and move to the next line."
   )
 
 ;; js-triage-session.el (no hydra required)
-(defun js/session-process ()
-  (interactive)
-  (js/triage-session-start "PROCESS" "process" #'js/triage--due-p)
-  (use-local-map js/triage-map))
+;; TODO: This should be integrated into the actual package - a triage session
+;; (defun js/session-process ()
+;;   (interactive)
+;;   (js/triage-session-start "PROCESS" "process" #'js/triage--due-p)
+;;   (use-local-map js/triage-map))
 
 ;; In init.el with use-package:
 (use-package js-triage-session
+  :after org-agenda
   :load-path "~/.emacs.d/lisp"
   :bind
-  (("C-c n j p" . js/session-process)
-   ("C-c n j k" . js/session-keyword)
-   ("C-c n j r" . js/session-review)
-   ("C-c n j a" . js/session-all))
+  (("C-c n j b p" . js/session-process)
+   ("C-c n j b k" . js/session-keyword)
+   ("C-c n j b r" . js/session-review)
+   ("C-c n j b a" . js/session-all)
+
+   ("C-c n j n" . js/triage-goto-next)
+   ("C-c n j d" . js/triage-done)
+   ("C-c n j c" . js/triage-cancel)
+   ("C-c n j s" . js/triage-snooze)
+   ("C-c n j S" . js/triage-manual)
+
+   ("C-c n j t" . org-todo)
+   ("C-c n j r" . org-roam-refile)
+   ("C-c n j R" . js/roamify-url-at-point)
+   ("C-c n j o" . open-urls-at-point-or-region)
+   ("C-c n j q" . js/triage-quit)
+
+   ("C-c n j j" . js/triage-hydra/body)
+   )
+  :config
+  (defhydra js/triage-hydra
+    (:color pink :hint nil)
+    "
+^Move^              ^Action^             ^Meta^
+^^-----------------^^------------------^^-----------
+_n_ext              _t_odo               _q_uit
+_p_rev              _o_pen URLs          _._ current
+_d_one              _r_oam refile
+_c_ancel            _R_oamify URL
+_s_nooze
+_S_manual
+"
+    ("." js/triage-goto-current)
+    ("n" js/triage-next)
+    ("p" js/triage-goto-prev)
+    ("d" js/triage-done)
+    ("c" js/triage-cancel)
+    ("s" js/triage-snooze)
+    ("S" js/triage-manual)
+    ("t" org-todo)
+    ("r" org-roam-refile)
+    ("R" js/roamify-url-at-point :exit t)
+    ("o" open-urls-at-point-or-region)
+    ("q" js/triage-quit :color blue))
   )
 
 
@@ -4053,49 +4107,49 @@ the current entry at point and move to the next line."
 
     (org-static-blog-page-header
      "<meta name=\"author\" content=\"Jure Smolar\">
-<meta name=\"referrer\" content=\"no-referrer\">
-<meta name=\"viewport\" content=\"initial-scale=1,width=device-width,minimum-scale=1\">
-<link href=\"static/sakura.css\" rel=\"stylesheet\" type=\"text/css\" />
-<link href=\"static/custom.css\" rel=\"stylesheet\" type=\"text/css\" />
-<link rel=\"icon\" href=\"static/favicon.ico\">
-<script src=\"static/mathjax-config.js\"></script>
-<script id=\"MathJax-script\" async src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\"></script>
+    <meta name=\"referrer\" content=\"no-referrer\">
+    <meta name=\"viewport\" content=\"initial-scale=1,width=device-width,minimum-scale=1\">
+    <link href=\"static/sakura.css\" rel=\"stylesheet\" type=\"text/css\" />
+    <link href=\"static/custom.css\" rel=\"stylesheet\" type=\"text/css\" />
+    <link rel=\"icon\" href=\"static/favicon.ico\">
+    <script src=\"static/mathjax-config.js\"></script>
+    <script id=\"MathJax-script\" async src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\"></script>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  const btn = document.createElement('button');
-  btn.className = 'js-toggle-headings';
-  btn.textContent = 'expand all';
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+						  const btn = document.createElement('button');
+						  btn.className = 'js-toggle-headings';
+						  btn.textContent = 'expand all';
 
-  let allOpen = false;
-  btn.addEventListener('click', function () {
-    allOpen = !allOpen;
-    document.querySelectorAll('details').forEach(function (d) {
-      allOpen ? d.setAttribute('open', '') : d.removeAttribute('open');
-    });
-    btn.textContent = allOpen ? 'collapse all' : 'expand all';
-  });
+						  let allOpen = false;
+						  btn.addEventListener('click', function () {
+										allOpen = !allOpen;
+										document.querySelectorAll('details').forEach(function (d) {
+																      allOpen ? d.setAttribute('open', '') : d.removeAttribute('open');
+																      });
+										btn.textContent = allOpen ? 'collapse all' : 'expand all';
+										});
 
-  // Insert after the first h1 on the page
-  const h1 = document.querySelector('h1');
-  if (h1) h1.insertAdjacentElement('afterend', btn);
-});
-</script>
-")
+						  // Insert after the first h1 on the page
+						  const h1 = document.querySelector('h1');
+						  if (h1) h1.insertAdjacentElement('afterend', btn);
+						  });
+    </script>
+    ")
 
     (org-static-blog-page-preamble
      "<div style=\"display:none\">\\(\\newenvironment{bprooftree}{\\begin{prooftree}}{\\end{prooftree}}\\)</div>
-<nav class=\"header\">
-  <div class=\"header-left\">
+    <nav class=\"header\">
+    <div class=\"header-left\">
     <a href=\"/\">Home</a>
     <a href=\"/archive.html\">Archive</a>
     <a href=\"/tags.html\">Tags</a>
     <a href=\"/rss.xml\">RSS</a>
-  </div>
-  <div class=\"header-right\">
+    </div>
+    <div class=\"header-right\">
     <a href=\"/about.html\">About</a>
-  </div>
-</nav>")
+    </div>
+    </nav>")
 
     (org-static-blog-page-postamble ;; End of <body> on every page
      nil)
@@ -4151,7 +4205,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     (defun my/org-static-blog-link (link desc info)
       "Transcode ID links to proper blog post URLs.
-Falls back to standard org-html-link for other link types."
+    Falls back to standard org-html-link for other link types."
       (if (not (string= (org-element-property :type link) "id"))
 	  (org-html-link link desc info)
 	(let* ((id (org-element-property :path link))
@@ -4183,7 +4237,7 @@ Falls back to standard org-html-link for other link types."
 
     (defun js/tikzcd-to-svg ()
       "Render tikzcd environment at point to SVG and insert link.
-Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
+    Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
       (interactive)
       (save-excursion
 	(let* ((start (progn (search-backward "\\begin{tikzcd}") (point)))
@@ -4247,9 +4301,9 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
     (defun js/sync-blog (arg)
       "Sync blog to muffalo server.
 
-No prefix: do not update the 'static/' directory on the remote.
-With C-u: include the 'static/' directory (push local static to remote).
-With C-u C-u: pull the 'static/' directory from the remote to local."
+    No prefix: do not update the 'static/' directory on the remote.
+    With C-u: include the 'static/' directory (push local static to remote).
+    With C-u C-u: pull the 'static/' directory from the remote to local."
       (interactive "P")
       (let* ((local (expand-file-name "~/Documents/blog/"))
              (remote "jure@muffalo:~/blog/")
@@ -4313,49 +4367,49 @@ With C-u C-u: pull the 'static/' directory from the remote to local."
 
   (org-static-blog-page-header
    "<meta name=\"author\" content=\"Jure Smolar\">
-<meta name=\"referrer\" content=\"no-referrer\">
-<meta name=\"viewport\" content=\"initial-scale=1,width=device-width,minimum-scale=1\">
-<link href=\"static/sakura.css\" rel=\"stylesheet\" type=\"text/css\" />
-<link href=\"static/custom.css\" rel=\"stylesheet\" type=\"text/css\" />
-<link rel=\"icon\" href=\"static/favicon.ico\">
-<script src=\"static/mathjax-config.js\"></script>
-<script id=\"MathJax-script\" async src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\"></script>
+    <meta name=\"referrer\" content=\"no-referrer\">
+    <meta name=\"viewport\" content=\"initial-scale=1,width=device-width,minimum-scale=1\">
+    <link href=\"static/sakura.css\" rel=\"stylesheet\" type=\"text/css\" />
+    <link href=\"static/custom.css\" rel=\"stylesheet\" type=\"text/css\" />
+    <link rel=\"icon\" href=\"static/favicon.ico\">
+    <script src=\"static/mathjax-config.js\"></script>
+    <script id=\"MathJax-script\" async src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\"></script>
 
-<script>
-document.addEventListener('DOMContentLoaded', function () {
-  const btn = document.createElement('button');
-  btn.className = 'js-toggle-headings';
-  btn.textContent = 'expand all';
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+						  const btn = document.createElement('button');
+						  btn.className = 'js-toggle-headings';
+						  btn.textContent = 'expand all';
 
-  let allOpen = false;
-  btn.addEventListener('click', function () {
-    allOpen = !allOpen;
-    document.querySelectorAll('details').forEach(function (d) {
-      allOpen ? d.setAttribute('open', '') : d.removeAttribute('open');
-    });
-    btn.textContent = allOpen ? 'collapse all' : 'expand all';
-  });
+						  let allOpen = false;
+						  btn.addEventListener('click', function () {
+										allOpen = !allOpen;
+										document.querySelectorAll('details').forEach(function (d) {
+																      allOpen ? d.setAttribute('open', '') : d.removeAttribute('open');
+																      });
+										btn.textContent = allOpen ? 'collapse all' : 'expand all';
+										});
 
-  // Insert after the first h1 on the page
-  const h1 = document.querySelector('h1');
-  if (h1) h1.insertAdjacentElement('afterend', btn);
-});
-</script>
-")
+						  // Insert after the first h1 on the page
+						  const h1 = document.querySelector('h1');
+						  if (h1) h1.insertAdjacentElement('afterend', btn);
+						  });
+    </script>
+    ")
 
   (org-static-blog-page-preamble
    "<div style=\"display:none\">\\(\\newenvironment{bprooftree}{\\begin{prooftree}}{\\end{prooftree}}\\)</div>
-<nav class=\"header\">
-  <div class=\"header-left\">
+    <nav class=\"header\">
+    <div class=\"header-left\">
     <a href=\"/\">Home</a>
     <a href=\"/archive.html\">Archive</a>
     <a href=\"/tags.html\">Tags</a>
     <a href=\"/rss.xml\">RSS</a>
-  </div>
-  <div class=\"header-right\">
+    </div>
+    <div class=\"header-right\">
     <a href=\"/about.html\">About</a>
-  </div>
-</nav>")
+    </div>
+    </nav>")
 
   (org-static-blog-page-postamble ;; End of <body> on every page
    nil)
@@ -4411,7 +4465,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   (defun my/org-static-blog-link (link desc info)
     "Transcode ID links to proper blog post URLs.
-Falls back to standard org-html-link for other link types."
+    Falls back to standard org-html-link for other link types."
     (if (not (string= (org-element-property :type link) "id"))
 	(org-html-link link desc info)
       (let* ((id (org-element-property :path link))
@@ -4443,7 +4497,7 @@ Falls back to standard org-html-link for other link types."
 
   (defun js/tikzcd-to-svg ()
     "Render tikzcd environment at point to SVG and insert link.
-Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
+    Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
     (interactive)
     (save-excursion
       (let* ((start (progn (search-backward "\\begin{tikzcd}") (point)))
@@ -4507,9 +4561,9 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
   (defun js/sync-blog (arg)
     "Sync blog to muffalo server.
 
-No prefix: do not update the 'static/' directory on the remote.
-With C-u: include the 'static/' directory (push local static to remote).
-With C-u C-u: pull the 'static/' directory from the remote to local."
+    No prefix: do not update the 'static/' directory on the remote.
+    With C-u: include the 'static/' directory (push local static to remote).
+    With C-u C-u: pull the 'static/' directory from the remote to local."
     (interactive "P")
     (let* ((local (expand-file-name "~/Documents/blog/"))
            (remote "jure@muffalo:~/blog/")
@@ -4663,9 +4717,9 @@ With C-u C-u: pull the 'static/' directory from the remote to local."
 
   (defun js/elfeed-yank-entry-content ()
     "Yank the full content of the current entry or selected entries.
-In elfeed-search-mode, works on selected entries (or entry at point).
-In elfeed-show-mode, works on the current entry.
-If multiple entries are selected, concatenates their content."
+    In elfeed-search-mode, works on selected entries (or entry at point).
+    In elfeed-show-mode, works on the current entry.
+    If multiple entries are selected, concatenates their content."
     (interactive)
     nil
     )
@@ -4778,8 +4832,8 @@ If multiple entries are selected, concatenates their content."
   (defun elfeed-search-compile-filter (filter)
     "Compile FILTER into a lambda function for `byte-compile'.
 
-Executing a filter in bytecode form is generally faster than
-\"interpreting\" the filter with `elfeed-search-filter'."
+    Executing a filter in bytecode form is generally faster than
+    \"interpreting\" the filter with `elfeed-search-filter'."
     (cl-destructuring-bind (&key after     before
 				 must-have must-not-have
 				 matches   not-matches
@@ -4860,8 +4914,8 @@ Executing a filter in bytecode form is generally faster than
 ;;; -> Elfeed -> Wallabag integration
   (defun js/elfeed-entries-to-wallabag (&optional entries)
     "Add elfeed entries to wallabag and sync to server.
-If ENTRIES is provided, use those instead of the selected entries.
-In show mode, adds the current entry; in search mode, adds all selected entries."
+    If ENTRIES is provided, use those instead of the selected entries.
+    In show mode, adds the current entry; in search mode, adds all selected entries."
     (interactive)
     (let ((entries
            (cond
