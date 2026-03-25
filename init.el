@@ -2495,6 +2495,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ;; Blog
 	 ("C-c n b b" . org-static-blog-publish)
 	 ("C-c n b p" . js/sync-blog)
+	 ("C-c n b o" . js/blog-open-in-browser)
 
          :map org-mode-map
          ("C-M-i" . completion-at-point)
@@ -3818,15 +3819,17 @@ See `js/anki-derive-fields' for full hierarchy details."
   (defvar js/org-ancestor-block-states '("HOLD" "CANCELLED" "FAILED" "PROCESS" "EXPLORE")
     "TODO states that hide their descendants from agenda views.")
 
-  (defun js/org-skip-if-ancestor-blocked ()
-    "Skip subtree if any ancestor has a state in `js/org-ancestor-block-states'."
-    (let ((subtree-end (save-excursion (org-end-of-subtree t))))
+  (defun js/org-skip-if-ancestor-blocked (&optional extra-states)
+    "Skip subtree if any ancestor has a state in `js/org-ancestor-block-states'.
+EXTRA-STATES is an optional list of additional states to block on."
+    (let ((subtree-end (save-excursion (org-end-of-subtree t)))
+          (block-states (append js/org-ancestor-block-states extra-states)))
       (save-excursion
 	(while (and (not (bobp))
                     (not (org-at-heading-p)))
           (outline-previous-heading))
 	(if (cl-loop while (and (not (bobp)) (org-up-heading-safe))
-                     thereis (member (org-get-todo-state) js/org-ancestor-block-states))
+                     thereis (member (org-get-todo-state) block-states))
             subtree-end
           nil))))
 
@@ -3869,9 +3872,10 @@ See `js/anki-derive-fields' for full hierarchy details."
 			      (org-agenda-skip-function
 			       '(org-agenda-skip-entry-if 'todo 'done))))
 		  (todo "FINISH" ((org-agenda-overriding-header "* Items to finish up:  ")
-				  (org-agenda-sorting-strategy '(category-up alpha-up))))
+				  (org-agenda-sorting-strategy '(scheduled-up category-up alpha-up))))
 		  (todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")
-				   (org-agenda-sorting-strategy '(category-up alpha-up))))
+				   (org-agenda-sorting-strategy '(scheduled-up category-up alpha-up))
+				   ))
 		  (alltodo "" ((org-agenda-skip-function
 				'(or (air-org-skip-subtree-if-habit)
 				     (air-org-skip-subtree-if-priority ?A)
@@ -3879,7 +3883,8 @@ See `js/anki-derive-fields' for full hierarchy details."
                                      (air-org-skip-if-blocked)
 				     (org-agenda-skip-if nil '(scheduled deadline))
 				     (org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISH" "PACT"))
-				     (js/org-skip-if-ancestor-blocked)))
+				     (js/org-skip-if-ancestor-blocked '("ACTIVE" "PROJECT"))
+				     ))
 			       (org-agenda-overriding-header "* All normal priority tasks:")))
 		  (todo "IDEA" ((org-agenda-overriding-header "* Ideas: ")))
 		  (todo "HOLD" ((org-agenda-overriding-header "* Currently on hold: ")))
@@ -3929,6 +3934,23 @@ the current entry at point and move to the next line."
       (call-interactively #'js/roamify-url-at-point)))
 
   )
+
+;; js-triage-session.el (no hydra required)
+(defun js/session-process ()
+  (interactive)
+  (js/triage-session-start "PROCESS" "process" #'js/triage--due-p)
+  (use-local-map js/triage-map))
+
+;; In init.el with use-package:
+(use-package js-triage-session
+  :load-path "~/.emacs.d/lisp"
+  :bind
+  (("C-c n j p" . js/session-process)
+   ("C-c n j k" . js/session-keyword)
+   ("C-c n j r" . js/session-review)
+   ("C-c n j a" . js/session-all))
+  )
+
 
 ;;; End of org agenda package block
 
@@ -4502,6 +4524,15 @@ With C-u C-u: pull the 'static/' directory from the remote to local."
                   ;; Any other prefix (e.g. single C-u): include static/ (push)
                   (format "rsync -avz --delete %s %s" local remote)))))
       (compile cmd)))
+
+  (defun js/blog-open-in-browser ()
+    "Open the current org-roam file as its published blog URL."
+    (interactive)
+    (let* ((file (buffer-file-name))
+           (public-path (org-static-blog-get-post-public-path file))
+           (url (concat org-static-blog-publish-url public-path)))
+      (browse-url url)))
+
 
   )
 
