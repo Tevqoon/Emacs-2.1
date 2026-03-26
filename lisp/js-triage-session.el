@@ -1,4 +1,4 @@
-;;; js-triage-session.el --- Minimal todo triage with exponential snooze backoff
+;;; js-triage-session.el --- Minimal todo triage with bidirectional interval snooze
 ;;
 ;; Navigation state:
 ;;   js/triage-session-queue   — list of remaining markers (current at head)
@@ -6,9 +6,15 @@
 ;;   js/triage-session-total   — count at session start
 ;;
 ;; "next" pops the head and appends it to the tail (circular).
-;; "prev" is not supported in this model — use next to cycle.
+;; "prev" brings the tail to the front.
 ;; A marker appears exactly once; collection runs once and the list
 ;; is never extended.
+;;
+;; Snooze uses a TRIAGE_INTERVAL property (days).
+;;   js/triage-snooze-later  — grow interval by 1.5x  (later)
+;;   js/triage-snooze-soon   — shrink interval by 0.5x (soon)
+;;   js/triage-snooze-manual — set interval explicitly (escape hatch)
+;; Migration from old SNOOZE_COUNT: js/triage--migrate-snooze-properties
 
 (require 'org)
 (require 'org-roam nil t)
@@ -111,12 +117,38 @@
 
 ;;; ─── Snooze machinery ────────────────────────────────────────────────────
 
-(defun js/triage--snooze-for (days)
-  "Snooze entry at point for DAYS days, incrementing SNOOZE_COUNT."
-  (let ((count (string-to-number
-                (or (org-entry-get nil "SNOOZE_COUNT") "0"))))
-    (org-entry-put nil "SNOOZE_COUNT" (number-to-string (1+ count)))
-    (org-schedule nil (format "+%dd" days))))
+(defun js/triage--get-interval ()
+  "Return the current TRIAGE_INTERVAL for the entry at point (default 1)."
+  (max 1 (string-to-number
+          (or (org-entry-get nil "TRIAGE_INTERVAL") "1"))))
+
+(defun js/triage--set-interval (days)
+  "Write TRIAGE_INTERVAL and schedule entry at point DAYS days from now."
+  (org-entry-put nil "TRIAGE_INTERVAL" (number-to-string days))
+  (org-schedule nil (format "+%dd" days)))
+
+(defun js/triage--fuzz-interval (days)
+  "Add ±5% jitter to DAYS when >= 8, to prevent queue clustering."
+  (if (>= days 8)
+      (let ((fuzz (max 1 (ceiling (* 0.05 days)))))
+        (+ days (nth (random 3) (list (- fuzz) 0 fuzz))))
+    days))
+
+;;; ─── Migration ───────────────────────────────────────────────────────────
+
+(defun js/triage--migrate-snooze-properties ()
+  "One-shot migration: convert SNOOZE_COUNT -> TRIAGE_INTERVAL across agenda files.
+Old interval is recovered as 2^SNOOZE_COUNT."
+  (interactive)
+  (org-map-entries
+   (lambda ()
+     (let ((count (org-entry-get nil "SNOOZE_COUNT")))
+       (when count
+         (let ((interval (expt 2 (string-to-number count))))
+           (org-entry-put nil "TRIAGE_INTERVAL" (number-to-string interval))
+           (org-entry-delete nil "SNOOZE_COUNT")))))
+   nil 'agenda)
+  (message "[triage] Migration complete: SNOOZE_COUNT -> TRIAGE_INTERVAL."))
 
 ;;; ─── Completing actions (remove from queue, then show next) ──────────────
 
@@ -147,30 +179,38 @@
   (js/triage--pop-current)
   (js/triage--visit-current))
 
-(defun js/triage-snooze ()
-  "Snooze with exponential backoff (2^SNOOZE_COUNT days), remove, show next."
-  (interactive)
+(defun js/triage--snooze (days label)
+  "Snooze entry at point for DAYS days, remove from queue, show next.
+LABEL is used in the echo area message."
   (save-excursion
     (org-back-to-heading t)
-    (let* ((count (string-to-number
-                   (or (org-entry-get nil "SNOOZE_COUNT") "0")))
-           (days  (expt 2 count)))
-      (js/triage--snooze-for days)
-      (message "[triage/%s] Snoozed for %d day(s)." js/triage-session-label days)))
+    (js/triage--set-interval days)
+    (message "[triage/%s] Snoozed (%s) for %d day(s)."
+             js/triage-session-label label days))
   (save-buffer)
   (js/triage--pop-current)
   (js/triage--visit-current))
 
+(defun js/triage-snooze-later ()
+  "Snooze later: grow TRIAGE_INTERVAL by 1.5x."
+  (interactive)
+  (let* ((old    (save-excursion (org-back-to-heading t) (js/triage--get-interval)))
+         (new    (max 1 (round (* old 1.5))))
+         (fuzzed (js/triage--fuzz-interval new)))
+    (js/triage--snooze fuzzed "later")))
+
+(defun js/triage-snooze-soon ()
+  "Snooze soon: shrink TRIAGE_INTERVAL by 0.5x (minimum 1 day)."
+  (interactive)
+  (let* ((old (save-excursion (org-back-to-heading t) (js/triage--get-interval)))
+         (new (max 1 (round (* old 0.5)))))
+    (js/triage--snooze new "soon")))
+
 (defun js/triage-snooze-manual ()
-  "Snooze for a manually specified number of days, remove, show next."
+  "Snooze for an explicitly specified number of days (escape hatch)."
   (interactive)
   (let ((days (read-number "Snooze for how many days? " 7)))
-    (save-excursion
-      (org-back-to-heading t)
-      (org-schedule nil (format "+%dd" days))))
-  (save-buffer)
-  (js/triage--pop-current)
-  (js/triage--visit-current))
+    (js/triage--snooze days "manual")))
 
 ;;; ─── Quit ─────────────────────────────────────────────────────────────────
 
