@@ -2496,9 +2496,15 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ("C-c n b b" . org-static-blog-publish)
 	 ("C-c n b p" . js/sync-blog)
 	 ("C-c n b o" . js/blog-open-in-browser)
+	 :map org-roam-dailies-map
+	 ("m" . js/org-roam-monthlies-goto-today)
+	 ("M" . js/org-roam-monthlies-goto-date)
+	 ("l" . js/org-roam-monthlies-capture-today)
+
 
          :map org-mode-map
          ("C-M-i" . completion-at-point)
+
 
 	 ;; Narrowing and movement
 	 ;; ("C-c n ." . my/org-narrow-to-heading-content) ;; current position
@@ -2672,7 +2678,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
 
   (setq org-roam-capture-templates
 	'(("d" "default" plain "%?"
-           :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+startup: content")
+           :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+startup: show2levels")
            :unnarrowed t)
           ))
 
@@ -2686,7 +2692,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
   (setq org-roam-dailies-capture-templates
 	`(("d" "default" plain "* %?"
 	   :target (file+head "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content"))
+			      "#+title: %<%Y-%m-%d>\n#+startup: show2levels"))
 	  ))
 
   (defun org-capture-task ()
@@ -2705,7 +2711,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
 			 )
       ))
 
-  ;;; -> org-roam -> Autocapture -> Browser integration
+  ;;; -> org-roam -> Autocapture -> dailies
 
   (defvar org-roam-capture--browser nil
     "Variable to pass current browser to capture templates.")
@@ -2713,34 +2719,30 @@ only processes keywords listed in `js/org-keywords-with-links'."
   (defvar org-roam-capture-body nil
     "Variable to pass body content to capture templates.")
 
-  ;;; TODO: Simplify the autocapture templates
-  ;;; https://github.com/org-roam/org-roam/commit/ed94524964a0b03538a84ae03c89ec61527ffe7d
-  ;;; These fucks added non-disablable ids to my fucking entries
-  ;;; Hence the plain + insertion directly into the OLP. What will you do lol.
   (defvar org-roam-dailies-autocapture-templates
     '(("w" "url capture" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content" ("Web" "%(eval (concat org-roam-capture-content))"))
+			      "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Web" "%(eval (concat org-roam-capture-content))"))
        :immediate-finish t)
       ("r" "url reading capture" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing" "%(eval (concat \"PROCESS \" org-roam-capture-content))"))
+			      "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Processing" "%(eval (concat \"PROCESS \" org-roam-capture-content))"))
        :immediate-finish t)
       ("e" "elfeed link capture" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content" ("Elfeed" "%(eval (concat org-roam-capture-content))"))
+			      "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Elfeed" "%(eval (concat org-roam-capture-content))"))
        :immediate-finish t)
       ("p" "process capture" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processing" "%(eval (concat \"PROCESS \" org-roam-capture-content))"))
+			      "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Processing" "%(eval (concat \"PROCESS \" org-roam-capture-content))"))
        :immediate-finish t)
       ("c" "chatlog capture" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content" ("Chats" "%(eval (concat org-roam-capture-content))"))
+			      "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Chats" "%(eval (concat org-roam-capture-content))"))
        :immediate-finish t)
       ("x" "processed log" plain "%(eval (or org-roam-capture-body \"\"))"
        :target (file+head+olp "%<%Y-%m-%d>.org"
-			      "#+title: %<%Y-%m-%d>\n#+startup: content" ("Processed today" "%(eval (concat \"DONE \" org-roam-capture-content))"))
+			      "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Processed today" "%(eval (concat \"DONE \" org-roam-capture-content))"))
        :immediate-finish t)
       )
     "A list of templates to use for automatic daily capture."
@@ -2759,6 +2761,8 @@ only processes keywords listed in `js/org-keywords-with-links'."
 			 :templates org-roam-dailies-autocapture-templates
 			 :props (list :override-default-time (current-time)))
       ))
+
+  ;;; -> Org-roam -> Autocapture -> Browser Integration
 
   (defun org-roam-link-make-string (id &optional description)
     "Makes an org-roam link string pointing to the given id.
@@ -3204,7 +3208,88 @@ you can catch it with `condition-case'."
 	       end (save-excursion (org-end-of-subtree t t))))
        (point-marker))))
 
-  ) ;;
+  ;;; -> org-roam -> dailies -> monthlies
+  ;;; Monthly professional log
+  ;; journals/monthlies/%Y-%m-monthly.org
+  ;; * %Y-%m-%d %A         <- day heading, no ID
+  ;;   ** ...               <- log entries captured here
+
+  (defvar org-roam-monthlies-capture-templates
+    '(("m" "monthly log goto" plain ""
+       :target (file+head+olp "%<%Y-%m>-monthly.org"
+                              "#+title: %<%Y-%m>\n#+startup: show2levels\n"
+                              ("%<%Y-%m-%d %A>"))
+       :unnarrowed t
+       :immediate-finish t)
+      ("e" "monthly log entry" plain "** %?"
+       :target (file+head+olp "%<%Y-%m>-monthly.org"
+                              "#+title: %<%Y-%m>\n#+startup: show2levels\n"
+                              ("%<%Y-%m-%d %A>"))
+       :unnarrowed t))
+    "Capture templates for monthly professional log files.")
+
+  (defun js/org-roam-monthlies--directory ()
+    "Return the absolute path to the monthlies directory, creating it if needed."
+    (let ((dir (expand-file-name
+		"monthlies/"
+		(expand-file-name org-roam-dailies-directory org-roam-directory))))
+      (make-directory dir t)
+      dir))
+
+  (defun js/org-roam-monthlies--file-for-time (time)
+    "Return the absolute path to the monthly file for TIME."
+    (expand-file-name (format-time-string "%Y-%m-monthly.org" time)
+                      (js/org-roam-monthlies--directory)))
+
+  (defun js/org-roam-monthlies--day-heading-re (time)
+    "Return a regexp matching the day heading for TIME."
+    (concat "^\\* " (regexp-quote (format-time-string "%Y-%m-%d %A" time))))
+
+  (defun js/org-roam-monthlies--capture (time &optional goto keys)
+    "Core capture dispatcher for monthly logs.
+TIME is an Emacs time value.  GOTO and KEYS as in `org-roam-capture-'."
+    (let ((org-roam-directory (js/org-roam-monthlies--directory))
+          (org-roam-dailies-directory "./"))
+      (org-roam-capture- :goto (when goto '(4))
+			 :keys keys
+			 :node (org-roam-node-create)
+			 :templates org-roam-monthlies-capture-templates
+			 :props (list :override-default-time time))))
+
+;;;###autoload
+  (defun js/org-roam-monthlies-goto-today ()
+    "Go to today's heading in the monthly log, creating it if absent."
+    (interactive)
+    (js/org-roam-monthlies--capture (current-time) 'goto "m"))
+
+;;;###autoload
+  (defun js/org-roam-monthlies-goto-date ()
+    "Prompt for a date and navigate to its monthly log.
+If the day heading exists, jump to it.  Otherwise open the file at the top.
+Never creates a heading for the chosen date."
+    (interactive)
+    (let* ((time (org-read-date nil t nil "Monthly log for date: "))
+           (file (js/org-roam-monthlies--file-for-time time)))
+      (if (not (file-exists-p file))
+          ;; File doesn't exist yet — open/create it via capture (writes the
+          ;; #+title header and registers the org-id) then bail to top.
+          (js/org-roam-monthlies--capture time 'goto "m")
+	(find-file file)
+	(widen)
+	(goto-char (point-min))
+	(re-search-forward (js/org-roam-monthlies--day-heading-re time) nil t)
+	;; re-search-forward leaves point after the match (end of heading line).
+	;; Move to the beginning of the line whether found or not.
+	(beginning-of-line))))
+
+;;;###autoload
+  (defun js/org-roam-monthlies-capture-today ()
+    "Capture a new subheading entry under today's day heading in the monthly log."
+    (interactive)
+    (js/org-roam-monthlies--capture (current-time) nil "e"))
+
+
+  )
 ;;; End of org-roam package block
 
 ;;; -> org-roam -> org-transclusion
@@ -3981,7 +4066,8 @@ _n_ext              _t_odo               _q_uit
 _p_rev              _o_pen URLs          _._ current
 _d_one              _r_oam refile
 _c_ancel            _R_oamify URL
-_s_nooze
+_s_ooner
+_l_ater
 _S_manual
 "
     ("." js/triage-goto-current)
@@ -3990,7 +4076,8 @@ _S_manual
     ("p" js/triage-goto-prev)
     ("d" js/triage-done)
     ("c" js/triage-cancel)
-    ("s" js/triage-snooze)
+    ("s" js/triage-snooze-soon)
+    ("l" js/triage-snooze-later)
     ("S" js/triage-manual)
     ("t" org-todo)
     ("r" org-roam-refile)
