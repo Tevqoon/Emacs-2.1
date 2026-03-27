@@ -1,0 +1,6 @@
+# -*- mode: snippet -*-
+# name: quad inference
+# key: qi
+# condition: (js/inside-prooftree-p)
+# --
+\\QuaternaryInfC{\\($0\\)}
