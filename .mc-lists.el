@@ -106,8 +106,11 @@
 	org-timestamp
 	org-todo
 	org-yank
+	paredit-raise-sexp
+	phi-search
 	racket-insert-closing
 	tab-bar-duplicate-tab
+	tab-to-tab-stop
 	transpose-sexps
 	transpose-words
 	undefined
@@ -129,6 +132,7 @@
 	counsel-yank-pop
 	dired-do-flagged-delete
 	dired-find-file-other-window
+	end-of-buffer
 	handle-switch-frame
 	iedit-switch-to-mc-mode
 	ignore

@@ -745,6 +745,16 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 
 ;;; --> Searching and navigation
 
+(use-package isearch
+  :ensure nil
+  :custom
+  (isearch-lazy-count t)
+  (isearch-allow-scroll t)
+  (lazy-count-prefix-format nil)
+  (lazy-count-suffix-format " [%s/%s]")
+  :bind
+  )
+
 (use-package counsel
   :defines
   ivy-minibuffer-map
@@ -760,8 +770,8 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (ivy-initial-inputs-alist nil)
   ;; (ivy-dynamic-exhibit-delay-ms 250)
   :bind (("s-b" . counsel-switch-buffer)
-	 ("C-s" . swiper)
-	 ("C-S-s" . swiper-all)
+	 ("M-s s" . swiper)
+	 ("M-s a" . swiper-all)
 	 :map ivy-minibuffer-map
          ("TAB" . ivy-alt-done))
   :config
@@ -1215,7 +1225,11 @@ Produces multiple regions so expreg can step through them."
 
 (use-package avy
   :bind (("s-j" . avy-goto-char-timer)
-	 ("s-l" . avy-goto-line))
+	 ("s-l" . avy-goto-line)
+	 :map isearch-mode-map
+	 ("M-j" . avy-isearch))
+  :custom
+  (avy-style 'de-bruijn)
   )
 
 (use-package jump-char
@@ -6844,7 +6858,11 @@ Sounds strange?  Try it out!"
 ;;   :config
 ;;   (flycheck-ocaml-setup))
 
-;;; TODO -> Programming -> Agda
+;;; -> Programming -> Agda
+
+(load-file (let ((coding-system-for-read 'utf-8))
+             (shell-command-to-string "agda --emacs-mode locate")))
+
 
 ;;; -> Programming -> Lean
 ;;; Currently lean simply works better in vscode. Figures.
