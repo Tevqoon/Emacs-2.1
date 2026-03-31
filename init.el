@@ -753,6 +753,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (lazy-count-prefix-format nil)
   (lazy-count-suffix-format " [%s/%s]")
   :bind
+  ("M-s i" . isearch-forward)
   )
 
 (use-package counsel
@@ -770,6 +771,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (ivy-initial-inputs-alist nil)
   ;; (ivy-dynamic-exhibit-delay-ms 250)
   :bind (("s-b" . counsel-switch-buffer)
+	 ("C-s" . swiper-isearch)
 	 ("M-s s" . swiper)
 	 ("M-s a" . swiper-all)
 	 :map ivy-minibuffer-map
@@ -1835,7 +1837,7 @@ exactly like the old ace-jump integration."
   (agent-shell-session-strategy 'new)
   (agent-shell-show-usage-at-turn-end t)
   :bind
-  ("C-c g a a" . agent-shell)
+  ("C-c g a" . agent-shell)
   (:map agent-shell-mode-map
 	("M-<tab>" . agent-shell-cycle-session-mode)
 	("C-c C-f" . agent-shell-prompt-compose)))
@@ -1844,7 +1846,7 @@ exactly like the old ace-jump integration."
   :vc (:url "https://github.com/jethrokuan/agent-shell-manager"
 	    :rev :newest)
   :after agent-shell
-  :bind ("C-c g a m" . agent-shell-manager-toggle)
+  :bind ("C-c g m" . agent-shell-manager-toggle)
   :custom
   (agent-shell-manager-side 'bottom))
 
@@ -1853,8 +1855,7 @@ exactly like the old ace-jump integration."
 	    :rev :newest)
   :after agent-shell
   :demand t
-  :bind (:map agent-shell-attention-mode-map
-              ("C-c g a j" . agent-shell-attention-jump))
+  :bind ("C-c g j" . agent-shell-attention-jump)
   :custom
   (agent-shell-attention-render-function #'agent-shell-attention-render-active)
   (agent-shell-attention-indicator-location 'global-mode-string)
