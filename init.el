@@ -772,8 +772,8 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (ivy-initial-inputs-alist nil)
   ;; (ivy-dynamic-exhibit-delay-ms 250)
   :bind (("s-b" . counsel-switch-buffer)
-	 ("C-s" . swiper-isearch)
-	 ("M-s s" . swiper)
+	 ("C-s" . swiper)
+	 ("M-s s" . swiper-isearch)
 	 ("M-s a" . swiper-all)
 	 :map ivy-minibuffer-map
          ("TAB" . ivy-alt-done))
