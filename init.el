@@ -23,6 +23,7 @@
 
 (require 'package)
 (add-to-list 'package-archives '("melpa" . "https://melpa.org/packages/") t)
+(add-to-list 'package-archives '("gnu-devel" . "https://elpa.gnu.org/devel/") :append)
 ;; Comment/uncomment this line to enable MELPA Stable if desired.  See `package-archive-priorities`
 ;; and `package-pinned-packages`. Most users will not need or want to do this.
 ;;(add-to-list 'package-archives '("melpa-stable" . "https://stable.melpa.org/packages/") t)
@@ -2516,7 +2517,6 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ("M" . js/org-roam-monthlies-goto-date)
 	 ("l" . js/org-roam-monthlies-capture-today)
 
-
          :map org-mode-map
          ("C-M-i" . completion-at-point)
 
@@ -3310,13 +3310,26 @@ Never creates a heading for the chosen date."
 ;;; -> org-roam -> org-transclusion
 
 (use-package org-transclusion
-  :defer
   :ensure t
+  :after org
   :bind
   (("<f12>" . org-transclusion-add)
-   ("s-<f12>" . org-transclusion-deactivate))
+   ("s-<f12>" . org-transclusion-deactivate)
+   ("C-c n x" . org-transclusion-transient-menu) ;; Xanadu
+   )
   :custom
-  (org-transclusion-include-first-section nil))
+  (org-transclusion-include-first-section nil)
+  :config
+  (set-face-attribute
+   'org-transclusion-fringe nil
+   :foreground "green"
+   :background "green")
+  )
+
+(use-package org-transclusion-font-lock
+  :ensure nil
+  :after org-transclusion
+  :config (org-transclusion-font-lock-mode +1))
 
 ;;; -> Org-roam -> org-node
 
@@ -3749,6 +3762,7 @@ See `js/anki-derive-fields' for full hierarchy details."
                        heading body explicit-front explicit-hint explicit-back))
              (fields (sort (list (cons "Front" (plist-get derived :front))
                                  (cons "Hint"  (plist-get derived :hint))
+
                                  (cons "Back"  (plist-get derived :back)))
                            (lambda (a b) (string< (car a) (car b))))))
         (unless deck      (user-error "Missing deck"))
@@ -3787,7 +3801,9 @@ See `js/anki-derive-fields' for full hierarchy details."
           (save-buffer)
           (condition-case err
               (progn
-                (save-excursion (anki-editor-push-notes 'file))
+                (save-excursion
+		  (org-transclusion-mode +1)
+		  (anki-editor-push-notes 'file))
                 (message "Successfully pushed %s to Anki" (buffer-file-name)))
             (error
              (anki-flashcard-report-error (buffer-file-name) (error-message-string err))
@@ -3805,6 +3821,7 @@ See `js/anki-derive-fields' for full hierarchy details."
       (dolist (file files)
         (condition-case err
             (with-current-buffer (find-file-noselect file)
+	      (org-transclusion-mode +1)
               (save-excursion (anki-editor-push-notes 'file))
               (cl-incf success))
           (error (anki-flashcard-report-error file (error-message-string err)))))
@@ -4224,46 +4241,54 @@ _S_manual
     <a href=\"/archive.html\">Archive</a>
     <a href=\"/tags.html\">Tags</a>
     <a href=\"/rss.xml\">RSS</a>
+    <a href=\"/lecture-notes.html\">Lecture Notes</a>
     </div>
     <div class=\"header-right\">
     <a href=\"/about.html\">About</a>
     </div>
     </nav>")
 
-  (org-static-blog-page-postamble ;; End of <body> on every page
-   nil)
+  (org-static-blog-page-postamble nil)
 
-  ;; This HTML code is inserted into the index page between the preamble and
-  ;;   the blog posts
-  (org-static-blog-index-front-matter ;; Between preamble and blog posts on index page
-   "Recent posts.")
+  (org-static-blog-index-front-matter "Recent posts.")
 
   :config
   (defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page" "draft")
     "Tags used for file management that shouldn't appear on the blog.")
 
+  (defvar blog-tags '("blog")
+    "Org-roam tags that mark nodes as published blog posts.")
+
+  (defvar static-tags '("blog-static-page" "draft" "lecture-notes")
+    "Org-roam tags that mark nodes as static pages, drafts, or lecture notes.")
+
   ;; These tags should not be inherited to facilitate future subtree publishing
   (add-to-list 'org-tags-exclude-from-inheritance "blog")
   (add-to-list 'org-tags-exclude-from-inheritance "note")
+  (add-to-list 'org-tags-exclude-from-inheritance "lecture-notes")
+
+  (defun js/tags->or-clause (tags)
+    "Build an emacsql :where clause matching tags:tag against any tag in TAGS.
+Returns e.g. (or (= tags:tag \"blog\") (= tags:tag \"note\"))."
+    (cons 'or (mapcar (lambda (tag) `(= tags:tag ,tag)) tags)))
 
   ;; Override to use org-roam query instead of subfolders
   (defun org-static-blog-get-post-filenames ()
-    "Get blog posts from org-roam :blog: tag."
+    "Get blog posts from org-roam nodes tagged with any tag in `blog-tags'."
     (delete-dups
      (mapcar #'car
              (org-roam-db-query
-              [:select :distinct [nodes:file] :from nodes
-		       :inner-join tags :on (= tags:node-id nodes:id)
-		       :where (= tags:tag "blog")]))))
+              `[:select :distinct [nodes:file] :from nodes
+                        :inner-join tags :on (= tags:node-id nodes:id)
+                        :where ,(js/tags->or-clause blog-tags)]))))
 
   (defun org-static-blog-get-draft-filenames ()
-    "Get static pages from org-roam :page: tag."
+    "Get static pages from org-roam nodes tagged with any tag in `static-tags'."
     (mapcar #'car
             (org-roam-db-query
-             [:select :distinct [nodes:file] :from nodes
-		      :inner-join tags :on (= tags:node-id nodes:id)
-		      :where (or (= tags:tag "blog-static-page")
-				 (= tags:tag "draft"))])))
+             `[:select :distinct [nodes:file] :from nodes
+                       :inner-join tags :on (= tags:node-id nodes:id)
+                       :where ,(js/tags->or-clause static-tags)])))
 
   (defun org-static-blog-get-tags (post-filename)
     "Extract tags from POST-FILENAME, excluding management tags."
@@ -4277,22 +4302,21 @@ _S_manual
           (setq all-tags (if (match-string 1)
                              (split-string (match-string 1) ":")
                            (split-string (match-string 1))))))
-      ;; Filter out ignored tags
       (cl-remove-if (lambda (tag)
-		      (member (downcase tag) orb-ignored-tags))
+                      (member (downcase tag) orb-ignored-tags))
                     all-tags)))
 
   (defun my/org-static-blog-link (link desc info)
     "Transcode ID links to proper blog post URLs.
-    Falls back to standard org-html-link for other link types."
+Falls back to standard org-html-link for other link types."
     (if (not (string= (org-element-property :type link) "id"))
-	(org-html-link link desc info)
+        (org-html-link link desc info)
       (let* ((id (org-element-property :path link))
              (node (org-roam-node-from-id id))
              (tags (and node (org-roam-node-tags node)))
-             (published-p (and tags (seq-intersection tags '("blog" "blog-static-page" "note"))))
+             (published-p (and tags (seq-intersection tags (append blog-tags static-tags))))
              (fallback-desc (if node (org-roam-node-title node) id)))
-	(if published-p
+        (if published-p
             (format "<a href=\"/%s\">%s</a>"
                     (org-static-blog-get-post-public-path (org-roam-node-file node))
                     (or desc (org-roam-node-title node)))
@@ -4304,9 +4328,33 @@ _S_manual
     "Ensure our custom link and tikzcd handlers are in the backend."
     (org-export-define-derived-backend 'org-static-blog-post-bare 'html
       :translate-alist '((template . (lambda (contents info) contents))
-			 (link . my/org-static-blog-link)
-			 )))
+                         (link . my/org-static-blog-link))))
 
+  ;; Turn on transclusions before exporting
+  (defun org-static-blog-render-post-content (post-filename)
+    "Render blog content as bare HTML without header."
+    (let ((org-html-doctype "html5")
+          (org-html-html5-fancy t))
+      (save-excursion
+	(let ((current-buffer (current-buffer))
+              (buffer-exists (org-static-blog-file-buffer post-filename))
+              (result nil))
+          (with-temp-buffer
+            (if buffer-exists
+		(insert-buffer-substring buffer-exists)
+              (insert-file-contents post-filename))
+            (org-mode)
+	    (org-transclusion-mode +1)
+            (goto-char (point-min))
+            (org-map-entries
+             (lambda ()
+               (setq org-map-continue-from (point))
+               (org-cut-subtree))
+             org-static-blog-no-post-tag)
+            (setq result
+                  (org-export-as 'org-static-blog-post-bare nil nil nil nil))
+            (switch-to-buffer current-buffer)
+            result)))))
 
   ;; Hook into the render function
   (advice-add 'org-static-blog-render-post-content :before #'my/setup-blog-backend)
@@ -4316,7 +4364,7 @@ _S_manual
 
   (defun js/tikzcd-to-svg ()
     "Render tikzcd environment at point to SVG and insert link.
-    Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
+Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
     (interactive)
     (save-excursion
       (let* ((start (progn (search-backward "\\begin{tikzcd}") (point)))
@@ -4333,12 +4381,12 @@ _S_manual
              (output-path (expand-file-name svg-file svg-dir))
              (relative-link (concat js/tikzcd-svg-directory svg-file)))
 
-	;; Create output directory if it doesn't exist
-	(unless (file-exists-p svg-dir)
+        ;; Create output directory if it doesn't exist
+        (unless (file-exists-p svg-dir)
           (make-directory svg-dir t))
 
-	;; Write LaTeX file
-	(with-temp-file temp-tex
+        ;; Write LaTeX file
+        (with-temp-file temp-tex
           (insert "\\documentclass[border=2pt]{standalone}\n")
           (insert "\\usepackage{tikz-cd}\n")
           (insert "\\usepackage{amsmath}\n")
@@ -4347,30 +4395,25 @@ _S_manual
           (insert tikzcd-code)
           (insert "\n\\end{document}\n"))
 
-	;; Compile to PDF in temp directory
-	(message "Compiling LaTeX...")
-	(shell-command (format "cd %s && pdflatex -interaction=nonstopmode diagram.tex"
-			       temp-dir))
+        ;; Compile to PDF in temp directory
+        (message "Compiling LaTeX...")
+        (shell-command (format "cd %s && pdflatex -interaction=nonstopmode diagram.tex"
+                               temp-dir))
 
-	;; Convert to SVG and copy to destination
-	(if (file-exists-p temp-pdf)
+        ;; Convert to SVG and copy to destination
+        (if (file-exists-p temp-pdf)
             (progn
-	      (message "Converting to SVG...")
-	      (shell-command (format "pdf2svg %s %s" temp-pdf temp-svg))
+              (message "Converting to SVG...")
+              (shell-command (format "pdf2svg %s %s" temp-pdf temp-svg))
 
-	      (if (file-exists-p temp-svg)
+              (if (file-exists-p temp-svg)
                   (progn
-                    ;; Copy SVG to destination
                     (copy-file temp-svg output-path t)
-
-                    ;; Cleanup entire temp directory
                     (delete-directory temp-dir t)
-
-                    ;; Insert link
                     (goto-char end)
                     (insert (format "\n\n[[file:%s]]\n" relative-link))
                     (message "Created %s" output-path))
-		(progn
+                (progn
                   (delete-directory temp-dir t)
                   (error "SVG conversion failed"))))
           (progn
@@ -4380,21 +4423,18 @@ _S_manual
   (defun js/sync-blog (arg)
     "Sync blog to muffalo server.
 
-    No prefix: do not update the 'static/' directory on the remote.
-    With C-u: include the 'static/' directory (push local static to remote).
-    With C-u C-u: pull the 'static/' directory from the remote to local."
+No prefix: do not update the 'static/' directory on the remote.
+With C-u: include the 'static/' directory (push local static to remote).
+With C-u C-u: pull the 'static/' directory from the remote to local."
     (interactive "P")
     (let* ((local (expand-file-name "~/Documents/blog/"))
            (remote "jure@muffalo:~/blog/")
            (cmd (cond
-		 ((null arg)
-                  ;; Default: exclude static/
+                 ((null arg)
                   (format "rsync -avz --delete --exclude 'static/' %s %s" local remote))
-		 ((and arg (= (prefix-numeric-value arg) 16))
-                  ;; C-u C-u: pull static/ from remote to local
+                 ((and arg (= (prefix-numeric-value arg) 16))
                   (format "rsync -avz --delete %s %s" (concat remote "static/") (concat local "static/")))
-		 (t
-                  ;; Any other prefix (e.g. single C-u): include static/ (push)
+                 (t
                   (format "rsync -avz --delete %s %s" local remote)))))
       (compile cmd)))
 
@@ -4404,10 +4444,7 @@ _S_manual
     (let* ((file (buffer-file-name))
            (public-path (org-static-blog-get-post-public-path file))
            (url (concat org-static-blog-publish-url public-path)))
-      (browse-url url)))
-
-
-  )
+      (browse-url url))))
 
 ;;; End of org-static-blog code block.
 
