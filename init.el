@@ -1950,6 +1950,24 @@ exactly like the old ace-jump integration."
 
   :config
   ;; Org Exporting
+  (setq org-latex-classes
+	'(("article" "\\documentclass[11pt,a4paper]{article}"
+	   ("\\section{%s}" . "\\section*{%s}")
+	   ("\\subsection{%s}" . "\\subsection*{%s}")
+	   ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+	   ("\\paragraph{%s}" . "\\paragraph*{%s}")
+	   ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))
+	  ("report" "\\documentclass[11pt,a4paper]{report}"
+	   ("\\part{%s}" . "\\part*{%s}") ("\\chapter{%s}" . "\\chapter*{%s}")
+	   ("\\section{%s}" . "\\section*{%s}")
+	   ("\\subsection{%s}" . "\\subsection*{%s}")
+	   ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))
+	  ("book" "\\documentclass[11pt,a4paper]{book}"
+	   ("\\part{%s}" . "\\part*{%s}")
+	   ("\\chapter{%s}" . "\\chapter*{%s}")
+	   ("\\section{%s}" . "\\section*{%s}")
+	   ("\\subsection{%s}" . "\\subsection*{%s}")
+	   ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
 
   (defun js/org-export-configure-numbering (backend)
     (pcase backend
@@ -6263,7 +6281,7 @@ When pressed twice, make the sub/superscript roman."
     "Try yasnippet expansion first, then fall back to cdlatex-tab."
     (interactive)
     (unless (yas-expand)
-      (js/cdlatex-tab)))
+      (cdlatex-tab)))
 
   ;; Replace cdlatex's TAB binding with our integrated version
   (define-key cdlatex-mode-map (kbd "TAB") #'js/yas-cdlatex-tab)
@@ -6326,6 +6344,7 @@ When pressed twice, make the sub/superscript roman."
      ("imb" "Implied" "\\impliedby" nil nil nil t)
      ("le" "leq" "\\leq" nil nil nil t)
      ("ge" "geq" "\\geq" nil nil nil t)
+     ("ne" "neq" "\\neq" nil nil nil t)
      ("int" "int" "\\int" nil nil nil t)
 
      ("or" "text or in math" "\\text{ or }" nil nil nil t)
@@ -6512,12 +6531,9 @@ When pressed twice, make the sub/superscript roman."
 
 ;;; -> Programming -> Agda
 
-(use-package agda
-  :ensure nil
-  :if (eq system-type 'darwin)
-  :config
-  (load-file (let ((coding-system-for-read 'utf-8))
-               (shell-command-to-string "agda --emacs-mode locate"))))
+(when (eq system-type 'darwin)
+  (let ((coding-system-for-read 'utf-8))
+    (shell-command-to-string "agda --emacs-mode locate")))
 
 
 ;;; -> Programming -> Lean
