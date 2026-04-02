@@ -6512,8 +6512,12 @@ When pressed twice, make the sub/superscript roman."
 
 ;;; -> Programming -> Agda
 
-(load-file (let ((coding-system-for-read 'utf-8))
-             (shell-command-to-string "agda --emacs-mode locate")))
+(use-package agda
+  :ensure nil
+  :if (eq system-type 'darwin)
+  :config
+  (load-file (let ((coding-system-for-read 'utf-8))
+               (shell-command-to-string "agda --emacs-mode locate"))))
 
 
 ;;; -> Programming -> Lean
