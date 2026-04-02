@@ -4093,6 +4093,7 @@ the current entry at point and move to the next line."
    ;; ("C-c n j b k" . js/session-keyword)
    ("C-c n j b r" . js/session-review)
    ("C-c n j b a" . js/session-all)
+   ("C-c n j b b" . js/session-buffer)
 
    ("C-c n j n" . js/triage-next)
    ("C-c n j p" . js/triage-goto-prev)

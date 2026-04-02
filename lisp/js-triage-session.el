@@ -30,6 +30,9 @@
 (defvar js/triage-session-total 0
   "Total items collected when the session started.")
 
+(defvar js/triage-default-session #'js/todo-buffer
+  "Function called when `js/triage--visit-current' finds an empty queue.")
+
 ;;; ─── Collection ──────────────────────────────────────────────────────────
 
 (defun js/triage--due-p ()
@@ -71,7 +74,9 @@
   "Display the entry at the head of the queue."
   (let ((marker (js/triage--current)))
     (if (null marker)
-        (message "[triage/%s] No items." js/triage-session-label)
+	(if js/triage-default-session
+            (funcall js/triage-default-session)
+          (message "[triage/%s] No items." js/triage-session-label))
       (switch-to-buffer (marker-buffer marker))
       (goto-char (marker-position marker))
       (org-fold-show-context 'agenda)
@@ -250,6 +255,22 @@ LABEL is used in the echo area message."
    (lambda ()
      (and (js/triage--due-p)
           (not (org-entry-blocked-p))))))
+
+(defun js/session-buffer ()
+  "Start a triage session on the current buffer's TODO entries."
+  (interactive)
+  (unless (buffer-file-name)
+    (user-error "[triage] Buffer is not visiting a file"))
+  (let* ((tree (org-element-parse-buffer 'headline))
+         (markers
+          (org-element-map tree 'headline
+            (lambda (hl)
+              (when (org-element-property :todo-keyword hl)
+                (copy-marker (org-element-property :begin hl)))))))
+    (setq js/triage-session-queue markers
+          js/triage-session-label (file-name-base (buffer-file-name))
+          js/triage-session-total (length markers))
+    (js/triage--visit-current)))
 
 (provide 'js-triage-session)
 ;;; js-triage-session.el ends here
