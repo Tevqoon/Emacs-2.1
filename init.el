@@ -1625,10 +1625,8 @@ exactly like the old ace-jump integration."
 
 (use-package stripspace
   :ensure t
-
-  ;; Enable for prog-mode-hook, text-mode-hook, conf-mode-hook
   :hook ((prog-mode . stripspace-local-mode)
-         (text-mode . stripspace-local-mode)
+         ;; (text-mode . stripspace-local-mode)
          (conf-mode . stripspace-local-mode))
 
   :custom
@@ -1637,7 +1635,7 @@ exactly like the old ace-jump integration."
   ;; - Non-nil to only delete whitespace when the buffer is clean initially.
   ;; (The initial cleanliness check is performed when `stripspace-local-mode'
   ;; is enabled.)
-  (stripspace-only-if-initially-clean nil)
+  (stripspace-only-if-initially-clean t)
 
   ;; Enabling `stripspace-restore-column' preserves the cursor's column position
   ;; even after stripping spaces. This is useful in scenarios where you add
