@@ -1340,6 +1340,13 @@ exactly like the old ace-jump integration."
 	 ([remap move-beginning-of-line] . crux-move-beginning-of-line))
   )
 
+;;; -> Searching and navigation -> Move text
+
+(use-package move-text
+  :bind
+  ("M-<up>" . move-text-up)
+  ("M-<down>" . move-text-down))
+
 ;;; -> Searching and navigation -> Casual suite
 
 (use-package casual-suite
