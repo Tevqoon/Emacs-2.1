@@ -272,5 +272,21 @@ LABEL is used in the echo area message."
           js/triage-session-total (length markers))
     (js/triage--visit-current)))
 
+(defun js/session-subtree-notodo ()
+  "Start a triage session on all headings in the top-level tree at point."
+  (interactive)
+  (unless (buffer-file-name)
+    (user-error "[triage] Buffer is not visiting a file"))
+  (save-excursion
+    (org-back-to-heading t)
+    (while (org-up-heading-safe))  ; go to top-level ancestor
+    (let* ((markers (org-map-entries
+                     (lambda () (copy-marker (point)))
+                     nil 'tree)))
+      (setq js/triage-session-queue markers
+            js/triage-session-label (file-name-base (buffer-file-name))
+            js/triage-session-total (length markers))
+      (js/triage--visit-current))))
+
 (provide 'js-triage-session)
 ;;; js-triage-session.el ends here

@@ -4107,6 +4107,7 @@ the current entry at point and move to the next line."
    ("C-c n j b r" . js/session-review)
    ("C-c n j b a" . js/session-all)
    ("C-c n j b b" . js/session-buffer)
+   ("C-c n j b s" . js/session-subtree-notodo)
 
    ("C-c n j n" . js/triage-next)
    ("C-c n j p" . js/triage-goto-prev)
@@ -4130,7 +4131,7 @@ _n_ext              _t_odo               _q_uit
 _p_rev              _o_pen URLs          _._ current
 _d_one              _r_oam refile
 _c_ancel            _R_oamify URL
-_s_ooner
+_s_ooner            _w_org refile
 _l_ater
 _S_manual
 "
@@ -4145,6 +4146,7 @@ _S_manual
     ("S" js/triage-manual)
     ("t" org-todo)
     ("r" org-roam-refile)
+    ("w" org-refile)
     ("R" js/roamify-url-at-point :exit t)
     ("o" open-urls-at-point-or-region)
     ("q" js/triage-quit :color blue))
