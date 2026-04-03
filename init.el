@@ -1929,6 +1929,9 @@ exactly like the old ace-jump integration."
   (org-catch-invisible-edits 'show-and-error)
   (org-insert-heading-respect-content t)
 
+  (org-goto-auto-isearch nil)
+  (org-M-RET-may-split-line nil)
+
   (org-default-notes-file (concat org-directory "/inbox.org"))
   (org-capture-templates
    `(("t" "Task" entry (file ,org-default-notes-file)
