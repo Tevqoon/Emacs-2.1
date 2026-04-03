@@ -51,6 +51,7 @@
   (column-number-mode)
   (delete-selection-mode nil) ; For lispy
   (global-auto-revert-mode 1)
+  (savehist-mode +1)
   (when (eq system-type 'darwin)
     (pixel-scroll-precision-mode 1)
     (setq pixel-scroll-precision-use-momentum t))
