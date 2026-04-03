@@ -1662,6 +1662,13 @@ exactly like the old ace-jump integration."
   (unless (featurep 'pdf-tools)
     (pdf-tools-install :noquery)))
 
+;;; -> Misc -> uptime
+
+(use-package js-uptime
+  :load-path "~/.emacs.d/lisp"
+  :config
+  (add-hook 'kill-emacs-hook #'js/uptime-log-session))
+
 ;;; --> AI configuration
 ;;; -> AI configuration -> GPTel
 
