@@ -5051,6 +5051,37 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
 		 nil t))  ; silent, no-cookies
             (message "No URL found for entry: %s" title))))))
 
+;;; -> Elfeed -> Backups
+;;; From https://punchagan.muse-amuse.in/blog/elfeed-db-back-up-hooks/
+
+  (defvar pc/elfeed-db-save-timer nil
+    "Timer for debounced elfeed database saves.")
+
+  (defun pc/elfeed-db-save-and-backup ()
+    "Save the elfeed database and commit to git."
+    (when (and (boundp 'elfeed-db) elfeed-db)
+      (elfeed-db-save)
+      (let ((default-directory elfeed-db-directory))
+	(when (file-exists-p ".git")
+          (call-process "git" nil "*elfeed-db-backup*" nil "add" "-A")
+          (call-process "git" nil "*elfeed-db-backup*" nil "commit" "-m" "auto-backup")
+          (call-process "git" nil "*elfeed-db-backup*" nil "push" "origin" "main")))))
+
+  (defun pc/elfeed-db-save-soon ()
+    "Schedule a database save after 10 seconds of idle."
+    (interactive)
+    (when pc/elfeed-db-save-timer
+      (cancel-timer pc/elfeed-db-save-timer))
+    (setq pc/elfeed-db-save-timer
+          (run-with-idle-timer 10 nil #'pc/elfeed-db-save-and-backup)))
+
+  ;; Save and backup when tags change (elfeed-web usage)
+  (add-hook 'elfeed-tag-hooks   (lambda (&rest _) (pc/elfeed-db-save-soon)))
+  (add-hook 'elfeed-untag-hooks (lambda (&rest _) (pc/elfeed-db-save-soon)))
+
+  ;; Save and backup when new entries are added
+  (add-hook 'elfeed-db-update-hook #'pc/elfeed-db-save-soon)
+
 ;;; -> Elfeed -> Multi-Device Syncing
 
 ;;; Core Variables
