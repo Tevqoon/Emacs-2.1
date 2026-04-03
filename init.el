@@ -51,6 +51,7 @@
   (column-number-mode)
   (delete-selection-mode nil) ; For lispy
   (global-auto-revert-mode 1)
+  (savehist-mode +1)
   (when (eq system-type 'darwin)
     (pixel-scroll-precision-mode 1)
     (setq pixel-scroll-precision-use-momentum t))
@@ -1339,6 +1340,13 @@ exactly like the old ace-jump integration."
 	 ([remap move-beginning-of-line] . crux-move-beginning-of-line))
   )
 
+;;; -> Searching and navigation -> Move text
+
+(use-package move-text
+  :bind
+  ("M-<up>" . move-text-up)
+  ("M-<down>" . move-text-down))
+
 ;;; -> Searching and navigation -> Casual suite
 
 (use-package casual-suite
@@ -1654,6 +1662,13 @@ exactly like the old ace-jump integration."
   (unless (featurep 'pdf-tools)
     (pdf-tools-install :noquery)))
 
+;;; -> Misc -> uptime
+
+(use-package js-uptime
+  :load-path "~/.emacs.d/lisp"
+  :config
+  (add-hook 'kill-emacs-hook #'js/uptime-log-session))
+
 ;;; --> AI configuration
 ;;; -> AI configuration -> GPTel
 
@@ -1913,6 +1928,9 @@ exactly like the old ace-jump integration."
   (org-tags-column 0)
   (org-catch-invisible-edits 'show-and-error)
   (org-insert-heading-respect-content t)
+
+  (org-goto-auto-isearch nil)
+  (org-M-RET-may-split-line nil)
 
   (org-default-notes-file (concat org-directory "/inbox.org"))
   (org-capture-templates
@@ -4092,6 +4110,7 @@ the current entry at point and move to the next line."
    ("C-c n j b r" . js/session-review)
    ("C-c n j b a" . js/session-all)
    ("C-c n j b b" . js/session-buffer)
+   ("C-c n j b s" . js/session-subtree-notodo)
 
    ("C-c n j n" . js/triage-next)
    ("C-c n j p" . js/triage-goto-prev)
@@ -4115,7 +4134,7 @@ _n_ext              _t_odo               _q_uit
 _p_rev              _o_pen URLs          _._ current
 _d_one              _r_oam refile
 _c_ancel            _R_oamify URL
-_s_ooner
+_s_ooner            _w_org refile
 _l_ater
 _S_manual
 "
@@ -4130,6 +4149,7 @@ _S_manual
     ("S" js/triage-manual)
     ("t" org-todo)
     ("r" org-roam-refile)
+    ("w" org-refile)
     ("R" js/roamify-url-at-point :exit t)
     ("o" open-urls-at-point-or-region)
     ("q" js/triage-quit :color blue))
@@ -5030,6 +5050,37 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
 		 (list entry title filepath completed-count total-count)
 		 nil t))  ; silent, no-cookies
             (message "No URL found for entry: %s" title))))))
+
+;;; -> Elfeed -> Backups
+;;; From https://punchagan.muse-amuse.in/blog/elfeed-db-back-up-hooks/
+
+  (defvar pc/elfeed-db-save-timer nil
+    "Timer for debounced elfeed database saves.")
+
+  (defun pc/elfeed-db-save-and-backup ()
+    "Save the elfeed database and commit to git."
+    (when (and (boundp 'elfeed-db) elfeed-db)
+      (elfeed-db-save)
+      (let ((default-directory elfeed-db-directory))
+	(when (file-exists-p ".git")
+          (call-process "git" nil "*elfeed-db-backup*" nil "add" "-A")
+          (call-process "git" nil "*elfeed-db-backup*" nil "commit" "-m" "auto-backup")
+          (call-process "git" nil "*elfeed-db-backup*" nil "push" "origin" "main")))))
+
+  (defun pc/elfeed-db-save-soon ()
+    "Schedule a database save after 10 seconds of idle."
+    (interactive)
+    (when pc/elfeed-db-save-timer
+      (cancel-timer pc/elfeed-db-save-timer))
+    (setq pc/elfeed-db-save-timer
+          (run-with-idle-timer 10 nil #'pc/elfeed-db-save-and-backup)))
+
+  ;; Save and backup when tags change (elfeed-web usage)
+  (add-hook 'elfeed-tag-hooks   (lambda (&rest _) (pc/elfeed-db-save-soon)))
+  (add-hook 'elfeed-untag-hooks (lambda (&rest _) (pc/elfeed-db-save-soon)))
+
+  ;; Save and backup when new entries are added
+  (add-hook 'elfeed-db-update-hook #'pc/elfeed-db-save-soon)
 
 ;;; -> Elfeed -> Multi-Device Syncing
 
