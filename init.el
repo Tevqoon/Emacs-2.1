@@ -156,6 +156,8 @@ are defining or executing a macro."
   ;; To disable collection of benchmark data after init is done.
   (add-hook 'after-init-hook 'benchmark-init/deactivate))
 
+(use-package bug-hunter)
+
 (use-package emacs-everywhere
   :bind
   ("<f16>" . js/goto-finder)
