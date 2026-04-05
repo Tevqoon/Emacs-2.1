@@ -4102,7 +4102,7 @@ _p_rev              _o_pen URLs          _._ current
 _d_one              _r_oam refile
 _c_ancel            _R_oamify URL
 _s_ooner            _w_org refile
-_l_ater
+_l_ater             _a_rchive
 _S_manual
 "
     ("." js/triage-goto-current)
@@ -4111,6 +4111,7 @@ _S_manual
     ("p" js/triage-goto-prev)
     ("d" js/triage-done)
     ("c" js/triage-cancel)
+    ("a" org-archive-subtree-default)
     ("s" js/triage-snooze-soon)
     ("l" js/triage-snooze-later)
     ("S" js/triage-manual)

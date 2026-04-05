@@ -30,7 +30,7 @@
 (defvar js/triage-session-total 0
   "Total items collected when the session started.")
 
-(defvar js/triage-default-session #'js/todo-buffer
+(defvar js/triage-default-session #'js/session-buffer
   "Function called when `js/triage--visit-current' finds an empty queue.")
 
 ;;; ─── Collection ──────────────────────────────────────────────────────────
