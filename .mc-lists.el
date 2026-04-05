@@ -37,6 +37,7 @@
 	dired-do-rename
 	dired-find-file
 	dired-flag-file-deletion
+	dired-mark
 	dired-maybe-insert-subdir
 	dired-next-line
 	dired-previous-line

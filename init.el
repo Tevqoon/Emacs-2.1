@@ -4019,7 +4019,8 @@ EXTRA-STATES is an optional list of additional states to block on."
 		  (todo "ACTIVE" ((org-agenda-overriding-header "* Active projects: ")
 				  (org-agenda-sorting-strategy '(deadline-up))))
 		  (todo "PACT" ((org-agenda-overriding-header "* Pacts: ")
-				(org-agenda-sorting-strategy '(deadline-up))))
+				(org-agenda-sorting-strategy '(deadline-up))
+				(org-agenda-skip-function '(or (js/org-skip-if-ancestor-blocked)))))
 		  (tags "PRIORITY=\"B\""
 			((org-agenda-skip-function '(org-agenda-skip-entry-if 'todo 'done))
 			 (org-agenda-overriding-header "* Lower-priority:")))
@@ -6023,7 +6024,9 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
 
 (use-package magit
   :defer t
-  :bind ("C-x g" . magit-status)
+  :bind
+  (("C-x g" . magit-status)
+   ("C-x f" . magit-file-dispatch))
   :custom
   (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1)
   (magit-process-connection-type nil)
