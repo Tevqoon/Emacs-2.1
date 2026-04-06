@@ -1751,10 +1751,12 @@ Produces multiple regions so expreg can step through them."
 
 ;;; -> AI configuration -> Emacs MCP
 
-(use-package mcp-server-lib)
+(use-package mcp-server-lib
+  :if (not (eq system-type 'android)))
 
 ;; Synchronous tool server for direct MCP tool calls
 (use-package emacs-mcp-tool-server
+  :if (not (eq system-type 'android)) ; Seems not worth the hassle
   :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
   :ensure mcp-server-lib
   :bind
@@ -1768,11 +1770,10 @@ Produces multiple regions so expreg can step through them."
   )
 
 (use-package mcp
+  :if (not (eq system-type 'android))
   :ensure t
   :custom (mcp-hub-servers
-           `(
-             ;; ("fetch" . (:command "uvx" :args ("mcp-server-fetch"))) ; Seems like DDG has its own fetch tool.
-	     ("duckduckgo" . (:command "uvx" :args ("duckduckgo-mcp-server")))
+           `(("duckduckgo" . (:command "uvx" :args ("duckduckgo-mcp-server")))
 	     ("emacs-mcp-tool-server" .
 	      (:command ,(expand-file-name "~/.emacs.d/emacs-mcp-stdio.sh")
 			:args ("--init-function=emacs-mcp-tool-start-server"
