@@ -4223,6 +4223,11 @@ _S_manual
   (add-to-list 'org-structure-template-alist '("ax" . "axiom"))  ; you have several axioms
   )
 
+(use-package corg
+  :vc (:url "https://github.com/isamert/corg.el")
+  :hook (org-mode . corg-setup))
+
+
 ;;; ** org-static-blog
 ;;; Blog + Personal website configuration
 
