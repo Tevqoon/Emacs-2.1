@@ -13,9 +13,9 @@
 ;;;
 ;;;
 ;;; Code:
-;;; --> Initialization
-;;;
-;;; -> Initialization -> Package initialization
+
+;;; * Initialization
+;;; ** Package initialization
 
 (setq custom-file "~/.emacs.d/custom.el")
 (when (file-exists-p custom-file)
@@ -42,7 +42,7 @@
   :functions exec-path-from-shell-initialize
   :init (exec-path-from-shell-initialize))
 
-;;; -> Initialization -> Basic setup
+;;; ** Basic setup
 (use-package emacs
   :init
   (tool-bar-mode -1)
@@ -175,7 +175,7 @@ are defining or executing a macro."
   (defalias 'display-buffer-other-window 'display-buffer))
 
 
-;;; -> Initialization -> Browser Integration
+;;; ** Browser Integration
 
 (use-package browser-setup
   :no-require t
@@ -196,9 +196,8 @@ are defining or executing a macro."
    )
   )
 
-;;; -> Initialization -> Misc
-
-;;; -> Initialization -> Misc -> Persistent Variables Utility
+;;; ** Misc
+;;; *** Persistent Variables Utility
 (use-package persistent-vars
   :ensure nil
   :commands (dump-vars-to-file dump-closing-variables)
@@ -247,7 +246,8 @@ between Emacs sessions.")
     (dump-vars-to-file closing-variables closing-variables-filename))
   )
 
-;;; --> Projects
+;;; * Projects
+
 (use-package project
   :ensure nil
   :bind-keymap ("C-c p" . project-prefix-map)
@@ -270,8 +270,8 @@ between Emacs sessions.")
 			 (project-remember-project pr))))
   )
 
-;;; --> Look and feel
-
+;;; * Look and feel
+;;; ** Theme & Symbols
 (use-package doom-themes
   :functions my/apply-theme
   :init
@@ -301,6 +301,8 @@ between Emacs sessions.")
 
 (use-package nerd-icons
   :defer t)
+
+;;; ** Modeline
 
 (use-package doom-modeline
   :functions doom-modeline-mode
@@ -367,7 +369,7 @@ between Emacs sessions.")
   :bind
   (("<f1> D" . devdocs-lookup)))
 
-;;; -> Look and feel -> Tabs, frames, windows
+;;; ** Tabs, frames, windows
 
 (use-package tab-bar
   :custom
@@ -454,8 +456,8 @@ between Emacs sessions.")
    (setq ns-pop-up-frames nil)
 
    (defvar org-roam-directory "~/Documents/org")
-   ;;; MacOS Autocommit:
-   ;;; launchctl load ~/Library/LaunchAgents/com.jure.org-git-autocommit.plist
+ ;;; MacOS Autocommit:
+ ;;; launchctl load ~/Library/LaunchAgents/com.jure.org-git-autocommit.plist
 
    (defvar org-directory "~/Documents/org")
    (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
@@ -469,7 +471,7 @@ between Emacs sessions.")
    (set-register ?j `(file . ,(concat org-directory "/journals/Journelly.org")))
    (set-register ?p `(file . ,(concat org-directory "/20250823160311-software.org")))
 
-   ;;; https://www.reddit.com/r/emacs/comments/1qlnde7/comment/o1fq5lj/
+ ;;; https://www.reddit.com/r/emacs/comments/1qlnde7/comment/o1fq5lj/
    (defun start-process@use-pipe (fn &rest args)
      ;; checkdoc-params: (fn args)
      "Advice to ensure that `start-process' uses a pipe rather than
@@ -483,7 +485,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 ;;; NOTE: Might work as well: https://github.com/d12frosted/homebrew-emacs-plus/tree/master/community/patches/aggressive-read-buffering
 
    )
-  ;;; Android configuration
+;;; ** Android configuration
   ('android
    (defvar org-roam-directory "~/Documents/org")
    (defvar org-directory "~/Documents/org")
@@ -518,6 +520,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
     :help "Display Android keyboard")
    )
 
+;;; ** Linux configuration
   ('gnu/linux
    (menu-bar-mode -1)
    (scroll-bar-mode -1)
@@ -546,7 +549,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (_ (display-warning 'os "Unhandled operating system %s" system-type :warning))
   )
 
-;;; -> Look and feel -> Fonts
+;;; ** Fonts
 
 ;; ===================================
 ;; Common Font Configuration (All Platforms)
@@ -747,7 +750,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 
   )
 
-;;; --> Searching and navigation
+;;; * Searching and navigation
 
 (use-package isearch
   :ensure nil
@@ -838,6 +841,11 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 
 (use-package company-box
   :hook company-mode)
+
+
+(use-package outline-stars
+  :vc (:url "https://codeberg.org/phmcc/outline-stars")
+  :config (outline-stars-mode 1))
 
 (use-package hydra)
 
@@ -1306,14 +1314,14 @@ Produces multiple regions so expreg can step through them."
 	 ([remap move-beginning-of-line] . crux-move-beginning-of-line))
   )
 
-;;; -> Searching and navigation -> Move text
+;;; ** Move text
 
 (use-package move-text
   :bind
   ("M-<up>" . move-text-up)
   ("M-<down>" . move-text-down))
 
-;;; -> Searching and navigation -> Casual suite
+;;; ** Casual suite
 
 (use-package casual-suite
   :ensure t)
@@ -1429,8 +1437,8 @@ Produces multiple regions so expreg can step through them."
   :bind	("s-." . casual-symbol-overlay-tmenu)
   :config
 
-  ;;; Add multiple cursors to the casual-symbol-overlay
-  (transient-append-suffix
+
+  (transient-append-suffix 		; Add multiple cursors to the casual-symbol-overlay
     'casual-symbol-overlay-tmenu
     '(0 2 0)
     '("h" "Multiple-cursors" ar/mc-mark-all-symbol-overlays))
@@ -1511,7 +1519,7 @@ Produces multiple regions so expreg can step through them."
          ("M-j" . org-agenda-clock-goto) ; optional
          ("J" . bookmark-jump))) ; optional
 
-;;; -> Searching and navigation -> Additional keybinds
+;;; ** Additional keybinds
 
 (use-package key-chord
   :config
@@ -1519,7 +1527,7 @@ Produces multiple regions so expreg can step through them."
   (key-chord-mode 1)
   )
 
-;;; -> Searching and navigation -> Controller support
+;;; ** Controller support
 ;;;
 ;;; Note: On the 8bitdo in switch mode on android, AB and XY are swapped between each other.
 ;;;
@@ -1589,7 +1597,7 @@ Produces multiple regions so expreg can step through them."
 	 )
   )
 
-;;; --> Misc helper packages
+;;; * Misc helper packages
 
 (use-package function-groups
   :load-path "~/.emacs.d/lisp/function-groups/")
@@ -1618,7 +1626,7 @@ Produces multiple regions so expreg can step through them."
   ;; editing experience without affecting cursor placement.
   (stripspace-restore-column t))
 
-;;; -> Misc -> PDFView
+;;; ** PDFView
 
 (use-package pdf-tools
   :ensure t
@@ -1628,15 +1636,15 @@ Produces multiple regions so expreg can step through them."
   (unless (featurep 'pdf-tools)
     (pdf-tools-install :noquery)))
 
-;;; -> Misc -> uptime
+;;; ** uptime
 
 (use-package js-uptime
   :load-path "~/.emacs.d/lisp"
   :config
   (add-hook 'kill-emacs-hook #'js/uptime-log-session))
 
-;;; --> AI configuration
-;;; -> AI configuration -> GPTel
+;;; * AI configuration
+;;; ** GPTel
 
 (use-package gptel
   :functions
@@ -1679,14 +1687,14 @@ Produces multiple regions so expreg can step through them."
     ;; :request-params '(:provider (:only ["openai"]))
     )
 
-  ;;; -> GPTel -> Tool use
+;;; ** Tool use
   ;; Don't include tool and reasoning blocks by default
   (setq-default gptel-include-reasoning nil)
   (setq-default gptel-include-tool-results 'auto)
 
   (require 'gptel-integrations) ; MCP
 
-  ;;; -> GPTel -> Saving
+;;; ** Saving
   (defun org/enable-gptel-for-chatlog-buffer ()
     "Enable gptel-mode if the current buffer has the `chatlog' tag."
     (when (and (buffer-file-name)
@@ -1730,7 +1738,7 @@ Produces multiple regions so expreg can step through them."
 
 ;;; End of GPTel package block
 
-;;; -> AI Configuration -> Copilot
+;;; ** Copilot
 
 (use-package copilot
   :if (not (eq system-type 'android))
@@ -1749,7 +1757,7 @@ Produces multiple regions so expreg can step through them."
   :config
   (add-to-list 'warning-suppress-types '(copilot)))
 
-;;; -> AI configuration -> Emacs MCP
+;;; ** Emacs MCP
 
 (use-package mcp-server-lib
   :if (not (eq system-type 'android)))
@@ -1785,7 +1793,7 @@ Produces multiple regions so expreg can step through them."
   (mcp-hub-start-all-server)
   )
 
-;;; -> AI configuration -> aidermacs
+;;; ** aidermacs
 
 ;; (use-package aidermacs
 ;;   :if (eq system-type 'darwin)
@@ -1806,7 +1814,7 @@ Produces multiple regions so expreg can step through them."
 
 ;;; End of aidermacs package block
 
-;;; -> AI Configuration -> Xenodium Agent shell
+;;; ** Xenodium Agent shell
 
 (use-package agent-shell
   :if (not (eq system-type 'android))
@@ -1856,13 +1864,13 @@ Produces multiple regions so expreg can step through them."
 ;;; End of AI configuration block
 
 
-;;; --> Markdown
+;;; * Markdown
 
 (use-package markdown-mode
   :ensure t
   :mode ("\\.md\\'" . markdown-mode))
 
-;;; --> Org-mode
+;;; * Org-mode
 
 (defvar-local js/org-rename-buffer-enabled nil
   "Buffer-local variable to enable/disable tag updating.")
@@ -2175,7 +2183,7 @@ Handles both |*abc*| and *|abc|* cases. Otherwise behave like self-insert."
 
   (add-hook 'org-mode-hook #'my/org-setup-wrap-keys)
 
-  ;;; -> Org mode -> Navigation
+;;; ** Navigation
   (defun my/org-narrow-to-heading-content ()
     "Narrow to current heading's content, excluding subheadings.
 Automatically expands the heading if it's folded."
@@ -2235,7 +2243,7 @@ Automatically expands the heading if it's folded."
 	(org-sort-entries nil ?o))))
   )
 
-;;; -> Org mode -> spliced exporting
+;;; ** spliced exporting
 
 (use-package js-ox-strip-heading
   :load-path "~/.emacs.d/lisp/"
@@ -2492,7 +2500,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	(org-todo "DONE"))))
   )
 
-;;; -> Org mode -> Org-roam
+;;; ** Org-roam
 
 (use-package org-roam
   :ensure t
@@ -2627,7 +2635,7 @@ With prefix arg NO-LINK, leave nothing behind (original behavior)."
                   "\n")
           (forward-line -1)))))
 
-;;; -> org-roam -> Aesthetics
+;;; ** Aesthetics
 
   ;; Color roam links differently
   (defface org-roam-link
@@ -2689,7 +2697,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
   ;; Folded backlink buffer
   (add-to-list 'magit-section-initial-visibility-alist (cons 'org-roam-node-section 'hide))
 
-;;; -> org-roam -> Dailies
+;;; ** Dailies
   (setq org-extend-today-until 4)
 
   ;; Fuck it, when nothing else works, bring in a global variable
@@ -2731,7 +2739,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
 			 )
       ))
 
-  ;;; -> org-roam -> Autocapture -> dailies
+;;; *** dailies
 
   (defvar org-roam-capture--browser nil
     "Variable to pass current browser to capture templates.")
@@ -2782,7 +2790,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
 			 :props (list :override-default-time (current-time)))
       ))
 
-  ;;; -> Org-roam -> Autocapture -> Browser Integration
+;;; *** Browser Integration
 
   (defun org-roam-link-make-string (id &optional description)
     "Makes an org-roam link string pointing to the given id.
@@ -2988,7 +2996,7 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 	 :info (list :ref url)
 	 :props (list :finalize #'roamify-finalizer)))))
 
-  ;;; -> org-roam -> Helper functions
+;;; ** Helper functions
 
   (defun js/org--derive-title ()
     "Return the first link's description in the heading, or the whole heading, as a plain string."
@@ -3010,7 +3018,7 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 		(id (org-roam-node-id node)))
       id))
 
-  ;;; -> org-roam -> Archiving
+;;; ** Archiving
   (defun archived-backlink-p (backlink)
     "Checks whether the backlink lives under the Archived today heading."
     (let* ((properties (org-roam-backlink-properties backlink))
@@ -3228,8 +3236,8 @@ you can catch it with `condition-case'."
 	       end (save-excursion (org-end-of-subtree t t))))
        (point-marker))))
 
-  ;;; -> org-roam -> dailies -> monthlies
-  ;;; Monthly professional log
+;;; *** monthlies
+;;; Monthly professional log
   ;; journals/monthlies/%Y-%m-monthly.org
   ;; * %Y-%m-%d %A         <- day heading, no ID
   ;;   ** ...               <- log entries captured here
@@ -3312,7 +3320,7 @@ Never creates a heading for the chosen date."
   )
 ;;; End of org-roam package block
 
-;;; -> org-roam -> org-transclusion
+;;; ** org-transclusion
 
 (use-package org-transclusion
   :ensure t
@@ -3336,7 +3344,7 @@ Never creates a heading for the chosen date."
   :after org-transclusion
   :config (org-transclusion-font-lock-mode +1))
 
-;;; -> Org-roam -> org-node
+;;; ** org-node
 
 (use-package org-mem
   :defer
@@ -3466,7 +3474,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
   (org-node-roam-accelerator-mode -1)
   )
 
-;;; -> Org-roam -> org-roam-ui
+;;; ** org-roam-ui
 
 (use-package org-roam-ui
   :after org-roam
@@ -3476,10 +3484,10 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
   (org-roam-ui-update-on-save t)
   (org-roam-ui-open-on-start nil))
 
-;;; TODO -> Org mode -> Citation
+;;; TODO ** Citation
 
 ;;; https://github.com/org-roam/org-roam-bibtex
-;;; -> Org mode -> Tag management
+;;; ** Tag management
 
 ;; The tag handling code adapted from:
 ;; https://d12frosted.io/posts/2021-01-16-task-management-with-roam-vol5.html
@@ -3661,7 +3669,7 @@ Each function is called with two arguments: the tag and the buffer.")
   ) ;;
 ;;; End of vulpea package block
 
-;;; -> Org mode -> Anki
+;;; ** Anki
 
 (use-package anki-editor
   :if (not (eq system-type 'android))
@@ -3694,7 +3702,7 @@ Each function is called with two arguments: the tag and the buffer.")
 
   (tags/make-db-searcher "flashcards")
 
-  ;;; -> Org mode -> Anki -> Overrides
+;;; *** Overrides
 
   (defcustom anki-editor-builtin-latex-environments '("tikzcd" "bprooftree" "prooftree" "logicproof")
     "LaTeX environments that will always be translated using Anki's built-in LaTeX.
@@ -3782,7 +3790,7 @@ See `js/anki-derive-fields' for full hierarchy details."
                                :hash   hash
                                :marker (point-marker)))))
 
-  ;;; -> Org mode -> Anki -> Push functions
+;;; *** Push functions
 
   (defvar anki-flashcard-error-buffer "*Anki Flashcard Errors*"
     "Buffer name for displaying Anki flashcard push errors.")
@@ -3839,7 +3847,7 @@ See `js/anki-derive-fields' for full hierarchy details."
             (display-buffer anki-flashcard-error-buffer))
         (message "Pushed all %d flashcard files" total)))))
 
-;;; -> Org mode -> Agenda
+;;; ** Agenda
 
 (use-package org-agenda
   :ensure org
@@ -4028,7 +4036,7 @@ EXTRA-STATES is an optional list of additional states to block on."
 		  (todo "EXPLORE" ((org-agenda-overriding-header "* Things to explore: ")))
 		  )))))
 
-  ;;; -> Org mode -> Agenda -> Refiling integration
+;;; *** Refiling integration
 
   (defun js/agenda-refile ()
     "From org-agenda, refile the subtree into the selected org-roam node."
@@ -4133,7 +4141,7 @@ _S_manual
 
 ;;; End of org agenda package block
 
-;;; -> Org mode -> Babel
+;;; ** Babel
 
 (use-package org ;; babel
   :defer t
@@ -4187,7 +4195,7 @@ _S_manual
   (add-to-list 'org-structure-template-alist '("ax" . "axiom"))  ; you have several axioms
   )
 
-;;; -> Org Mode -> org-static-blog
+;;; ** org-static-blog
 ;;; Blog + Personal website configuration
 
 (use-package htmlize
@@ -4456,7 +4464,7 @@ With C-u C-u: pull static/ from remote."
 
 ;;; End of org-static-blog code block.
 
-;;; -> Org Mode -> Open Street map
+;;; ** Open Street map
 
 (use-package osm
   :bind-keymap ("C-c n m" . osm-prefix-map) ;; Alternatives: `osm-home' or `osm'
@@ -4502,7 +4510,7 @@ With C-u C-u: pull static/ from remote."
             (message "No coordinates found in heading properties"))))))
   )
 
-;;; --> Elfeed
+;;; * Elfeed
 
 (use-package elfeed
   :defines
@@ -4688,7 +4696,7 @@ With C-u C-u: pull static/ from remote."
     (interactive)
     (elfeed-filter-maker "-trash +papers @1-months-ago" "Showing papers."))
 
-  ;;; Modified so we can search both by feed name and author.
+;;; Modified so we can search both by feed name and author.
   (defun elfeed-search-compile-filter (filter)
     "Compile FILTER into a lambda function for `byte-compile'.
 
@@ -4771,7 +4779,7 @@ With C-u C-u: pull static/ from remote."
 	(elfeed-search-browse-url))))
 
 
-;;; -> Elfeed -> Wallabag integration
+;;; ** Wallabag integration
   (defun js/elfeed-entries-to-wallabag (&optional entries)
     "Add elfeed entries to wallabag and sync to server.
     If ENTRIES is provided, use those instead of the selected entries.
@@ -4804,7 +4812,7 @@ With C-u C-u: pull static/ from remote."
 
       (message "Added %d entries to wallabag" added-count)))
 
-  ;;; -> Elfeed -> Podcastify integration
+;;; ** Podcastify integration
   (defvar my/elfeed-podcastify-feed-rules nil
     "List of (feed-name . predicate-function) pairs for automatic feed classification.
 Each predicate function should take an elfeed entry and return non-nil if the entry
@@ -4951,7 +4959,7 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
           (error
            (message "Error adding to podcastify: %s" (error-message-string err)))))))
 
-;;; -> Elfeed -> Deluge integration
+;;; ** Deluge integration
 
   (defvar deluge-watch-dir (expand-file-name "~/Downloads/")
     "The folder into which to download the .torrent files.")
@@ -5022,7 +5030,7 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
 		 nil t))  ; silent, no-cookies
             (message "No URL found for entry: %s" title))))))
 
-;;; -> Elfeed -> Backups
+;;; ** Backups
 ;;; From https://punchagan.muse-amuse.in/blog/elfeed-db-back-up-hooks/
 
   (defvar pc/elfeed-db-save-timer nil
@@ -5053,7 +5061,7 @@ In show mode, adds the current entry; in search mode, adds all selected entries.
   ;; Save and backup when new entries are added
   (add-hook 'elfeed-db-update-hook #'pc/elfeed-db-save-soon)
 
-;;; -> Elfeed -> Multi-Device Syncing
+;;; ** Multi-Device Syncing
 
 ;;; Core Variables
   (defvar my/elfeed-db-modified nil
@@ -5223,7 +5231,8 @@ This is attached directly to database modification functions."
              (if my/elfeed-debug "enabled" "disabled")))
 
 
-  ) ;;; End of elfeed use-package block
+  )
+;;; End of elfeed use-package block
 
 ;;; The abstracted out package has some weird issues
 (use-package elfeed-sync
@@ -5294,7 +5303,7 @@ This is attached directly to database modification functions."
       (format "%s (%s)" desc link)))
 
 
-  ;;; Elfeed autologging
+;;; Elfeed autologging
   (advice-add 'elfeed-search-browse-url :before #'js/log-elfeed-entries)
   (advice-add 'elfeed-search-show-entry :after #'js/elfeed-search-logger)
   (advice-add 'open-youtube-in-iina :before #'js/log-elfeed-entries)
@@ -5366,7 +5375,7 @@ If a key is provided, use it instead of the default capture template."
   ) ;;
 ;;; End of elfeed-org package block
 
-;;; -> Elfeed -> Elfeed-tube
+;;; ** Elfeed-tube
 ;;; TODO: Rewrite the elfeed downloader
 
 (use-package elfeed-tube
@@ -5507,8 +5516,8 @@ If the file doesn't exist, removes the +downloaded tag and skips it."
              (upload-date (elfeed-search-format-date (elfeed-entry-date entry)))
              (elfeed-title (escape-slashes (elfeed-entry-title entry)))
 
-             ;;; The base filename is stored relative to the Youtube folder
-             ;;; It is later reconstructed with the yt-dlp-folder variable
+             ;; The base filename is stored relative to the Youtube folder
+             ;; It is later reconstructed with the yt-dlp-folder variable
              (base-filename (concat (file-name-as-directory subfolder)
                                     (file-name-as-directory author-name)
                                     upload-date
@@ -5561,7 +5570,7 @@ If none of the selected entries are downloaded, a message is shown."
     (interactive)
     (elfeed-filter-maker "+downloaded" "Showing previously downloaded items."))
 
-  ;;; Manually add items
+;;; Manually add items
   (defun js/elfeed-fetch-youtube-metadata (url)
     "Synchronously fetch title and channel info for a YouTube video at URL.
 Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
@@ -5588,7 +5597,7 @@ Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
   ) ;;
 ;;; End of elfeed-tube package block
 
-;;; -> Elfeed -> Elfeed-score
+;;; ** Elfeed-score
 
 (use-package elfeed-score
   :ensure t
@@ -5601,7 +5610,7 @@ Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
 
   )
 
-;;; -> Elfeed -> Elpapers
+;;; ** Elpapers
 
 ;;; Works for Emacs 30+
 (use-package elpapers
@@ -5615,9 +5624,9 @@ Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
   :config
   (elpapers-enable-auto-ingest))
 
-;;; -> Elfeed -> End
+;;; ** End
 
-;;; --> Readwise
+;;; * Readwise
 
 ;; (use-package org-readwise
 ;;   :vc (:url "https://github.com/Tevqoon/org-readwise" :rev :newest)
@@ -5642,7 +5651,7 @@ Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
 ;;     (unless (file-exists-p org-readwise-output-directory)
 ;;       (make-directory org-readwise-output-directory t)))
 
-;;; --> Wallabag annotation importer
+;;; * Wallabag annotation importer
 
 (use-package org-roam-annotation-import
   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
@@ -5650,7 +5659,7 @@ Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
   (require 'wallabag-backend)
   )
 
-;;; --> Wallabag
+;;; * Wallabag
 
 (use-package request
   :ensure t)
@@ -5984,13 +5993,12 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
                              content)))
   )
 
-;;; -> Verb for HTTP Requests
 (use-package verb
   :ensure t
   :defer t
   :commands (verb-send-request-on-point verb-mode))
 
-;;; --> Programming
+;;; * Programming
 
 (use-package magit
   :defer t
@@ -6116,7 +6124,7 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
 (use-package aggressive-indent
   :diminish aggressive-indent-mode)
 
-;;; -> Programming -> Tree-sitter
+;;; ** Tree-sitter
 
 ;; (use-package treesit
 ;;   :ensure nil
@@ -6148,7 +6156,7 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
 ;;   :config
 ;;   (global-treesit-auto-mode))
 
-;;; -> Programming -> apheleia
+;;; ** apheleia
 
 (use-package apheleia
   :if (not (eq system-type 'android))
@@ -6219,7 +6227,7 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
   ;; Enable globally
   (apheleia-global-mode +1))
 
-;;; -> Programming -> LSP Eglot
+;;; ** LSP Eglot
 
 (use-package eglot
   :functions jsonrpc--log-event
@@ -6240,7 +6248,7 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
   (setf (plist-get eglot-events-buffer-config :size) 0)
   )
 
-;;; -> Programming -> LaTeX
+;;; ** LaTeX
 
 (use-package tex
   :ensure auctex
@@ -6274,7 +6282,7 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
   (LaTeX-mode . turn-on-reftex)
   )
 
-;;; -> Programming -> LaTeX -> CDLaTeX
+;;; ** CDLaTeX
 (use-package cdlatex
   :config
   (defun js/cdlatex-sub-superscript ()
@@ -6444,7 +6452,7 @@ When pressed twice, make the sub/superscript roman."
   (LaTeX-mode . turn-on-cdlatex)
   )
 
-;;; -> Programming -> LaTeX -> Math delimiters
+;;; **   Math delimiters
 
 (use-package math-delimiters
   :load-path "~/.emacs.d/lisp/math-delimiters"
@@ -6456,7 +6464,7 @@ When pressed twice, make the sub/superscript roman."
   :custom
   (math-delimiters-compressed-display-math nil))
 
-;;; -> Programming -> Lisp
+;;; ** Lisp
 
 (use-package lisp-mode
   :ensure nil  ; built-in package
@@ -6471,18 +6479,18 @@ When pressed twice, make the sub/superscript roman."
 
 
 
-;;; -> Programming -> Lisp -> Common lisp
+;;; *** Common lisp
 
 (use-package sly
   :custom
   (inferior-lisp-program "sbcl"))
 
-;;; -> Programming -> Lisp -> Racket
+;;; *** Racket
 
 (use-package racket-mode
   :defer t)
 
-;;; -> Programming -> Lisp -> Clojure
+;;; *** Clojure
 
 (use-package clojure-mode
   :custom
@@ -6501,17 +6509,17 @@ When pressed twice, make the sub/superscript roman."
   :config
   (cljr-add-keybindings-with-prefix "C-c C-m"))
 
-;;; -> Programming -> Haskell
+;;; ** Haskell
 
 (use-package haskell-mode
   :defer t)
 
-;;; -> Programming -> Nix
+;;; ** Nix
 
 (use-package nix-mode
   :mode "\\.nix\\'")
 
-;;; -> Programming -> OCaml
+;;; ** OCaml
 ;;; Adapted from
 ;;; https://batsov.com/articles/2022/08/23/setting-up-emacs-for-ocaml-development/
 
@@ -6553,14 +6561,14 @@ When pressed twice, make the sub/superscript roman."
 ;;   :config
 ;;   (flycheck-ocaml-setup))
 
-;;; -> Programming -> Agda
+;;; ** Agda
 
 (when (eq system-type 'darwin)
   (let ((coding-system-for-read 'utf-8))
     (shell-command-to-string "agda --emacs-mode locate")))
 
 
-;;; -> Programming -> Lean
+;;; ** Lean
 ;;; Currently lean simply works better in vscode. Figures.
 
 ;; (use-package lsp-ui)
@@ -6570,7 +6578,7 @@ When pressed twice, make the sub/superscript roman."
 ;;   ;; to defer loading the package until required
 ;;   :commands (lean4-mode))
 
-;;; -> Programming -> Octave
+;;; ** Octave
 
 (use-package octave
   :mode (("\\.m\\'" . octave-mode))
@@ -6582,7 +6590,7 @@ When pressed twice, make the sub/superscript roman."
   ;;             (setq comment-add 0)))
   )
 
-;;; --> Programming -> Restclient
+;;; ** Restclient
 
 (use-package restclient
   :ensure t
@@ -6596,7 +6604,7 @@ When pressed twice, make the sub/superscript roman."
         restclient-same-buffer-response t
         restclient-same-buffer-response-name "*HTTP Response*"))
 
-;;; --> Programming -> Docker
+;;; ** Docker
 
 (use-package dockerfile-mode
   :ensure t)
@@ -6609,7 +6617,7 @@ When pressed twice, make the sub/superscript roman."
   :ensure t
   :bind ("M-s d" . docker))
 
-;;; --> Video Trimmer
+;;; * Video Trimmer
 (use-package video-trimmer
   :load-path "~/.emacs.d/lisp/"
   :commands video-trimmer-trim
@@ -6619,7 +6627,7 @@ When pressed twice, make the sub/superscript roman."
   (video-trimmer-move-by-increment 1.0)
   (video-trimmer-auto-show-transient-menu t))
 
-;;; --> Misc functions
+;;; * Misc functions
 
 (defun copy-current-line ()
   "Copy the current line into the kill ring without affecting the cursor position."
