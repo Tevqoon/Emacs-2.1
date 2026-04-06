@@ -2494,8 +2494,8 @@ Falls back to #+attr_latex :options for backwards compatibility."
   :functions
   org-roam-node-from-ref
   :bind (("C-c n n b " . org-roam-buffer-toggle)
-         ;; ("C-c n f" . js/org-roam-node-find)
-         ;; ("C-c n i" . js/org-roam-node-insert)
+         ("C-c n f" . js/org-roam-node-find)
+         ("C-c n i" . js/org-roam-node-insert)
          ("C-c n d" . org-roam-dailies-map)
          ("C-c n n r" . org-roam-refile)
          ("C-c n n g" . org-id-get-create)
@@ -3341,6 +3341,7 @@ Never creates a heading for the chosen date."
   (org-mem-updater-mode))
 
 (use-package org-node
+  :if (not (eq system-type 'android))	; For some reason not working well on Android
   :after org-roam
   :bind
   (("C-c n f" . js/org-node-find)
@@ -3389,6 +3390,7 @@ With C-u prefix, insert a transclusion instead."
       (let ((org-node-filter-fn #'js/org-node-not-archived-p))
 	(org-node-insert-link*))))
 
+  ;; Modified to work outside of org-mode buffers, so i can use it in the minibuffer
   (defun org-node-insert-link (&optional region-as-initial-input novisit)
     "Insert a link to one of your ID nodes.
 
