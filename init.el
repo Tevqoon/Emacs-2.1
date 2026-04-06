@@ -431,7 +431,29 @@ between Emacs sessions.")
   :vc (:url "https://github.com/positron-solutions/sinister")
   :config
   (sinister-stillness-mode 1)
+
+  ;; Make swiper play nice with this
+  (defun js/swiper-preserve-window-start (orig &rest args)
+    "Prevent swiper from scrolling the window on open."
+    (let ((saved-window-start (window-start))
+          (saved-point (point)))
+      (apply orig args)
+      ;; only restore if we ended up back where we started (i.e. quit)
+      (when (= (point) saved-point)
+	(set-window-start (selected-window) saved-window-start))))
+
+  (advice-add 'swiper--update-input-ivy :around
+	      (defun js/swiper-update-input-no-initial-scroll (orig)
+		"Skip the first recenter call when swiper initializes."
+		(if (null swiper--current-window-start)
+		    ;; First call: run update but then restore window-start
+		    (let ((ws (window-start)))
+		      (funcall orig)
+		      (set-window-start (selected-window) ws))
+		  (funcall orig))))
   )
+
+(use-package occult)			; NOTE: Seems interesting to use more
 
 (use-package winpulse
   :vc (:url "https://github.com/xenodium/winpulse"
@@ -439,10 +461,10 @@ between Emacs sessions.")
   :config
   (winpulse-mode +1))
 
-;;; -> OS specific configuration
+;;; * OS specific configuration
 
 (pcase system-type
-  ;;; MacOS Config
+;;; ** MacOS Config
   ('darwin
    (setq ns-alternate-modifier 'meta)
    (setq ns-right-alternate-modifier 'meta)
