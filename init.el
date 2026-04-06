@@ -4505,7 +4505,6 @@ With C-u C-u: pull static/ from remote."
 ;;; --> Elfeed
 
 (use-package elfeed
-  :if (not (eq system-type 'android))
   :defines
   elfeed-search-mode-map
   elfeed-show-mode-map
@@ -5228,7 +5227,6 @@ This is attached directly to database modification functions."
 
 ;;; The abstracted out package has some weird issues
 (use-package elfeed-sync
-  :if (not (eq system-type 'android))
   :disabled
   :load-path "~/.emacs.d/lisp/elfeed-sync"
   ;; NOTE TO SELF: Defer after pattern
@@ -5252,7 +5250,6 @@ This is attached directly to database modification functions."
   )
 
 (use-package cuckoo-search
-  :if (not (eq system-type 'android))
   ;; :vc (:url "https://github.com/rtrppl/cuckoo-search" :rev :newest)
   :after (elfeed)
   :bind
@@ -5262,7 +5259,6 @@ This is attached directly to database modification functions."
 	))
 
 (use-package elfeed-org
-  :if (not (eq system-type 'android))
   :defer nil
   :after elfeed
   :custom
@@ -5374,7 +5370,6 @@ If a key is provided, use it instead of the default capture template."
 ;;; TODO: Rewrite the elfeed downloader
 
 (use-package elfeed-tube
-  :if (not (eq system-type 'android))
   :defer nil
   :after elfeed
   :bind
@@ -5596,7 +5591,6 @@ Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
 ;;; -> Elfeed -> Elfeed-score
 
 (use-package elfeed-score
-  :if (not (eq system-type 'android))
   :ensure t
   :config
   (progn
