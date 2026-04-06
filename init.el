@@ -4426,22 +4426,18 @@ Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
             (error "PDF compilation failed"))))))
 
   (defun js/sync-blog (arg)
-    "Sync blog to muffalo server.
+    "Sync blog to muffalo server via Makefile targets.
 
-No prefix: do not update the 'static/' directory on the remote.
-With C-u: include the 'static/' directory (push local static to remote).
-With C-u C-u: pull the 'static/' directory from the remote to local."
+No prefix: sync without static/.
+With C-u: sync including static/ (push).
+With C-u C-u: pull static/ from remote."
     (interactive "P")
-    (let* ((local (expand-file-name "~/Documents/blog/"))
-           (remote "jure@muffalo:~/blog/")
-           (cmd (cond
-                 ((null arg)
-                  (format "rsync -avz --delete --exclude 'static/' %s %s" local remote))
-                 ((and arg (= (prefix-numeric-value arg) 16))
-                  (format "rsync -avz --delete %s %s" (concat remote "static/") (concat local "static/")))
-                 (t
-                  (format "rsync -avz --delete %s %s" local remote)))))
-      (compile cmd)))
+    (let* ((default-directory (expand-file-name "~/Documents/blog/"))
+           (target (cond
+                    ((null arg) "sync")
+                    ((= (prefix-numeric-value arg) 16) "pull-static")
+                    (t "sync-static"))))
+      (compile (format "make %s" target))))
 
   (defun js/blog-open-in-browser ()
     "Open the current org-roam file as its published blog URL."
