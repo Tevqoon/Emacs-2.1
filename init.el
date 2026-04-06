@@ -864,10 +864,16 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 (use-package company-box
   :hook company-mode)
 
-
 (use-package outline-stars
   :vc (:url "https://codeberg.org/phmcc/outline-stars")
-  :config (outline-stars-mode 1))
+  :custom
+  (outline-stars-level-1-overline)
+  (outline-start-default-state 'folded)
+  :config
+  (outline-stars-mode 1)
+  ;; TODO: bind narrow-to-subtree and fix its jumping
+  :bind
+  )
 
 (use-package hydra)
 
