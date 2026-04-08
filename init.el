@@ -4491,6 +4491,12 @@ With C-u C-u: pull static/ from remote."
                     (t "sync-static"))))
       (compile (format "make %s" target))))
 
+  (defun js/makovec-rss ()
+    "Scrape makovec and add to blog"
+    (interactive)
+    (let* ((default-directory (expand-file-name "~/Documents/blog/")))
+      (compile "make makovec")))
+
   (defun js/blog-open-in-browser ()
     "Open the current org-roam file as its published blog URL."
     (interactive)
@@ -6482,6 +6488,7 @@ When pressed twice, make the sub/superscript roman."
      (?j ("\\iota" "\\jmath"))
      (?I ("\\mid" "\\Im"))
      (?_ ("\\downarrow" "\\Downarrow"))
+     (?. ("\\cdot" ".\\,"))
      ))
 
   :hook
