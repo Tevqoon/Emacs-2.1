@@ -38,3 +38,7 @@ anki-flashcard-queue.el
 /.agent-shell/
 /agent/
 /auto-saves/
+/.org-readwise-last-sync
+/elfeed.stats
+/history
+/vulpea.db

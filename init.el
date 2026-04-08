@@ -6652,7 +6652,7 @@ When pressed twice, make the sub/superscript roman."
 
 ;;; * Video Trimmer
 (use-package video-trimmer
-  :load-path "~/.emacs.d/lisp/"
+  :vc (:url "https://github.com/xenodium/video-trimmer")
   :commands video-trimmer-trim
   :bind (:map dired-mode-map
 	      ("V" . video-trimmer-trim))
