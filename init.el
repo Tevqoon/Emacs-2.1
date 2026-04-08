@@ -408,6 +408,10 @@ between Emacs sessions.")
     )
   )
 
+(use-package unfill
+  :bind
+  ("C-M-q" . unfill-region))
+
 ;; Also includes config from
 ;; https://www.masteringemacs.org/article/demystifying-emacs-window-manager
 (use-package ace-window
@@ -1659,7 +1663,7 @@ Produces multiple regions so expreg can step through them."
 (use-package pdf-tools
   :ensure t
   :mode ("\\.pdf\\'" . pdf-view-mode)
-  :config
+  :init
   ;; Build/install the helper binary on first run (quiet)
   (unless (featurep 'pdf-tools)
     (pdf-tools-install :noquery)))
