@@ -1277,7 +1277,8 @@ Produces multiple regions so expreg can step through them."
   (flash-multi-window t)
   (flash-rainbow t)
   (flash-rainbow-shade 8)
-  (flash-autojump t))
+  (flash-autojump nil) 			; It's hard to keep track of when you get there
+  )
 
 (use-package ace-link
   :functions ace-link-setup-default
