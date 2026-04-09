@@ -1663,6 +1663,7 @@ Produces multiple regions so expreg can step through them."
 ;;; ** PDFView
 
 (use-package pdf-tools
+  :if (not (eq system-type 'android))
   :ensure t
   :mode ("\\.pdf\\'" . pdf-view-mode)
   :init
