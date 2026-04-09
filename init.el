@@ -522,6 +522,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
 
+   (setq my/redshift? t)
    (my/apply-theme 'dark)
    ;; Bars ;;
    (menu-bar-mode -1)
