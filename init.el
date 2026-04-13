@@ -1936,6 +1936,8 @@ Produces multiple regions so expreg can step through them."
   (org-insert-heading-respect-content t)
   (org-export-with-broken-links t)
   (org-loop-over-headlines-in-active-region start-level)
+  (org-num-skip-unnumbered t)
+  (org-num-skip-tags '("nonumber" "noexport"))
 
   (org-special-ctrl-a/e t)
   (org-auto-align-tags nil)
