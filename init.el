@@ -2278,9 +2278,9 @@ Automatically expands the heading if it's folded."
 	(org-sort-entries nil ?o))))
   )
 
-;;; ** spliced exporting
+;;; ** exporting
 
-(use-package js-ox-strip-heading
+(use-package js-ox-strip-heading	; Spliced exports
   :load-path "~/.emacs.d/lisp/"
   :after ox
   )
