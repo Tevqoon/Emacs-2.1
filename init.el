@@ -6279,7 +6279,6 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
 ;;; ** LSP Eglot
 
 (use-package eglot
-  :functions jsonrpc--log-event
   :ensure nil  ; Eglot is built-in from Emacs 29
   :defer t
   :hook ((python-mode . eglot-ensure)
@@ -6287,14 +6286,13 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
          (c++-mode . eglot-ensure)
          (rust-mode . eglot-ensure)
          ;; (haskell-ts-mode . eglot-ensure)
+	 (neocaml-mode . eglot-ensure)
+	 (neocaml-interface-mode . eglot-ensure)
 	 )
 
   :custom
   (eglot-autoshutdown t)
-  (eglot-confirm-server-initiated-edits nil)
-  :config
-  (fset #'jsonrpc--log-event #'ignore)
-  (setf (plist-get eglot-events-buffer-config :size) 0)
+  (eglot-sync-connect nil)
   )
 
 ;;; ** LaTeX
@@ -6570,46 +6568,17 @@ When pressed twice, make the sub/superscript roman."
   :mode "\\.nix\\'")
 
 ;;; ** OCaml
-;;; Adapted from
-;;; https://batsov.com/articles/2022/08/23/setting-up-emacs-for-ocaml-development/
-
-;; Major mode for OCaml programming
-(use-package tuareg
-  :mode (("\\.ocamlinit\\'" . tuareg-mode)))
-
-(use-package utop
-  :ensure t
-  :commands utop
+(use-package neocaml
+  :mode (("\\.ml\\'" . neocaml-mode)
+         ("\\.mli\\'" . neocaml-interface-mode)
+         ("\\.ocamlinit\\'" . neocaml-mode))
   :config
-  ;; optional: use utop as the default REPL for tuareg
-  (add-hook 'tuareg-mode-hook #'utop-minor-mode))
+  (with-eval-after-load 'eglot
+    (neocaml--register-with-eglot)))
 
-;; (use-package ob-ocaml
-;;   :ensure nil   ;; if not available from MELPA, see fallback below
-;;   :after org
-;;   :config
-;;   (setq org-babel-default-header-args:ocaml
-;; 	'((:session . "utop")    ; use utop session by default
-;;           (:results . "output")  ; capture printed output
-;;           (:exports . "both")    ; export code and results
-;;           (:cache . "no"))))
-
-;; Major mode for editing Dune project files
-(use-package dune)
-
-;; Merlin provides advanced IDE features
-(use-package merlin
-  :hook tuareg-mode)
-
-(use-package merlin-eldoc
-  :hook ((tuareg-mode) . merlin-eldoc-setup))
-
-;; Disabled since using flymake for now, might be worth switching?
-;; This uses Merlin internally
-;; (use-package flycheck-ocaml
-;;   :ensure t
-;;   :config
-;;   (flycheck-ocaml-setup))
+(use-package ocaml-eglot
+  :ensure t
+  :hook (neocaml-mode . ocaml-eglot))
 
 ;;; ** Agda
 
