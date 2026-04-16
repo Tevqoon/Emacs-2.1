@@ -6207,74 +6207,74 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
 
 ;;; ** apheleia
 
-(use-package apheleia
-  :if (not (eq system-type 'android))
-  :config
-  ;; -- Formatter definitions for tools not built into apheleia --
+;; (use-package apheleia
+;;   :if (not (eq system-type 'android))
+;;   :config
+;;   ;; -- Formatter definitions for tools not built into apheleia --
 
-  ;; Nix: nixfmt (or alejandra if you prefer)
-  (setf (alist-get 'nixfmt apheleia-formatters)
-        '("nixfmt" "-"))
+;;   ;; Nix: nixfmt (or alejandra if you prefer)
+;;   (setf (alist-get 'nixfmt apheleia-formatters)
+;;         '("nixfmt" "-"))
 
-  ;; Clojure: cljfmt via clj-kondo's --lint or zprint standalone
-  ;; zprint is simpler - single binary, no project config needed
-  (setf (alist-get 'zprint apheleia-formatters)
-        '("zprint" "{:style [:community] :map {:comma? false}}"))
+;;   ;; Clojure: cljfmt via clj-kondo's --lint or zprint standalone
+;;   ;; zprint is simpler - single binary, no project config needed
+;;   (setf (alist-get 'zprint apheleia-formatters)
+;;         '("zprint" "{:style [:community] :map {:comma? false}}"))
 
-  ;; Emacs Lisp: use the built-in lisp-indent formatter
-  ;; (this is an elisp function formatter bundled with apheleia)
+;;   ;; Emacs Lisp: use the built-in lisp-indent formatter
+;;   ;; (this is an elisp function formatter bundled with apheleia)
 
-  ;; -- Mode associations --
-  ;; These override/extend apheleia's defaults
+;;   ;; -- Mode associations --
+;;   ;; These override/extend apheleia's defaults
 
-  ;; Python: black is already the default, but chain with isort
-  (setf (alist-get 'isort apheleia-formatters)
-        '("isort" "--profile" "black" "--stdout" "-"))
-  (setf (alist-get 'python-mode apheleia-mode-alist)
-        '(isort black))
+;;   ;; Python: black is already the default, but chain with isort
+;;   (setf (alist-get 'isort apheleia-formatters)
+;;         '("isort" "--profile" "black" "--stdout" "-"))
+;;   (setf (alist-get 'python-mode apheleia-mode-alist)
+;;         '(isort black))
 
-  ;; C/C++: clang-format (already built-in to apheleia)
-  ;; These are already mapped by default, but being explicit:
-  (setf (alist-get 'c-mode apheleia-mode-alist) 'clang-format)
-  (setf (alist-get 'c++-mode apheleia-mode-alist) 'clang-format)
+;;   ;; C/C++: clang-format (already built-in to apheleia)
+;;   ;; These are already mapped by default, but being explicit:
+;;   (setf (alist-get 'c-mode apheleia-mode-alist) 'clang-format)
+;;   (setf (alist-get 'c++-mode apheleia-mode-alist) 'clang-format)
 
-  ;; Rust: rustfmt (already built-in)
-  ;; rust-mode -> rustfmt is already the default
+;;   ;; Rust: rustfmt (already built-in)
+;;   ;; rust-mode -> rustfmt is already the default
 
-  ;; Haskell: ormolu (or fourmolu if you prefer)
-  ;; Both are already defined in apheleia-formatters
-  (setf (alist-get 'haskell-mode apheleia-mode-alist) 'ormolu)
+;;   ;; Haskell: ormolu (or fourmolu if you prefer)
+;;   ;; Both are already defined in apheleia-formatters
+;;   (setf (alist-get 'haskell-mode apheleia-mode-alist) 'ormolu)
 
-  ;; Nix
-  (setf (alist-get 'nix-mode apheleia-mode-alist) 'nixfmt)
+;;   ;; Nix
+;;   (setf (alist-get 'nix-mode apheleia-mode-alist) 'nixfmt)
 
-  ;; OCaml: ocamlformat (already built-in)
-  ;; tuareg-mode -> ocamlformat is already the default
+;;   ;; OCaml: ocamlformat (already built-in)
+;;   ;; tuareg-mode -> ocamlformat is already the default
 
-  ;; Clojure
-  (setf (alist-get 'clojure-mode apheleia-mode-alist) 'zprint)
+;;   ;; Clojure
+;;   (setf (alist-get 'clojure-mode apheleia-mode-alist) 'zprint)
 
-  ;; Emacs Lisp: opt-in to lisp-indent
-  (setf (alist-get 'emacs-lisp-mode apheleia-mode-alist) 'lisp-indent)
+;;   ;; Emacs Lisp: opt-in to lisp-indent
+;;   (setf (alist-get 'emacs-lisp-mode apheleia-mode-alist) 'lisp-indent)
 
-  ;; YAML: prettier handles this (already built-in)
-  ;; yaml-mode -> prettier is already the default
+;;   ;; YAML: prettier handles this (already built-in)
+;;   ;; yaml-mode -> prettier is already the default
 
-  ;; Dockerfile: no good standalone formatter, skip
+;;   ;; Dockerfile: no good standalone formatter, skip
 
-  ;; LaTeX: latexindent (already built-in)
-  ;; latex-mode -> latexindent is already the default
+;;   ;; LaTeX: latexindent (already built-in)
+;;   ;; latex-mode -> latexindent is already the default
 
-  ;; Shell: shfmt (disabled by default upstream due to zsh issues)
-  ;; Re-enable for bash specifically
-  (setf (alist-get 'sh-mode apheleia-mode-alist) 'shfmt)
+;;   ;; Shell: shfmt (disabled by default upstream due to zsh issues)
+;;   ;; Re-enable for bash specifically
+;;   (setf (alist-get 'sh-mode apheleia-mode-alist) 'shfmt)
 
-  ;; -- Inhibit in modes where formatting is unwanted --
-  ;; Org, restclient, octave - no formatters, apheleia will
-  ;; silently skip these since they have no mode-alist entry
+;;   ;; -- Inhibit in modes where formatting is unwanted --
+;;   ;; Org, restclient, octave - no formatters, apheleia will
+;;   ;; silently skip these since they have no mode-alist entry
 
-  ;; Enable globally
-  (apheleia-global-mode +1))
+;;   ;; Enable globally
+;;   (apheleia-global-mode +1))
 
 ;;; ** LSP Eglot
 
