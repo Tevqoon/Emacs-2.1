@@ -4118,6 +4118,7 @@ the current entry at point and move to the next line."
   )
 
 ;; In init.el with use-package:
+;; TODO: Might be better served by el-secretario
 (use-package js-triage-session
   :after org-agenda
   :load-path "~/.emacs.d/lisp"
@@ -6048,7 +6049,7 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
   :commands (verb-send-request-on-point verb-mode))
 
 ;;; * Programming
-
+;;; ** Version control
 (use-package magit
   :defer t
   :bind
@@ -6112,6 +6113,8 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
   (prog-mode . subword-mode)
   (lisp-interaction-mode . (lambda () (flymake-mode -1)))
   :config
+  (setq flymake-diagnostic-format-alist
+        '((t . (origin code message))))
   :bind (:map flymake-mode-map
 	      ("M-n" . flymake-goto-next-error)
 	      ("M-p" . flymake-goto-prev-error)
@@ -6286,8 +6289,6 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
          (c++-mode . eglot-ensure)
          (rust-mode . eglot-ensure)
          ;; (haskell-ts-mode . eglot-ensure)
-	 (neocaml-mode . eglot-ensure)
-	 (neocaml-interface-mode . eglot-ensure)
 	 )
 
   :custom
@@ -6578,7 +6579,15 @@ When pressed twice, make the sub/superscript roman."
 
 (use-package ocaml-eglot
   :ensure t
-  :hook (neocaml-mode . ocaml-eglot))
+  :after neocaml
+  :hook
+  (neocaml-base-mode . ocaml-eglot-mode)
+  (ocaml-eglot-mode . eglot-ensure)
+  :config
+  (setq ocaml-eglot-syntax-checker 'flymake))
+
+(use-package utop
+  :ensure t)
 
 ;;; ** Agda
 
