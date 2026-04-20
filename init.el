@@ -6576,6 +6576,7 @@ When pressed twice, make the sub/superscript roman."
 
 ;;; ** OCaml
 (use-package neocaml
+  :if (not (eq system-type 'android))
   :mode (("\\.ml\\'" . neocaml-mode)
          ("\\.mli\\'" . neocaml-interface-mode)
          ("\\.ocamlinit\\'" . neocaml-mode))
@@ -6584,6 +6585,7 @@ When pressed twice, make the sub/superscript roman."
     (neocaml--register-with-eglot)))
 
 (use-package ocaml-eglot
+  :if (not (eq system-type 'android))
   :ensure t
   :after neocaml
   :hook
@@ -6593,6 +6595,7 @@ When pressed twice, make the sub/superscript roman."
   (setq ocaml-eglot-syntax-checker 'flymake))
 
 (use-package utop
+  :if (not (eq system-type 'android))
   :ensure t)
 
 ;;; ** Agda
