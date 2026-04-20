@@ -363,7 +363,9 @@ between Emacs sessions.")
          :map help-map
          ("p" . helpful-at-point)
 	 :map helpful-mode-map
-	 ("q" . quit-window--and-kill))
+	 ("q" . quit-window--and-kill)
+	 :map Info-mode-map
+	 ("U" . js/process-at-point))
   :custom
   (helpful-switch-buffer-function #'switch-to-buffer)
   (help-window-select t))
@@ -2877,6 +2879,11 @@ Using the org-mac-link, this comes pre-formatted with the url title."
             (list raw (if (and cb ce)
                           (buffer-substring-no-properties cb ce)
 			"")))))))
+
+  (defun  js/process-at-point ()
+    (interactive)
+    (let ((url (org-store-link nil nil)))
+      (js/url-target-process url)))
 
   (defvar js/url-targets
     '((Log . js/url-target-log)

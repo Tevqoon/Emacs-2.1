@@ -42,3 +42,4 @@ anki-flashcard-queue.el
 /elfeed.stats
 /history
 /vulpea.db
+/org-persist/
