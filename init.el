@@ -220,6 +220,7 @@ between Emacs sessions.")
           (dump-varlist varlist buf)
           (save-buffer)
           (kill-buffer)))))
+
   (defun dump-varlist (varlist buffer)
     "Insert into buffer the setq statement to recreate the variables in VARLIST"
     (mapc (lambda (var)
@@ -250,7 +251,8 @@ between Emacs sessions.")
 
 (use-package project
   :ensure nil
-  :bind-keymap ("C-c p" . project-prefix-map)
+  ;; :bind-keymap ("C-c p" . project-prefix-map)
+  ;; No need - it is bound to =C-x p= by default!
   :custom
   (project-switch-commands
    '((project-find-file "Find file" ?f)
@@ -363,7 +365,8 @@ between Emacs sessions.")
 	 :map helpful-mode-map
 	 ("q" . quit-window--and-kill))
   :custom
-  (helpful-switch-buffer-function #'switch-to-buffer))
+  (helpful-switch-buffer-function #'switch-to-buffer)
+  (help-window-select t))
 
 (use-package devdocs
   :bind
@@ -876,6 +879,9 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (outline-start-default-state 'folded)
   :config
   (outline-stars-mode 1)
+  :bind
+  (:map prog-mode-map
+	("<backtab>" . outline-stars-cycle-buffer))
   ;; TODO: bind narrow-to-subtree and fix its jumping
   :bind
   )
@@ -2279,6 +2285,8 @@ Automatically expands the heading if it's folded."
 	(goto-char (point-min))
 	(org-sort-entries nil ?o))))
   )
+
+(use-package org-present)
 
 ;;; ** exporting
 
@@ -4052,7 +4060,7 @@ EXTRA-STATES is an optional list of additional states to block on."
 		  (agenda "" ((org-agenda-span 'week)
 			      (org-agenda-skip-function
 			       '(or (org-agenda-skip-entry-if 'todo 'done)
-				    (org-agenda-skip-entry-if 'todo '("PROCESS"))))))
+				    (org-agenda-skip-entry-if 'todo '("PROCESS" "EXPLORE"))))))
 		  (todo "FINISH" ((org-agenda-overriding-header "* Items to finish up:  ")
 				  (org-agenda-sorting-strategy '(scheduled-up category-up alpha-up))))
 		  (todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")
@@ -5674,8 +5682,6 @@ Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
   :config
   (elpapers-enable-auto-ingest))
 
-;;; ** End
-
 ;;; * Readwise
 
 ;; (use-package org-readwise
@@ -6677,20 +6683,24 @@ When pressed twice, make the sub/superscript roman."
 	      (kill-buffer)))
       (message "Not a file visiting buffer!"))))
 
+
+(defun run-emacs-with-directory (directory &optional arg)
+  (interactive "DDirectory: \nP")
+  (let ((args (cond ((equal arg '(16)) '("-Q"))
+                    (t (list "--init-directory" (expand-file-name directory))))))
+    (when (equal arg '(4))
+      (setq args (cons "--debug-init" args)))
+    (apply #'start-process "emacs" nil "emacs" args)))
+
 (defun run-emacs-with-current-directory (&optional arg)
   "Run Emacs with the current file's directory as the configuration directory.
 Calling with single prefix ARG (C-u) enables debugging.
 Calling with double prefix ARG (C-u C-u) runs Emacs with -Q."
   (interactive "P")
-  (let* ((emacs-path "/opt/homebrew/Cellar/emacs-plus@30/30.2/Emacs.app/Contents/MacOS/Emacs")
-         (current-dir (if buffer-file-name
+  (let* ((current-dir (if buffer-file-name
                           (file-name-directory buffer-file-name)
-                        default-directory))
-         (args (cond ((equal arg '(16)) '("-Q"))  ; C-u C-u
-                     (t (list "--init-directory" (expand-file-name current-dir))))))
-    (when (equal arg '(4))  ; single C-u
-      (setq args (cons "--debug-init" args)))
-    (apply #'start-process "emacs" nil emacs-path args)))
+                        default-directory)))
+    (run-emacs-with-directory current-dir arg)))
 
 (defun quit-window--and-kill ()
   "Quit and kill the buffer, also closing its window."
