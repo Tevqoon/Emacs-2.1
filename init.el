@@ -370,6 +370,33 @@ between Emacs sessions.")
   (helpful-switch-buffer-function #'switch-to-buffer)
   (help-window-select t))
 
+(use-package info
+  :ensure nil
+  :config
+  (defvar js/info-directory (expand-file-name "info/" org-roam-directory))
+
+  (add-to-list 'Info-directory-list js/info-directory)
+
+  (defun js/rebuild-info-dir ()
+    (interactive)
+    (let* ((dir js/info-directory)
+           (script (concat
+                    "cd " dir " && rm -f dir && "
+                    "for f in *.info; do "
+                    "  title=$(grep -m1 'The .* Manual\\|^File:' \"$f\" | head -1); "
+                    "  name=$(basename \"$f\" .info); "
+                    "  if grep -q 'START-INFO-DIR-ENTRY' \"$f\"; then "
+                    "    install-info --dir-file=dir \"$f\"; "
+                    "  else "
+                    "    install-info --dir-file=dir "
+                    "      --entry=\"* $name: ($name). See $name.\" \"$f\"; "
+                    "  fi; "
+                    "done"))
+           (result (shell-command-to-string script)))
+      (setq Info-dir-contents nil)
+      (message "Info dir rebuilt")))
+  )
+
 (use-package devdocs
   :bind
   (("<f1> D" . devdocs-lookup)))
