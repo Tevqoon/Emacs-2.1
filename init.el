@@ -3395,7 +3395,6 @@ Never creates a heading for the chosen date."
            (result (shell-command-to-string script)))
       (setq Info-dir-contents nil)
       (message "Info dir rebuilt")))
-  (js/rebuild-info-dir)
   )
 
 ;;; End of org-roam package block
