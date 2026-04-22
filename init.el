@@ -511,6 +511,8 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
      (let ((process-connection-type nil))
        (apply fn args)))
 
+   (add-to-list 'Info-directory-list "/opt/homebrew/share/info")
+
 
 
 ;;; NOTE: Might work as well: https://github.com/d12frosted/homebrew-emacs-plus/tree/master/community/patches/aggressive-read-buffering
@@ -1901,6 +1903,8 @@ Produces multiple regions so expreg can step through them."
   :config
   (agent-shell-attention-mode 1))
 
+
+
 ;;; End of Agent shell block
 
 ;;; End of AI configuration block
@@ -2592,8 +2596,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
   :hook (org-roam-mode . visual-line-mode)
 
   :custom
-
-  (org-roam-completion-everywhere t)
+  (org-roam-completion-everywhere nil)	; It's actually bothersome
   (org-roam-dailies-directory "journals/")
   (org-roam-node-display-template
    (concat "${title:*} " (propertize "${tags:40}" 'face 'org-tag)))
@@ -3463,15 +3466,14 @@ Never creates a heading for the chosen date."
   ;; Your custom filtering logic
   (defun js/org-node-not-archived-p (node)
     "Return t if NODE should be shown (not archived)."
-    (not (member "ARCHIVE" (org-mem-tags node))))
+    (not (org-mem-property-with-inheritance "ARCHIVE_NODE" node)))
+  (setq org-node-filter-fn #'js/org-node-not-archived-p)
 
   (defun js/org-node-find (&optional arg)
     "Find and open an org-node, hiding archived by default.
 With C-u prefix, show all nodes including archived."
     (interactive "P")
-    (let ((org-node-filter-fn
-           (if arg nil #'js/org-node-not-archived-p)))
-      (org-node-find)))
+    (org-node-find))
 
   (defun js/org-node-insert (&optional arg)
     "Insert a link to an org-node, hiding archived by default.
@@ -3479,8 +3481,7 @@ With C-u prefix, insert a transclusion instead."
     (interactive "P")
     (if arg
 	(org-node-insert-transclusion)
-      (let ((org-node-filter-fn #'js/org-node-not-archived-p))
-	(org-node-insert-link*))))
+      (org-node-insert-link*)))
 
   ;; Modified to work outside of org-mode buffers, so i can use it in the minibuffer
   (defun org-node-insert-link (&optional region-as-initial-input novisit)
