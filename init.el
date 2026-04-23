@@ -220,6 +220,7 @@ between Emacs sessions.")
           (dump-varlist varlist buf)
           (save-buffer)
           (kill-buffer)))))
+
   (defun dump-varlist (varlist buffer)
     "Insert into buffer the setq statement to recreate the variables in VARLIST"
     (mapc (lambda (var)
@@ -250,7 +251,8 @@ between Emacs sessions.")
 
 (use-package project
   :ensure nil
-  :bind-keymap ("C-c p" . project-prefix-map)
+  ;; :bind-keymap ("C-c p" . project-prefix-map)
+  ;; No need - it is bound to =C-x p= by default!
   :custom
   (project-switch-commands
    '((project-find-file "Find file" ?f)
@@ -361,9 +363,12 @@ between Emacs sessions.")
          :map help-map
          ("p" . helpful-at-point)
 	 :map helpful-mode-map
-	 ("q" . quit-window--and-kill))
+	 ("q" . quit-window--and-kill)
+	 :map Info-mode-map
+	 ("U" . js/process-at-point))
   :custom
-  (helpful-switch-buffer-function #'switch-to-buffer))
+  (helpful-switch-buffer-function #'switch-to-buffer)
+  (help-window-select t))
 
 (use-package devdocs
   :bind
@@ -505,6 +510,8 @@ a pty for the compilation command. This increases performance on OSX
 by a factor of 10, as the default pty size is a pitiful 1024 bytes."
      (let ((process-connection-type nil))
        (apply fn args)))
+
+   (add-to-list 'Info-directory-list "/opt/homebrew/share/info")
 
 
 
@@ -876,8 +883,10 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (outline-start-default-state 'folded)
   :config
   (outline-stars-mode 1)
-  ;; TODO: bind narrow-to-subtree and fix its jumping
   :bind
+  (:map prog-mode-map
+	("<backtab>" . outline-stars-cycle-buffer))
+  ;; TODO: bind narrow-to-subtree and fix its jumping
   )
 
 (use-package hydra)
@@ -1894,6 +1903,8 @@ Produces multiple regions so expreg can step through them."
   :config
   (agent-shell-attention-mode 1))
 
+
+
 ;;; End of Agent shell block
 
 ;;; End of AI configuration block
@@ -2280,6 +2291,8 @@ Automatically expands the heading if it's folded."
 	(org-sort-entries nil ?o))))
   )
 
+(use-package org-present)
+
 ;;; ** exporting
 
 (use-package js-ox-strip-heading	; Spliced exports
@@ -2583,8 +2596,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
   :hook (org-roam-mode . visual-line-mode)
 
   :custom
-
-  (org-roam-completion-everywhere t)
+  (org-roam-completion-everywhere nil)	; It's actually bothersome
   (org-roam-dailies-directory "journals/")
   (org-roam-node-display-template
    (concat "${title:*} " (propertize "${tags:40}" 'face 'org-tag)))
@@ -2869,6 +2881,11 @@ Using the org-mac-link, this comes pre-formatted with the url title."
             (list raw (if (and cb ce)
                           (buffer-substring-no-properties cb ce)
 			"")))))))
+
+  (defun  js/process-at-point ()
+    (interactive)
+    (let ((url (org-store-link nil nil)))
+      (js/url-target-process url)))
 
   (defvar js/url-targets
     '((Log . js/url-target-log)
@@ -3355,6 +3372,34 @@ Never creates a heading for the chosen date."
 
 
   )
+
+(use-package info
+  :ensure nil
+  :init
+  (defvar js/info-directory (expand-file-name "info/" org-roam-directory))
+
+  (add-to-list 'Info-directory-list js/info-directory)
+
+  (defun js/rebuild-info-dir ()
+    (interactive)
+    (let* ((dir js/info-directory)
+           (script (concat
+                    "cd " dir " && rm -f dir && "
+                    "for f in *.info; do "
+                    "  title=$(grep -m1 'The .* Manual\\|^File:' \"$f\" | head -1); "
+                    "  name=$(basename \"$f\" .info); "
+                    "  if grep -q 'START-INFO-DIR-ENTRY' \"$f\"; then "
+                    "    install-info --dir-file=dir \"$f\"; "
+                    "  else "
+                    "    install-info --dir-file=dir "
+                    "      --entry=\"* $name: ($name). See $name.\" \"$f\"; "
+                    "  fi; "
+                    "done"))
+           (result (shell-command-to-string script)))
+      (setq Info-dir-contents nil)
+      (message "Info dir rebuilt")))
+  )
+
 ;;; End of org-roam package block
 
 ;;; ** org-transclusion
@@ -3421,15 +3466,14 @@ Never creates a heading for the chosen date."
   ;; Your custom filtering logic
   (defun js/org-node-not-archived-p (node)
     "Return t if NODE should be shown (not archived)."
-    (not (member "ARCHIVE" (org-mem-tags node))))
+    (not (org-mem-property-with-inheritance "ARCHIVE_NODE" node)))
+  (setq org-node-filter-fn #'js/org-node-not-archived-p)
 
   (defun js/org-node-find (&optional arg)
     "Find and open an org-node, hiding archived by default.
 With C-u prefix, show all nodes including archived."
     (interactive "P")
-    (let ((org-node-filter-fn
-           (if arg nil #'js/org-node-not-archived-p)))
-      (org-node-find)))
+    (org-node-find))
 
   (defun js/org-node-insert (&optional arg)
     "Insert a link to an org-node, hiding archived by default.
@@ -3437,8 +3481,7 @@ With C-u prefix, insert a transclusion instead."
     (interactive "P")
     (if arg
 	(org-node-insert-transclusion)
-      (let ((org-node-filter-fn #'js/org-node-not-archived-p))
-	(org-node-insert-link*))))
+      (org-node-insert-link*)))
 
   ;; Modified to work outside of org-mode buffers, so i can use it in the minibuffer
   (defun org-node-insert-link (&optional region-as-initial-input novisit)
@@ -4052,7 +4095,7 @@ EXTRA-STATES is an optional list of additional states to block on."
 		  (agenda "" ((org-agenda-span 'week)
 			      (org-agenda-skip-function
 			       '(or (org-agenda-skip-entry-if 'todo 'done)
-				    (org-agenda-skip-entry-if 'todo '("PROCESS"))))))
+				    (org-agenda-skip-entry-if 'todo '("PROCESS" "EXPLORE"))))))
 		  (todo "FINISH" ((org-agenda-overriding-header "* Items to finish up:  ")
 				  (org-agenda-sorting-strategy '(scheduled-up category-up alpha-up))))
 		  (todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")
@@ -5674,8 +5717,6 @@ Returns a plist with :title, :channel-name, :channel-id, or nil on failure."
   :config
   (elpapers-enable-auto-ingest))
 
-;;; ** End
-
 ;;; * Readwise
 
 ;; (use-package org-readwise
@@ -6570,6 +6611,7 @@ When pressed twice, make the sub/superscript roman."
 
 ;;; ** OCaml
 (use-package neocaml
+  :if (not (eq system-type 'android))
   :mode (("\\.ml\\'" . neocaml-mode)
          ("\\.mli\\'" . neocaml-interface-mode)
          ("\\.ocamlinit\\'" . neocaml-mode))
@@ -6578,6 +6620,7 @@ When pressed twice, make the sub/superscript roman."
     (neocaml--register-with-eglot)))
 
 (use-package ocaml-eglot
+  :if (not (eq system-type 'android))
   :ensure t
   :after neocaml
   :hook
@@ -6587,6 +6630,7 @@ When pressed twice, make the sub/superscript roman."
   (setq ocaml-eglot-syntax-checker 'flymake))
 
 (use-package utop
+  :if (not (eq system-type 'android))
   :ensure t)
 
 ;;; ** Agda
@@ -6677,20 +6721,24 @@ When pressed twice, make the sub/superscript roman."
 	      (kill-buffer)))
       (message "Not a file visiting buffer!"))))
 
+
+(defun run-emacs-with-directory (directory &optional arg)
+  (interactive "DDirectory: \nP")
+  (let ((args (cond ((equal arg '(16)) '("-Q"))
+                    (t (list "--init-directory" (expand-file-name directory))))))
+    (when (equal arg '(4))
+      (setq args (cons "--debug-init" args)))
+    (apply #'start-process "emacs" nil "emacs" args)))
+
 (defun run-emacs-with-current-directory (&optional arg)
   "Run Emacs with the current file's directory as the configuration directory.
 Calling with single prefix ARG (C-u) enables debugging.
 Calling with double prefix ARG (C-u C-u) runs Emacs with -Q."
   (interactive "P")
-  (let* ((emacs-path "/opt/homebrew/Cellar/emacs-plus@30/30.2/Emacs.app/Contents/MacOS/Emacs")
-         (current-dir (if buffer-file-name
+  (let* ((current-dir (if buffer-file-name
                           (file-name-directory buffer-file-name)
-                        default-directory))
-         (args (cond ((equal arg '(16)) '("-Q"))  ; C-u C-u
-                     (t (list "--init-directory" (expand-file-name current-dir))))))
-    (when (equal arg '(4))  ; single C-u
-      (setq args (cons "--debug-init" args)))
-    (apply #'start-process "emacs" nil emacs-path args)))
+                        default-directory)))
+    (run-emacs-with-directory current-dir arg)))
 
 (defun quit-window--and-kill ()
   "Quit and kill the buffer, also closing its window."
