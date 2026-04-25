@@ -15,7 +15,7 @@
 ;;; Code:
 
 ;;; * Initialization
-;;; ** Package initialization
+;;; ** Basic initialization
 
 (setq custom-file "~/.emacs.d/custom.el")
 (when (file-exists-p custom-file)
@@ -36,10 +36,32 @@
 ;; (setq package-check-signature nil)
 
 (require 'use-package)
-;; (setq use-package-vc-prefer-newest nil)
+(defun use-package-require (name &optional no-require body)
+  (if use-package-expand-minimally
+      (use-package-concat
+       (unless no-require
+         (list (use-package-load-name name)))
+       body)
+    (if no-require
+        body
+      (use-package-with-elapsed-timer
+          (format "Loading package %s" name)
+        `((if (not ,(use-package-load-name name))
+              (display-warning 'use-package
+                               (format "Cannot load %s" ',name)
+                               :error)
+            ,@body))))))
+;; (setq use-package-vec-prefer-newest nil)
 
 (use-package exec-path-from-shell
   :init (exec-path-from-shell-initialize))
+
+(use-package benchmark-init
+  :ensure t
+  :init (benchmark-init/activate)
+  :hook (after-init . benchmark-init/deactivate))
+
+(use-package bug-hunter)
 
 ;;; ** Basic setup
 (use-package emacs
@@ -48,7 +70,7 @@
   (tooltip-mode -1)
   (set-fringe-mode 5)
   (column-number-mode)
-  (delete-selection-mode nil) ; For lispy
+  (delete-selection-mode nil)		; For lispy
   (global-auto-revert-mode 1)
   (savehist-mode +1)
   (when (eq system-type 'darwin)
@@ -145,11 +167,6 @@ are defining or executing a macro."
   :ensure t
   :init
   (gcmh-mode 1))
-
-(use-package benchmark-init
-  :hook (after-init . benchmark-init/deactivate))
-
-(use-package bug-hunter)
 
 (use-package emacs-everywhere
   :bind
@@ -263,10 +280,6 @@ between Emacs sessions.")
 (defvar my/light-theme-redshift 'modus-operandi)
 (defvar my/dark-theme-redshift 'modus-vivendi)
 
-(use-package doom-themes
-  :init
-  (my/apply-theme 'light))
-
 (defun my/apply-theme (appearance)
   "Load theme based on appearance and redshift? status."
   (interactive)
@@ -281,6 +294,10 @@ between Emacs sessions.")
   (interactive)
   (setq my/redshift? (not my/redshift?))
   (message "Retoggled redshift"))
+
+(use-package doom-themes
+  :init
+  (my/apply-theme 'light))
 
 (use-package nerd-icons)
 
@@ -763,6 +780,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   ("M-s i" . isearch-forward))
 
 (use-package counsel
+  :defer nil
   :custom
   (ivy-use-virtual-buffers nil)
   (ivy-count-format "(%d/%d) ")
@@ -891,6 +909,7 @@ _p_rev       _u_pper              _=_: upper/lower       _r_esolve
   ("q" nil "cancel" :color blue))
 
 (use-package expreg
+  :defer nil
   :custom
   (expreg-restore-point-on-quit t)
   :bind ("s-f" . expreg-expand)
@@ -1331,7 +1350,7 @@ Produces multiple regions so expreg can step through them."
   :config
   (add-hook 'kill-emacs-hook #'js/uptime-log-session))
 
-;;; ** Info (what's that doing here lol)
+;;; ** Info
 (use-package info
   :ensure nil
   :init
@@ -1357,48 +1376,42 @@ Produces multiple regions so expreg can step through them."
            (result (shell-command-to-string script)))
       (setq Info-dir-contents nil)
       (message "Info dir rebuilt"))))
+
 ;;; * AI configuration
 ;;; ** GPTel
 
 (use-package gptel
+  :defer t
+  :after org
   :bind
   (("C-c g k" . gptel-abort)
    ("C-c g c" . gptel-add)
    ("C-c g r" . gptel-rewrite)
    ("C-c g s" . gptel-send)
    ("C-c g /" . gptel-menu)
-   ("C-c g w" . org/save-gptel-chat-as-node)
    ("C-c g g" . gptel)
-   ("C-c g C" . copilot-mode)
    (:map gptel-mode-map
 	 ("C-c g t o" . gptel-org-set-topic)))
-  :hook
-  (org-mode . org/enable-gptel-for-chatlog-buffer)
   :custom
   (gptel-default-mode 'org-mode)
-  (gptel-model 'gpt-5-mini)
-  (gptel-backend (gptel-make-gh-copilot "Copilot"))
-  (require 'gptel-org)
+
+  :config
+  (setq gptel-model 'gpt-5-mini)
+  (setq gptel-backend (gptel-make-gh-copilot "Copilot"))
+
+  (setq-default gptel-include-reasoning nil)
+  (setq-default gptel-include-tool-results 'auto)
+
+  (gptel-make-openai "OpenRouter"
+    :host "openrouter.ai"
+    :endpoint "/api/v1/chat/completions"
+    :stream t
+    :key 'gptel-api-key-from-auth-source
+    :models '(openai/gpt-5-mini
+	      openai/gpt-4o
+	      openai/o4-mini-deep-research
+	      anthropic/claude-sonnet-4.6))
   (require 'gptel-integrations))
-
-(defvar org-roam-chatlogs-directory "chatlogs/"
-  "The directory to save gptel chatlogs in.")
-
-(gptel-make-openai "OpenRouter"
-  :host "openrouter.ai"
-  :endpoint "/api/v1/chat/completions"
-  :stream t
-  :key 'gptel-api-key-from-auth-source
-  :models '(openai/gpt-5-mini
-	    openai/gpt-4o
-	    openai/o4-mini-deep-research
-	    anthropic/claude-sonnet-4.6))
-
-;;; ** Tool use
-(setq-default gptel-include-reasoning nil)
-(setq-default gptel-include-tool-results 'auto)
-
-;;; End of GPTel package block
 
 ;;; ** Emacs MCP
 
@@ -1415,8 +1428,7 @@ Produces multiple regions so expreg can step through them."
    ("C-c g t k" . emacs-mcp-tool-stop-server)
    ("C-c g t r" . emacs-mcp-tool-restart-server)
    ("C-c g t ?" . emacs-mcp-tool-server-status))
-  :config
-  (require 'emacs-mcp-tool-server))
+  :config (require 'emacs-mcp-tool-server))
 
 (use-package mcp
   :if (not (eq system-type 'android))
@@ -1488,6 +1500,7 @@ Produces multiple regions so expreg can step through them."
 	      ("C-a" . js/dired-smart-bol)
               ("C-e" . js/dired-smart-eol))
   :config
+  (require 'wdired)
   (when (eq system-type 'darwin)
     (setq dired-listing-switches "-lagGFDh")
     (setq insert-directory-program "gls")
@@ -1556,6 +1569,7 @@ Produces multiple regions so expreg can step through them."
   "Buffer-local variable to enable/disable tag updating.")
 
 (use-package org
+  :defer nil
   :custom
   (org-hide-emphasis-markers t)
   (org-image-actual-width nil)
@@ -1563,7 +1577,7 @@ Produces multiple regions so expreg can step through them."
   (calendar-week-start-day 1)
   (org-insert-heading-respect-content t)
   (org-export-with-broken-links t)
-  (org-loop-over-headlines-in-active-region start-level)
+  (org-loop-over-headlines-in-active-region 'start-level)
   (org-num-skip-unnumbered t)
   (org-num-skip-tags '("nonumber" "noexport"))
 
@@ -1602,7 +1616,12 @@ Produces multiple regions so expreg can step through them."
    ("M-o" . ace-link-org)
    ("C-c C-l" . ar/org-insert-link-dwim)
    ("C-'" . nil)
-   ("C-," . nil)))
+   ("C-," . nil))
+  :config
+  (add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
+  ;; Open links in the same window
+  (setf (alist-get 'file org-link-frame-setup) #'find-file)
+  )
 
 ;; Org Exporting
 (setq org-latex-classes
@@ -1630,9 +1649,6 @@ Produces multiple regions so expreg can step through them."
     ('html  (setq-local org-export-with-section-numbers nil))))
 (setq org-export-with-section-numbers nil)
 
-(add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
-;; Open links in the same window
-(setf (alist-get 'file org-link-frame-setup) #'find-file)
 
 (defun js/org-rename-buffer-to-title ()
   "Rename buffer to value of #+TITLE:."
@@ -1852,6 +1868,7 @@ Handles both |*abc*| and *|abc|* cases. Otherwise behave like self-insert."
   :after ox)
 
 (use-package ox
+  :after org
   :ensure nil
   :custom
   (org-export-allow-bind-keywords t)
@@ -1980,10 +1997,13 @@ Falls back to #+attr_latex :options for backwards compatibility."
 
 ;;; ** Org-download
 
-(use-package org-download)
+(use-package org-download
+  :after org)
 
 ;;; ** Org-mac-link
+
 (use-package org-mac-link
+  :after org
   :if (eq system-type 'darwin)
   :ensure t)
 
@@ -1992,7 +2012,6 @@ Falls back to #+attr_latex :options for backwards compatibility."
 
 (use-package xenops
   :after org
-  :defer nil
   :bind
   (:map org-mode-map
 	("C-c n !" . xenops-mode))
@@ -2100,7 +2119,10 @@ Falls back to #+attr_latex :options for backwards compatibility."
 ;;; * Org-roam
 
 (use-package org-roam
+  :after org
   :ensure t
+  :init
+  (require 'org-roam-dailies)
   :bind (("C-c n n b " . org-roam-buffer-toggle)
          ("C-c n f" . js/org-roam-node-find)
          ("C-c n i" . js/org-roam-node-insert)
@@ -2161,7 +2183,33 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 (lambda (node) (org-roam-backlinks-section
 			 node
 			 :show-backlink-p #'archived-backlink-p
-			 :section-heading "Archived backlinks: ")))))
+			 :section-heading "Archived backlinks: "))))
+  :config
+  ;; Color roam links differently
+  (defface org-roam-link
+    '((t :foreground "orange" :underline t))
+    "Face for Org-roam links."
+    :group 'org-roam-faces)
+  (org-link-set-parameters "id" :face 'org-roam-link)
+
+
+  (add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
+  (add-hook 'org-mode-hook #'js/setup-specific-keyword-link-fontification)
+
+  ;; Folded backlink buffer
+  (add-to-list 'magit-section-initial-visibility-alist (cons 'org-roam-node-section 'hide))
+  (add-to-list 'display-buffer-alist
+	     '("\\*org-roam\\*"
+	       (display-buffer-in-direction)
+	       (direction . right)
+	       (window-width . 0.33)
+	       (window-height . fit-window-to-buffer)))
+(org-roam-db-autosync-mode)
+
+(advice-add 'org-roam-db-update-file :around
+	    (defun +org-roam-db-update-file (fn &rest args)
+              (emacsql-with-transaction (org-roam-db)
+                (apply fn args)))))
 
 ;;; ** Managing headings
 (defun js/org-roam-node-not-archived-p (node)
@@ -2183,7 +2231,7 @@ With C-u prefix, show all nodes including archived."
   (let ((filter-fn (if arg nil #'js/org-roam-node-not-archived-p)))
     (org-roam-node-insert filter-fn)))
 
-(add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
+
 
 (defun js/org-roam-extract-subtree (&optional no-link)
   "Extract subtree to org-roam node.
@@ -2228,13 +2276,6 @@ With prefix arg NO-LINK, leave nothing behind (original behavior)."
 
 ;;; ** Aesthetics - fontification
 
-;; Color roam links differently
-(defface org-roam-link
-  '((t :foreground "orange" :underline t))
-  "Face for Org-roam links."
-  :group 'org-roam-faces)
-
-(org-link-set-parameters "id" :face 'org-roam-link)
 
 ;; Fonfify links in filetags
 (defun js/org-activate-keyword-links (limit)
@@ -2282,11 +2323,6 @@ only processes keywords listed in `js/org-keywords-with-links'."
    nil
    '((js/org-activate-specific-keyword-links))
    'append))
-
-(add-hook 'org-mode-hook #'js/setup-specific-keyword-link-fontification)
-
-;; Folded backlink buffer
-(add-to-list 'magit-section-initial-visibility-alist (cons 'org-roam-node-section 'hide))
 
 ;;; ** Capture and logging
 ;;; *** Manual capture setup
@@ -2755,18 +2791,6 @@ Restores the original TODO state from ARCHIVE_TODO."
 		     (format " under %s" archive-olpath)
                    ""))))))
 
-(add-to-list 'display-buffer-alist
-	     '("\\*org-roam\\*"
-	       (display-buffer-in-direction)
-	       (direction . right)
-	       (window-width . 0.33)
-	       (window-height . fit-window-to-buffer)))
-(org-roam-db-autosync-mode)
-
-(advice-add 'org-roam-db-update-file :around
-	    (defun +org-roam-db-update-file (fn &rest args)
-              (emacsql-with-transaction (org-roam-db)
-                (apply fn args))))
 
 ;; Fixes a bug in the capture templates using a heading outline path
 ;; https://github.com/org-roam/org-roam/pull/2336
@@ -2936,164 +2960,169 @@ Never creates a heading for the chosen date."
 		       ("flashcards" . org/has-anki-flashcards-p)
 		       ("chatlog" . org/has-gptel-chatlog-p)))
   (setq tags/updating-tags (mapcar #'car tag-checkers))
-
-  :config
-
-  (defun org/project-p ()
-    "Return non-nil if current buffer has a todo entry.
-Ignores headlines under ARCHIVE-tagged ancestors."
-    (org-element-map
-	(org-element-parse-buffer 'headline)
-	'headline
-      (lambda (h)
-	;; Skip if this headline or any ancestor has :ARCHIVE: tag
-	(unless (org-element-lineage-map h
-                    (lambda (ancestor)
-		      (member "ARCHIVE" (org-element-property :tags ancestor)))
-                  'headline 'with-self 'first-match)
-          (eq (org-element-property :todo-type h) 'todo)))
-      nil 'first-match))
-
-  (defun org/has-anki-flashcards-p ()
-    "Return non-nil if current buffer has ANKI-related properties in actual drawers.
-Ignores headlines under ARCHIVE-tagged ancestors."
-    (org-element-map
-	(org-element-parse-buffer 'headline)
-	'headline
-      (lambda (h)
-	;; Skip if this headline or any ancestor has :ARCHIVE: tag
-	(unless (org-element-lineage-map h
-                    (lambda (ancestor)
-		      (member "ARCHIVE" (org-element-property :tags ancestor)))
-                  'headline 'with-self 'first-match)
-          (or (org-element-property :ANKI_NOTE_TYPE h)
-	      (org-element-property :ANKI_DECK h)
-	      (org-element-property :ANKI_NOTE_ID h)
-	      (org-element-property :ANKI_TAGS h))))
-      nil 'first-match))
-
-  (defun org/has-gptel-chatlog-p ()
-    "Return non-nil if current buffer has GPTEL-related properties in actual drawers."
-    (org-element-map
-	(org-element-parse-buffer 'headline)
-	'headline
-      (lambda (h)
-	(or (org-element-property :GPTEL_TOPIC h)
-            (org-element-property :GPTEL_MESSAGES h)
-            (org-element-property :GPTEL_MODEL h)
-            (org-element-property :GPTEL_CONTEXT h)))
-      nil 'first-match))
-
-  ;; Exclude the relevant tags from inheritance
+  :init
+  (require 'vulpea-buffer)
   (dolist (tag (cons "summary" tags/updating-tags))
     (add-to-list 'org-tags-exclude-from-inheritance tag))
 
   (add-to-list 'org-tags-exclude-from-inheritance "interesting")
 
-  (defvar tags/tag-added-hook nil
-    "Hook run when a tag is added to a file.
-Each function is called with two arguments: the tag and the buffer.")
+  :config
+  ;; Exclude the relevant tags from inheritance
 
-  (defvar tags/tag-removed-hook nil
-    "Hook run when a tag is removed from a file.
-Each function is called with two arguments: the tag and the buffer.")
-
-  (defun vulpea-buffer-p ()
-    "Return non-nil if the currently visited buffer is a note."
-    (and buffer-file-name
-	 (string-prefix-p
-          (expand-file-name (file-name-as-directory org-roam-directory))
-          (file-name-directory buffer-file-name))))
-
-  (defun tags/org-update-tag (tcpair)
-    "Update \\='(tag . checker) tag in the current buffer."
-    (when (and (not (member (buffer-name) prune/ignored-files))
-	       (not (active-minibuffer-window))
-	       (vulpea-buffer-p))
-      (save-excursion
-	(goto-char (point-min))
-	(let* ((tag-name (car tcpair))
-	       (tags (vulpea-buffer-tags-get))
-	       (original-tags tags)
-	       (had-tag (member tag-name tags)))
-
-          ;; Run checker and modify tags
-          (if (funcall (cdr tcpair))
-	      (setq tags (cons tag-name tags))
-            (setq tags (remove tag-name tags)))
-
-          ;; Cleanup duplicates
-          (setq tags (seq-uniq tags))
-
-          ;; Update tags if changed
-          (when (or (seq-difference tags original-tags)
-                    (seq-difference original-tags tags))
-            (apply #'vulpea-buffer-tags-set tags)
-
-            ;; Run appropriate hooks
-            (let ((now-has-tag (member tag-name tags)))
-	      (cond
-	       ;; Tag was added
-	       ((and (not had-tag) now-has-tag)
-		(run-hook-with-args 'tags/tag-added-hook tag-name (current-buffer)))
-	       ;; Tag was removed
-	       ((and had-tag (not now-has-tag))
-		(run-hook-with-args 'tags/tag-removed-hook tag-name (current-buffer))))))))))
-
-  (defun tags/org-update-all-tags ()
-    (mapc #'tags/org-update-tag tag-checkers))
-
-  (defmacro tags/make-db-searcher (tag)
-    "Define the function to return a list of note files containing the specified TAG."
-    (let ((func-name (intern (format "org-%s-files" tag))))
-      `(defun ,func-name ()
-	 ,(format "Return a list of note files containing the '%s' tag." tag)
-	 (seq-uniq
-	  (seq-map
-	   #'car
-	   (org-roam-db-query
-	    [:select [nodes:file]
-		     :from tags
-		     :left-join nodes
-		     :on (= tags:node-id nodes:id)
-		     :where (like tag (quote ,(format "%%\"%s\"%%" tag)))]))))))
-
-  (defvar-local tags/update-tags-enabled nil
-    "Buffer-local variable to enable/disable tag updating.")
-
-  (defvar tags/tag-pause nil
-    "Global flag to pause tag updating during certain operations.")
-
-  (defun tags/maybe-update-tags ()
-    "Update tags if enabled for the current buffer."
-    (when (and tags/update-tags-enabled
-	       (not tags/tag-pause)
-	       (not (member (buffer-name) prune/ignored-files))
-	       (not (active-minibuffer-window))
-	       (vulpea-buffer-p))
-      (message "Updating tags!")
-      (tags/org-update-all-tags)
-      ))
-
-  (defun tags/enable-tag-updating ()
-    "Enable tag updating for the current buffer."
-    (setq-local tags/update-tags-enabled t)
-    (add-hook 'before-save-hook #'tags/maybe-update-tags nil t)
-    (tags/maybe-update-tags))
-
-  ;; Fixes weird tag insertion on extracting heading with `TODO' subheadings
-  (defun tags/extract-subtree-with-tag-pause (orig-fun &rest args)
-    "Pause tag updating during extraction, then update tags after."
-    (let ((tags/tag-pause t))
-      (apply orig-fun args))
-    ;; Now we're in the new buffer, tags/tag-pause is nil again
-    (message (concat "The current value is: " tags/tag-pause))
-    (save-buffer))
-
-  (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
+(advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
 
   :hook
-  (org-mode . tags/enable-tag-updating))
+  (org-mode . tags/enable-tag-updating)
+
+)
+
+(defun org/project-p ()
+  "Return non-nil if current buffer has a todo entry.
+Ignores headlines under ARCHIVE-tagged ancestors."
+  (org-element-map
+      (org-element-parse-buffer 'headline)
+      'headline
+    (lambda (h)
+      ;; Skip if this headline or any ancestor has :ARCHIVE: tag
+      (unless (org-element-lineage-map h
+                  (lambda (ancestor)
+		    (member "ARCHIVE" (org-element-property :tags ancestor)))
+                'headline 'with-self 'first-match)
+        (eq (org-element-property :todo-type h) 'todo)))
+    nil 'first-match))
+
+(defun org/has-anki-flashcards-p ()
+  "Return non-nil if current buffer has ANKI-related properties in actual drawers.
+Ignores headlines under ARCHIVE-tagged ancestors."
+  (org-element-map
+      (org-element-parse-buffer 'headline)
+      'headline
+    (lambda (h)
+      ;; Skip if this headline or any ancestor has :ARCHIVE: tag
+      (unless (org-element-lineage-map h
+                  (lambda (ancestor)
+		    (member "ARCHIVE" (org-element-property :tags ancestor)))
+                'headline 'with-self 'first-match)
+        (or (org-element-property :ANKI_NOTE_TYPE h)
+	    (org-element-property :ANKI_DECK h)
+	    (org-element-property :ANKI_NOTE_ID h)
+	    (org-element-property :ANKI_TAGS h))))
+    nil 'first-match))
+
+(defun org/has-gptel-chatlog-p ()
+  "Return non-nil if current buffer has GPTEL-related properties in actual drawers."
+  (org-element-map
+      (org-element-parse-buffer 'headline)
+      'headline
+    (lambda (h)
+      (or (org-element-property :GPTEL_TOPIC h)
+          (org-element-property :GPTEL_MESSAGES h)
+          (org-element-property :GPTEL_MODEL h)
+          (org-element-property :GPTEL_CONTEXT h)))
+    nil 'first-match))
+
+
+(defvar tags/tag-added-hook nil
+  "Hook run when a tag is added to a file.
+Each function is called with two arguments: the tag and the buffer.")
+
+(defvar tags/tag-removed-hook nil
+  "Hook run when a tag is removed from a file.
+Each function is called with two arguments: the tag and the buffer.")
+
+(defun vulpea-buffer-p ()
+  "Return non-nil if the currently visited buffer is a note."
+  (and buffer-file-name
+       (string-prefix-p
+        (expand-file-name (file-name-as-directory org-roam-directory))
+        (file-name-directory buffer-file-name))))
+
+(defun tags/org-update-tag (tcpair)
+  "Update \\='(tag . checker) tag in the current buffer."
+  (when (and (not (member (buffer-name) prune/ignored-files))
+	     (not (active-minibuffer-window))
+	     (vulpea-buffer-p))
+    (save-excursion
+      (goto-char (point-min))
+      (let* ((tag-name (car tcpair))
+	     (tags (vulpea-buffer-tags-get))
+	     (original-tags tags)
+	     (had-tag (member tag-name tags)))
+
+        ;; Run checker and modify tags
+        (if (funcall (cdr tcpair))
+	    (setq tags (cons tag-name tags))
+          (setq tags (remove tag-name tags)))
+
+        ;; Cleanup duplicates
+        (setq tags (seq-uniq tags))
+
+        ;; Update tags if changed
+        (when (or (seq-difference tags original-tags)
+                  (seq-difference original-tags tags))
+          (apply #'vulpea-buffer-tags-set tags)
+
+          ;; Run appropriate hooks
+          (let ((now-has-tag (member tag-name tags)))
+	    (cond
+	     ;; Tag was added
+	     ((and (not had-tag) now-has-tag)
+	      (run-hook-with-args 'tags/tag-added-hook tag-name (current-buffer)))
+	     ;; Tag was removed
+	     ((and had-tag (not now-has-tag))
+	      (run-hook-with-args 'tags/tag-removed-hook tag-name (current-buffer))))))))))
+
+(defun tags/org-update-all-tags ()
+  (mapc #'tags/org-update-tag tag-checkers))
+
+(defmacro tags/make-db-searcher (tag)
+  "Define the function to return a list of note files containing the specified TAG."
+  (let ((func-name (intern (format "org-%s-files" tag))))
+    `(defun ,func-name ()
+       ,(format "Return a list of note files containing the '%s' tag." tag)
+       (seq-uniq
+	(seq-map
+	 #'car
+	 (org-roam-db-query
+	  [:select [nodes:file]
+		   :from tags
+		   :left-join nodes
+		   :on (= tags:node-id nodes:id)
+		   :where (like tag (quote ,(format "%%\"%s\"%%" tag)))]))))))
+
+(defvar-local tags/update-tags-enabled nil
+  "Buffer-local variable to enable/disable tag updating.")
+
+(defvar tags/tag-pause nil
+  "Global flag to pause tag updating during certain operations.")
+
+(defun tags/maybe-update-tags ()
+  "Update tags if enabled for the current buffer."
+  (when (and tags/update-tags-enabled
+	     (not tags/tag-pause)
+	     (not (member (buffer-name) prune/ignored-files))
+	     (not (active-minibuffer-window))
+	     (vulpea-buffer-p))
+    (message "Updating tags!")
+    (tags/org-update-all-tags)
+    ))
+
+(defun tags/enable-tag-updating ()
+  "Enable tag updating for the current buffer."
+  (setq-local tags/update-tags-enabled t)
+  (add-hook 'before-save-hook #'tags/maybe-update-tags nil t)
+  (tags/maybe-update-tags))
+
+;; Fixes weird tag insertion on extracting heading with `TODO' subheadings
+(defun tags/extract-subtree-with-tag-pause (orig-fun &rest args)
+  "Pause tag updating during extraction, then update tags after."
+  (let ((tags/tag-pause t))
+    (apply orig-fun args))
+  ;; Now we're in the new buffer, tags/tag-pause is nil again
+  (message (concat "The current value is: " tags/tag-pause))
+  (save-buffer))
+
 
 ;;; ** Anki
 
@@ -3218,6 +3247,7 @@ See `js/anki-derive-fields' for full hierarchy details."
 ;;; ** Agenda
 
 (use-package org-agenda
+  :after org
   :ensure org
   :defer t
   :custom
@@ -3499,9 +3529,7 @@ _S_manual
 
 ;;; ** Babel
 
-(use-package org-babel
-  :ensure nil
-  :after org
+(use-package org ;;babel
   :custom
   (org-babel-python-command "python3")
   (org-confirm-babel-evaluate nil)
@@ -4468,8 +4496,9 @@ If none of the selected entries are downloaded, a message is shown."
 ;;; * Annotation importer
 
 (use-package org-roam-annotation-import
+  :after org
   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
-  :init
+  :config
   (require 'wallabag-backend))
 
 ;;; * Wallabag
@@ -4984,6 +5013,49 @@ When pressed twice, make the sub/superscript roman."
 (use-package git-timemachine
   :defer t)
 
+;;; ** Misc
+(use-package crdt)
+
+(use-package quickrun
+  :bind (("C-c C-r" . js/quickrun-dwim))
+  :config
+  (quickrun-add-command "python"
+    '((:command . "python3")
+      (:compile-only . "pyflakes %s")
+      (:description . "Run Python script"))
+    :override t)
+
+  (defun js/quickrun-dwim ()
+    "Run quickrun on region if active, otherwise on buffer."
+    (interactive)
+    (if (region-active-p)
+        (call-interactively #'quickrun-region)
+      (call-interactively #'quickrun)))
+  )
+
+(use-package dumb-jump
+  :custom
+  (dumb-jump-force-searcher 'rg)
+  (dumb-jump-prefer-searcher 'rg)
+  (xref-show-definitions-function #'xref-show-definitions-completing-read)
+  :config
+  (add-hook 'xref-backend-functions #'dumb-jump-xref-activate))
+
+(use-package flymake
+  :defer t
+  :ensure nil  ; built-in package
+  :hook
+  (prog-mode . flymake-mode)
+  (prog-mode . subword-mode)
+  (lisp-interaction-mode . (lambda () (flymake-mode -1)))
+  :config
+  (setq flymake-diagnostic-format-alist
+        '((t . (origin code message))))
+  :bind (:map flymake-mode-map
+	      ("M-n" . flymake-goto-next-error)
+	      ("M-p" . flymake-goto-prev-error)
+	      ("M-l" . flymake-show-buffer-diagnostics)
+	      ))
 ;;; ** LSP Eglot
 
 (use-package eglot
