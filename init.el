@@ -1961,67 +1961,6 @@ Falls back to #+attr_latex :options for backwards compatibility."
   :if (eq system-type 'darwin)
   :ensure t)
 
-;;; ** Xenops/fragtog/org latex
-;;; TODO: Move xenops to latex block
-
-(use-package xenops
-  :after org
-  :bind
-  (:map org-mode-map
-	("C-c n !" . xenops-mode))
-  :config
-  (setq xenops-reveal-on-entry t)
-  (pcase system-type
-    ('gnu/linux (setq xenops-math-image-scale-factor 2.0))
-    ('darwin (setq xenops-math-image-scale-factor 1.6)))
-  (setq xenops-math-latex-process 'imagemagick)
-  (defun xenops-src-parse-at-point ()
-    "Parse 'src element at point."
-    (-if-let* ((element (xenops-parse-element-at-point 'src))
-	       (org-babel-info
-		(xenops-src-do-in-org-mode
-		 (org-babel-get-src-block-info 'light (org-element-context)))))
-	(xenops-util-plist-update
-	 element
-	 :type 'src
-	 :language (nth 0 org-babel-info)
-	 :org-babel-info org-babel-info))))
-
-(use-package org-fragtog
-  ;; :disabled ;; Seems like xenops is working again
-  ;; Not disabled but unhooked - I set some C-c C-x C-l stuff here
-  :defer nil
-  :after org
-  :custom
-  (org-latex-create-formula-image-program 'imagemagick-lualatex)
-  (org-latex-packages-alist
-   (pcase system-type
-     ('gnu/linux '(("" "/home/jure/.emacs.d/defaults/js" t)))
-     ('darwin '(("" "/Users/jure/.emacs.d/defaults/js" t)))))
-  (org-export-in-background nil)
-
-  :config
-  (add-to-list
-   'org-preview-latex-process-alist
-   '(imagemagick-lualatex
-     :programs ("lualatex" "convert") :description "pdf > png"
-     :message
-     "you need to install the programs: latex and imagemagick."
-     :image-input-type "pdf" :image-output-type "png"
-     :image-size-adjust (1.0 . 1.0)
-     :latex-compiler
-     ("lualatex -interaction nonstopmode -output-directory %o %f")
-     :image-converter
-     ("convert -verbose -density %D -background none -trim -antialias %f -quality 100 %O")
-     ))
-
-  ;; In some rare cases, the argument that gets passed to the density makes convert unable to trim.
-  ;; 1.6 fucks randy up
-  (pcase system-type
-    ('gnu/linux (plist-put org-format-latex-options :scale 2.0))
-    ('darwin (plist-put org-format-latex-options :scale 1.6)))
-  )
-
 ;;; ** Org visuals
 (use-package org-appear
   :hook org-mode)
@@ -2089,15 +2028,12 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ("C-c n r" . js/roamify-url-at-point)
 	 ("C-c n t" . org-roam-tag-add)
 	 ("C-c n n s" . org-roam-db-sync)
+	 ("C-c n v" . vulpea-ui-sidebar-toggle)
 
 	 ;; Blog
 	 ("C-c n b b" . org-static-blog-publish)
 	 ("C-c n b p" . js/sync-blog)
 	 ("C-c n b o" . js/blog-open-in-browser)
-	 :map org-roam-dailies-map
-	 ("m" . js/org-roam-monthlies-goto-today)
-	 ("M" . js/org-roam-monthlies-goto-date)
-	 ("l" . js/org-roam-monthlies-capture-today)
 
          :map org-mode-map
          ("C-M-i" . completion-at-point)
@@ -2116,7 +2052,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
 
   :custom
   (org-roam-completion-everywhere nil)	; It's actually bothersome
-  (org-roam-dailies-directory "journals/")
+  (org-roam-dailies-directory "journal/")
   (org-roam-node-display-template
    (concat "${title:*} " (propertize "${tags:40}" 'face 'org-tag)))
 
@@ -2182,8 +2118,6 @@ With C-u prefix, show all nodes including archived."
   (interactive "P")
   (let ((filter-fn (if arg nil #'js/org-roam-node-not-archived-p)))
     (org-roam-node-insert filter-fn)))
-
-
 
 (defun js/org-roam-extract-subtree (&optional no-link)
   "Extract subtree to org-roam node.
@@ -2794,80 +2728,6 @@ you can catch it with `condition-case'."
 	     end (save-excursion (org-end-of-subtree t t))))
      (point-marker))))
 
-;;; ** Monthlies
-(defvar org-roam-monthlies-capture-templates
-  '(("m" "monthly log goto" plain ""
-     :target (file+head+olp "%<%Y-%m>-monthly.org"
-                            "#+title: %<%Y-%m>\n#+startup: show2levels\n"
-                            ("%<%Y-%m-%d %A>"))
-     :unnarrowed t
-     :immediate-finish t)
-    ("e" "monthly log entry" plain "** %?"
-     :target (file+head+olp "%<%Y-%m>-monthly.org"
-                            "#+title: %<%Y-%m>\n#+startup: show2levels\n"
-                            ("%<%Y-%m-%d %A>"))
-     :unnarrowed t))
-  "Capture templates for monthly professional log files.")
-
-(defun js/org-roam-monthlies--directory ()
-  "Return the absolute path to the monthlies directory, creating it if needed."
-  (let ((dir (expand-file-name
-	      "monthlies/"
-	      (expand-file-name org-roam-dailies-directory org-roam-directory))))
-    (make-directory dir t)
-    dir))
-
-(defun js/org-roam-monthlies--file-for-time (time)
-  "Return the absolute path to the monthly file for TIME."
-  (expand-file-name (format-time-string "%Y-%m-monthly.org" time)
-                    (js/org-roam-monthlies--directory)))
-
-(defun js/org-roam-monthlies--day-heading-re (time)
-  "Return a regexp matching the day heading for TIME."
-  (concat "^\\* " (regexp-quote (format-time-string "%Y-%m-%d %A" time))))
-
-(defun js/org-roam-monthlies--capture (time &optional goto keys)
-  "Core capture dispatcher for monthly logs.
-TIME is an Emacs time value.  GOTO and KEYS as in `org-roam-capture-'."
-  (let ((org-roam-directory (js/org-roam-monthlies--directory))
-        (org-roam-dailies-directory "./"))
-    (org-roam-capture- :goto (when goto '(4))
-		       :keys keys
-		       :node (org-roam-node-create)
-		       :templates org-roam-monthlies-capture-templates
-		       :props (list :override-default-time time))))
-
-;;;###autoload
-(defun js/org-roam-monthlies-goto-today ()
-  "Go to today's heading in the monthly log, creating it if absent."
-  (interactive)
-  (js/org-roam-monthlies--capture (current-time) 'goto "m"))
-
-;;;###autoload
-(defun js/org-roam-monthlies-goto-date ()
-  "Prompt for a date and navigate to its monthly log.
-If the day heading exists, jump to it.  Otherwise open the file at the top.
-Never creates a heading for the chosen date."
-  (interactive)
-  (let* ((time (org-read-date nil t nil "Monthly log for date: "))
-         (file (js/org-roam-monthlies--file-for-time time)))
-    (if (not (file-exists-p file))
-        ;; File doesn't exist yet — open/create it via capture (writes the
-        ;; #+title header and registers the org-id) then bail to top.
-        (js/org-roam-monthlies--capture time 'goto "m")
-      (find-file file)
-      (widen)
-      (goto-char (point-min))
-      (re-search-forward (js/org-roam-monthlies--day-heading-re time) nil t)
-      ;; re-search-forward leaves point after the match (end of heading line).
-      ;; Move to the beginning of the line whether found or not.
-      (beginning-of-line))))
-
-;;;###autoload
-(defun js/org-roam-monthlies-capture-today ()
-  "Capture a new subheading entry under today's day heading in the monthly log."
-  (interactive)
-  (js/org-roam-monthlies--capture (current-time) nil "e"))
 
 ;;; ** Org-transclusion
 
@@ -2900,34 +2760,136 @@ Never creates a heading for the chosen date."
   (org_roam-ui-follow nil)
   (org-roam-ui-update-on-save t)
   (org-roam-ui-open-on-start nil))
+;;; ** Org-node
 
-;;; * Vulpea (old)
+(use-package org-mem
+  :defer
+  :custom
+  (org-mem-do-sync-with-org-id t)
+  :config
+  (org-mem-updater-mode))
 
-;; The tag handling code adapted from:
-;; https://d12frosted.io/posts/2021-01-16-task-management-with-roam-vol5.html
-(use-package vulpea
-  :preface
-  (setq prune/ignored-files '("tasks.org" "inbox.org")) ; These should always have project tags.
-  (setq tag-checkers '(("project" . org/project-p)
-		       ("flashcards" . org/has-anki-flashcards-p)
-		       ("chatlog" . org/has-gptel-chatlog-p)))
-  (setq tags/updating-tags (mapcar #'car tag-checkers))
-  :init
-  (require 'vulpea-buffer)
-  (dolist (tag (cons "summary" tags/updating-tags))
-    (add-to-list 'org-tags-exclude-from-inheritance tag))
+(use-package org-node
+  :if (not (eq system-type 'android))	; For some reason not working well on Android
+  :after org-roam
+  :bind
+  (("C-c n f" . js/org-node-find)
+   ("C-c n i" . js/org-node-insert))
 
-  (add-to-list 'org-tags-exclude-from-inheritance "interesting")
+  :custom
+  (org-node-alter-candidates t) ; OLP support
+
+  ;; Performance tuning
+  (org-node-perf-keep-file-name-handlers nil)  ; Max speed
+
+  ;; Org-roam compatibility
+  (org-node-creation-fn #'org-node-new-via-roam-capture)
+  (org-node-file-slug-fn #'org-node-slugify-like-roam-default)
+  (org-node-file-timestamp-format "%Y%m%d%H%M%S-")
+
+  ;; Directory configuration
+  (org-id-locations-file-relative t)
+  (org-node-extra-id-dirs
+   (list org-roam-directory
+         (expand-file-name org-roam-dailies-directory org-roam-directory)))
+
+  ;; Customs
+  (org-node-display-sort-fn #'org-node-sort-by-file-mtime)
 
   :config
-  ;; Exclude the relevant tags from inheritance
+  ;; Your custom filtering logic
+  (defun js/org-node-not-archived-p (node)
+    "Return t if NODE should be shown (not archived)."
+    (not (org-mem-property-with-inheritance "ARCHIVE_NODE" node)))
+  (setq org-node-filter-fn #'js/org-node-not-archived-p)
 
-  (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
+  (defun js/org-node-find (&optional arg)
+    "Find and open an org-node, hiding archived by default.
+With C-u prefix, show all nodes including archived."
+    (interactive "P")
+    (org-node-find))
 
-  :hook
-  (org-mode . tags/enable-tag-updating)
+  (defun js/org-node-insert (&optional arg)
+    "Insert a link to an org-node, hiding archived by default.
+With C-u prefix, insert a transclusion instead."
+    (interactive "P")
+    (if arg
+	(org-node-insert-transclusion)
+      (org-node-insert-link*)))
 
+  ;; Modified to work outside of org-mode buffers, so i can use it in the minibuffer
+  (defun org-node-insert-link (&optional region-as-initial-input novisit)
+    "Insert a link to one of your ID nodes.
+
+To behave exactly like org-roam\\='s `org-roam-node-insert',
+see `org-node-insert-link*', or pass REGION-AS-INITIAL-INPUT t.
+
+Argument NOVISIT for use by `org-node-insert-link-novisit'."
+    (interactive "@*" org-mode)
+
+    ;; (unless (derived-mode-p 'org-mode)
+    ;;   (user-error "Only works in org-mode buffers"))
+    (org-node-cache-ensure)
+    (let* ((beg nil)
+           (end nil)
+           (region-text (when (region-active-p)
+                          (setq end (region-end))
+                          (goto-char (region-beginning))
+                          (skip-chars-forward "\n[:space:]")
+                          (setq beg (point))
+                          (goto-char end)
+                          (skip-chars-backward "\n[:space:]")
+                          (setq end (point))
+                          (org-link-display-format
+                           (buffer-substring-no-properties beg end))))
+           (initial (if (or region-as-initial-input
+                            (and region-text
+				 (try-completion region-text
+						 org-node--title<>affixations)))
+			region-text
+		      nil))
+           (_ (when (eq t initial)
+		;; Guard against `try-completion' returning t instead of a string
+		;; (who knew?!)
+		(setq initial nil)))
+           (input (if (and novisit initial)
+		      initial
+                    (org-node-read-candidate nil t initial)))
+           (_ (when (string-blank-p input)
+		(setq input (funcall org-node-blank-input-title-generator))))
+           (node (gethash input org-node--candidate<>entry))
+           (id (if node (org-mem-id node) (org-id-new)))
+           (link-desc (or region-text
+                          (and node
+			       org-node-custom-link-format-fn
+			       (funcall org-node-custom-link-format-fn node))
+                          (and (not org-node-alter-candidates) input)
+                          (and node (seq-find (##string-search % input)
+					      (org-mem-entry-roam-aliases node)))
+                          (and node (org-mem-entry-title node))
+                          input)))
+      (atomic-change-group
+	(when region-text
+          (delete-region beg end))
+	;; TODO: When inserting a citation, insert a [cite:] instead of a normal
+	;;       link
+	;; (if (string-prefix-p "@" input))
+	(insert (org-link-make-string (concat "id:" id) link-desc)))
+      (run-hooks 'org-node-insert-link-hook)
+      ;; TODO: Delete the link if a node was not created
+      ;;       See `org-node-insert-transclusion'
+      ;; TODO: Respect `org-node-stay-in-source-buffer'
+      (unless node
+	(org-node-create input id))))
+
+  ;; Initialize the cache
+  (org-node-cache-mode)
+  (org-node-cache-ensure)
+  (org-node-roam-accelerator-mode -1)
   )
+
+;;; * Vulpea
+;;; ** Tag management
 
 (defun org/project-p ()
   "Return non-nil if current buffer has a todo entry.
@@ -2973,7 +2935,6 @@ Ignores headlines under ARCHIVE-tagged ancestors."
           (org-element-property :GPTEL_MODEL h)
           (org-element-property :GPTEL_CONTEXT h)))
     nil 'first-match))
-
 
 (defvar tags/tag-added-hook nil
   "Hook run when a tag is added to a file.
@@ -3075,6 +3036,62 @@ Each function is called with two arguments: the tag and the buffer.")
   (message (concat "The current value is: " tags/tag-pause))
   (save-buffer))
 
+;;; ** Basic config
+
+(use-package vulpea
+  :preface
+  (setq prune/ignored-files '("tasks.org" "inbox.org")) ; These should always have project tags.
+  (setq tag-checkers '(("project" . org/project-p)
+		       ("flashcards" . org/has-anki-flashcards-p)
+		       ("chatlog" . org/has-gptel-chatlog-p)))
+  (setq tags/updating-tags (mapcar #'car tag-checkers))
+
+  :init
+  (require 'vulpea-buffer)
+  (dolist (tag (cons "interesting" (cons "summary" tags/updating-tags))) ;TODO: Remove double cons
+    (add-to-list 'org-tags-exclude-from-inheritance tag))
+
+  :custom
+  (vulpea-buffer-alias-property "ROAM_ALIASES")
+
+  :config
+  (vulpea-db-autosync-mode +1)
+  (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
+
+  :hook
+  (org-mode . tags/enable-tag-updating)
+
+  )
+
+(use-package vulpea-ui)
+
+(use-package vulpea-journal
+  :bind
+  (:map org-roam-dailies-map
+	("m" . js/vulpea-journal-month-today)
+	("M" . js/vulpea-journal-month-date))
+  :init
+  (defvar js/vulpea-monthly-template
+    '(:file-name "journal/monthlies/%Y-%m-monthly.org"
+			 :title "%Y-%m"
+			 :tags ("journal")
+			 :entry-level 1
+			 :entry-title "%Y-%m-%d %A"
+			 :head "#+created: %<[%Y-%m-%d]>\n#+startup: show2levels"))
+
+  :config
+  (vulpea-journal-setup)
+
+  (defun js/vulpea-journal-month-today ()
+    (interactive)
+    (let ((vulpea-journal-default-template js/vulpea-monthly-template))
+      (vulpea-journal (current-time))))
+
+  (defun js/vulpea-journal-month-date (date)
+    (interactive (list (vulpea-journal--read-date "Journal date: ")))
+    (let ((vulpea-journal-default-template js/vulpea-monthly-template))
+      (vulpea-journal date)))
+  )
 
 ;;; ** Anki
 
@@ -3194,6 +3211,27 @@ See `js/anki-derive-fields' for full hierarchy details."
 			     :fields fields
 			     :hash   hash
 			     :marker (point-marker)))))
+
+(defun my/anki-flashcard-push-all ()
+  "Push all flashcard files (via org-roam tag index) to Anki."
+  (interactive)
+  (anki-flashcard-clear-error-buffer)
+  (let* ((files (org-flashcards-files))
+         (total (length files))
+         (success 0))
+    (dolist (file files)
+      (condition-case err
+          (with-current-buffer (find-file-noselect file)
+	    (org-transclusion-mode +1)
+            (save-excursion (anki-editor-push-notes 'file))
+            (cl-incf success))
+        (error (anki-flashcard-report-error file (error-message-string err)))))
+    (if (< success total)
+        (progn
+          (message "Pushed %d/%d, %d errors — see %s"
+                   success total (- total success) anki-flashcard-error-buffer)
+          (display-buffer anki-flashcard-error-buffer))
+      (message "Pushed all %d flashcard files" total))))
 
 ;;; ** Agenda
 
@@ -4227,6 +4265,124 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
         (error
          (message "Error adding to podcastify: %s" (error-message-string err)))))))
 
+;;; ** Elfeed cuckoo-search
+(use-package cuckoo-search
+  ;; :vc (:url "https://github.com/rtrppl/cuckoo-search" :rev :newest)
+  :after (elfeed)
+  :bind
+  (:map elfeed-search-mode-map
+	("C" . cuckoo-search)
+	;; ("x" . cuckoo-search-saved-searches)
+	))
+
+(use-package elfeed-org
+  :defer nil
+  :after elfeed
+  :custom
+  (rmh-elfeed-org-files (list (concat org-roam-directory "/elfeed.org")))
+
+  :config
+  (elfeed-org)
+
+  (require 'elfeed-link)
+
+  (org-link-set-parameters "elfeed" :export #'elfeed-link-export-link)
+
+  ;; This allows conversion to links to underlying content when exporting
+  ;; https://takeonrules.com/2024/08/11/exporting-org-mode-elfeed-links/
+  (defun elfeed-link-export-link (link desc format _protocol)
+    "Export `org-mode' `elfeed' LINK with DESC for FORMAT."
+    (if (string-match "\\([^#]+\\)#\\(.+\\)" link)
+	(if-let* ((entry
+                   (elfeed-db-get-entry
+                    (cons (match-string 1 link)
+			  (match-string 2 link))))
+		  (url
+                   (elfeed-entry-link entry))
+		  (title
+                   (elfeed-entry-title entry)))
+	    (pcase format
+	      ('html (format "<a href=\"%s\">%s</a>" url desc))
+	      ('md (format "[%s](%s)" desc url))
+	      ('latex (format "\\href{%s}{%s}" url desc))
+	      ('texinfo (format "@uref{%s,%s}" url desc))
+	      (_ (format "%s (%s)" desc url)))
+	  (format "%s (%s)" desc url))
+      (format "%s (%s)" desc link)))
+
+
+;;; Elfeed autologging
+  (advice-add 'elfeed-search-browse-url :before #'js/log-elfeed-entries)
+  (advice-add 'elfeed-search-show-entry :after #'js/elfeed-search-logger)
+  (advice-add 'open-youtube-in-iina :before #'js/log-elfeed-entries)
+  (advice-add 'js/elfeed-entries-to-wallabag :before #'js/log-elfeed-entries)
+  (advice-add 'js/elfeed-entries-to-podcastify :before #'js/log-elfeed-entries)
+  (advice-add 'js/elfeed-entries-to-deluge :before #'js/log-elfeed-entries)
+  ;; (advice-add 'open-downloaded-youtube-in-iina :before #'js/log-elfeed-entries)
+
+  (defun js/elfeed-search-logger (entry)
+    "Wrapper for elfeed entry logger for elfeed-search-show-entry"
+    (interactive (list (elfeed-search-selected :ignore-region)))
+    (js/log-elfeed-entries nil (list entry)))
+
+  (defun get-elfeed-entry-author (entry)
+    "Extract the (first) author name from an Elfeed entry."
+    (let* ((meta (elfeed-entry-meta entry))
+           (authors (plist-get meta :authors))
+           (first-author (car authors)))
+      (plist-get first-author :name)))
+
+  (defun js/make-elfeed-entry-link (entry)
+    "Returns the `org' link string to the given Elfeed entry."
+    (org-link-make-string
+     (format "elfeed:%s#%s"
+             (car (elfeed-entry-id entry))
+             (cdr (elfeed-entry-id entry)))
+     (let ((author (get-elfeed-entry-author entry))
+	   (title (elfeed-entry-title entry)))
+       (if author
+	   (format "%s - %s" title author)
+	 title))))
+
+  ;; Define variables for skipped tags and feed IDs
+  (defvar js/elfeed-skipped-tags '(logged asmr papers github trash)
+    "Tags for Elfeed entries that should not be logged automatically.")
+
+  (defvar js/elfeed-skipped-feed-ids '("xkcd.com")
+    "Feed IDs for Elfeed entries that should not be logged automatically.")
+
+  (defun js/elfeed-entry-should-be-logged-p (entry)
+    "Return non-nil if the Elfeed ENTRY should be logged."
+    (let ((tags (elfeed-entry-tags entry))
+          (feed-id (car (elfeed-entry-id entry))))
+      (and (not (seq-intersection tags js/elfeed-skipped-tags))
+           (not (member feed-id js/elfeed-skipped-feed-ids)))))
+
+  (defun js/log-elfeed-entries (&optional arg r keys)
+    "Log unlogged elfeed entries to the daily file and mark them as logged.
+R can be a list of entries to log.
+With prefix ARG, log entries regardless of filters.
+If a key is provided, use it instead of the default capture template."
+    (interactive "P")
+    (let ((entries
+           (cond
+            ((and r (consp (car r))) (car r))
+            ((derived-mode-p 'elfeed-show-mode) (list elfeed-show-entry))
+            ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
+            (t (user-error "Not in an Elfeed buffer or no entries provided")))))
+      (dolist (entry entries)
+	(when (or arg (js/elfeed-entry-should-be-logged-p entry))
+          (let ((link (js/make-elfeed-entry-link entry)))
+            (org-roam-dailies-autocapture-today (or keys "e") link)
+            (elfeed-tag entry 'logged))))
+      (elfeed-db-save)))
+
+  (defun js/log-elfeed-process ()
+    (interactive)
+    (js/log-elfeed-entries 1 nil "p"))
+  ) ;;
+
+
 ;;; ** Elfeed Backups
 ;;; From https://punchagan.muse-amuse.in/blog/elfeed-db-back-up-hooks/
 
@@ -4934,6 +5090,66 @@ When pressed twice, make the sub/superscript roman."
 	("$" . math-delimiters-insert))
   :custom
   (math-delimiters-compressed-display-math nil))
+;;; ** Xenops/fragtog/org latex
+
+(use-package xenops
+  :after org
+  :bind
+  (:map org-mode-map
+	("C-c n !" . xenops-mode))
+  :config
+  (setq xenops-reveal-on-entry t)
+  (pcase system-type
+    ('gnu/linux (setq xenops-math-image-scale-factor 2.0))
+    ('darwin (setq xenops-math-image-scale-factor 1.6)))
+  (setq xenops-math-latex-process 'imagemagick)
+  (defun xenops-src-parse-at-point ()
+    "Parse 'src element at point."
+    (-if-let* ((element (xenops-parse-element-at-point 'src))
+	       (org-babel-info
+		(xenops-src-do-in-org-mode
+		 (org-babel-get-src-block-info 'light (org-element-context)))))
+	(xenops-util-plist-update
+	 element
+	 :type 'src
+	 :language (nth 0 org-babel-info)
+	 :org-babel-info org-babel-info))))
+
+(use-package org-fragtog
+  ;; :disabled ;; Seems like xenops is working again
+  ;; Not disabled but unhooked - I set some C-c C-x C-l stuff here
+  :defer nil
+  :after org
+  :custom
+  (org-latex-create-formula-image-program 'imagemagick-lualatex)
+  (org-latex-packages-alist
+   (pcase system-type
+     ('gnu/linux '(("" "/home/jure/.emacs.d/defaults/js" t)))
+     ('darwin '(("" "/Users/jure/.emacs.d/defaults/js" t)))))
+  (org-export-in-background nil)
+
+  :config
+  (add-to-list
+   'org-preview-latex-process-alist
+   '(imagemagick-lualatex
+     :programs ("lualatex" "convert") :description "pdf > png"
+     :message
+     "you need to install the programs: latex and imagemagick."
+     :image-input-type "pdf" :image-output-type "png"
+     :image-size-adjust (1.0 . 1.0)
+     :latex-compiler
+     ("lualatex -interaction nonstopmode -output-directory %o %f")
+     :image-converter
+     ("convert -verbose -density %D -background none -trim -antialias %f -quality 100 %O")
+     ))
+
+  ;; In some rare cases, the argument that gets passed to the density makes convert unable to trim.
+  ;; 1.6 fucks randy up
+  (pcase system-type
+    ('gnu/linux (plist-put org-format-latex-options :scale 2.0))
+    ('darwin (plist-put org-format-latex-options :scale 1.6)))
+  )
+
 
 ;;; * Programming
 ;;; ** Magit and VC
