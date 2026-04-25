@@ -328,9 +328,9 @@ between Emacs sessions.")
   (org-mode . js/fix-angle-bracket-syntax))
 
 (defun js/fix-angle-bracket-syntax ()
-    "Make < and > punctuation instead of paired delimiters."
-    (modify-syntax-entry ?< ".")
-    (modify-syntax-entry ?> "."))
+  "Make < and > punctuation instead of paired delimiters."
+  (modify-syntax-entry ?< ".")
+  (modify-syntax-entry ?> "."))
 
 (use-package surround
   :ensure t
@@ -470,8 +470,8 @@ between Emacs sessions.")
    (setq ns-pop-up-frames nil)
 
    (defvar org-roam-directory "~/Documents/org")
- ;;; MacOS Autocommit:
- ;;; launchctl load ~/Library/LaunchAgents/com.jure.org-git-autocommit.plist
+;;; MacOS Autocommit:
+;;; launchctl load ~/Library/LaunchAgents/com.jure.org-git-autocommit.plist
 
    (defvar org-directory "~/Documents/org")
    (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
@@ -485,7 +485,7 @@ between Emacs sessions.")
    (set-register ?j `(file . ,(concat org-directory "/journals/Journelly.org")))
    (set-register ?p `(file . ,(concat org-directory "/20250823160311-software.org")))
 
- ;;; https://www.reddit.com/r/emacs/comments/1qlnde7/comment/o1fq5lj/
+;;; https://www.reddit.com/r/emacs/comments/1qlnde7/comment/o1fq5lj/
    (defun start-process@use-pipe (fn &rest args)
      ;; checkdoc-params: (fn args)
      "Advice to ensure that `start-process' uses a pipe rather than
@@ -531,9 +531,9 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
      (android-toggle-on-screen-keyboard (selected-frame) nil))
 
    (tool-bar-add-item
-    "spell" ; icon
-    'android-display-keyboard  ; function
-    'android-keyboard              ; property
+    "spell"				; icon
+    'android-display-keyboard		; function
+    'android-keyboard			; property
     :help "Display Android keyboard")
    )
 
@@ -800,14 +800,14 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
                '(org-node-collection . js/ivy-org-node-mtime-compare)))
 
 (defun js/ivy-org-node-mtime-compare (a b)
-    "Compare org-node candidates A and B by file mtime, most recent first."
-    (let* ((node-a (gethash a org-node--candidate<>entry))
-           (node-b (gethash b org-node--candidate<>entry))
-           (mtime-a (and node-a (ignore-errors (org-mem-file-mtime node-a))))
-           (mtime-b (and node-b (ignore-errors (org-mem-file-mtime node-b)))))
-      (cond ((null mtime-a) nil)
-            ((null mtime-b) t)
-            (t (time-less-p mtime-b mtime-a)))))
+  "Compare org-node candidates A and B by file mtime, most recent first."
+  (let* ((node-a (gethash a org-node--candidate<>entry))
+         (node-b (gethash b org-node--candidate<>entry))
+         (mtime-a (and node-a (ignore-errors (org-mem-file-mtime node-a))))
+         (mtime-b (and node-b (ignore-errors (org-mem-file-mtime node-b)))))
+    (cond ((null mtime-a) nil)
+          ((null mtime-b) t)
+          (t (time-less-p mtime-b mtime-a)))))
 
 (use-package ibuffer
   :ensure nil
@@ -829,7 +829,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (ibuffer-mode . ibuffer-auto-mode))
 
 (defun ibuffer-switch-to-default ()
-    (ibuffer-switch-to-saved-filter-groups "default"))
+  (ibuffer-switch-to-saved-filter-groups "default"))
 
 (use-package ivy-rich
   :after ivy
@@ -861,11 +861,11 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 Preserve original point position instead of jumping to the bottom of selection."
   (interactive)
   (save-excursion
-   (unless (outline-on-heading-p t)
-     (outline-back-to-heading t))
-   (let ((beg (point)))
-     (outline-end-of-subtree)
-     (narrow-to-region beg (point)))))
+    (unless (outline-on-heading-p t)
+      (outline-back-to-heading t))
+    (let ((beg (point)))
+      (outline-end-of-subtree)
+      (narrow-to-region beg (point)))))
 
 (use-package hydra)
 
@@ -2199,17 +2199,17 @@ Falls back to #+attr_latex :options for backwards compatibility."
   ;; Folded backlink buffer
   (add-to-list 'magit-section-initial-visibility-alist (cons 'org-roam-node-section 'hide))
   (add-to-list 'display-buffer-alist
-	     '("\\*org-roam\\*"
-	       (display-buffer-in-direction)
-	       (direction . right)
-	       (window-width . 0.33)
-	       (window-height . fit-window-to-buffer)))
-(org-roam-db-autosync-mode)
+	       '("\\*org-roam\\*"
+		 (display-buffer-in-direction)
+		 (direction . right)
+		 (window-width . 0.33)
+		 (window-height . fit-window-to-buffer)))
+  (org-roam-db-autosync-mode)
 
-(advice-add 'org-roam-db-update-file :around
-	    (defun +org-roam-db-update-file (fn &rest args)
-              (emacsql-with-transaction (org-roam-db)
-                (apply fn args)))))
+  (advice-add 'org-roam-db-update-file :around
+	      (defun +org-roam-db-update-file (fn &rest args)
+		(emacsql-with-transaction (org-roam-db)
+                  (apply fn args)))))
 
 ;;; ** Managing headings
 (defun js/org-roam-node-not-archived-p (node)
@@ -2970,12 +2970,12 @@ Never creates a heading for the chosen date."
   :config
   ;; Exclude the relevant tags from inheritance
 
-(advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
+  (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
 
   :hook
   (org-mode . tags/enable-tag-updating)
 
-)
+  )
 
 (defun org/project-p ()
   "Return non-nil if current buffer has a todo entry.
@@ -3979,7 +3979,7 @@ With C-u C-u: pull static/ from remote."
 
 ;; Trash
 (defun my/elfeed-show-default ()
-    "Set Elfeed search filter to exclude 'trash' tagged entries and start live filtering."
+  "Set Elfeed search filter to exclude 'trash' tagged entries and start live filtering."
   (interactive)
   (setq elfeed-search-filter "-trash @7-days-ago ")
   (elfeed-search-update :force)
