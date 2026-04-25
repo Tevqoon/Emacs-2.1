@@ -204,51 +204,6 @@ are defining or executing a macro."
   (shell-command-to-string (format "open -a Safari %s" (shell-quote-argument url))))
 
 ;;; ** Misc
-;;; *** Persistent Variables Utility
-
-(defvar closing-variables nil
-  "Variables to dump to a file upon closing emacs.")
-(defvar closing-variables-filename "~/.emacs.d/variables.el"
-  "File path where persistent variables will be saved when Emacs closes.
-This file stores variables specified in `closing-variables` to maintain state
-between Emacs sessions.")
-
-(use-package persistent-vars		; TODO: Get rid of persistent vars
-  :ensure nil
-  :hook (kill-emacs . dump-closing-variables)
-  :init
-  (make-directory (file-name-directory closing-variables-filename) t)
-  (unless (file-exists-p closing-variables-filename)
-    (with-temp-file closing-variables-filename
-      (insert ";; Persistent variables\n")))
-
-  (condition-case nil
-      (load closing-variables-filename t t t)
-    (error (message "Could not load %s, creating new file" closing-variables-filename))))
-
-
-(defun dump-vars-to-file (varlist filename)
-  "Simplistic dumping of variables in VARLIST to a file FILENAME"
-  (save-excursion
-    (let ((buf (find-file-noselect filename t)))
-      (with-current-buffer buf
-        (erase-buffer)
-        (dump-varlist varlist buf)
-        (save-buffer)
-        (kill-buffer)))))
-
-(defun dump-varlist (varlist buffer)
-  "Insert into buffer the setq statement to recreate the variables in VARLIST"
-  (mapc (lambda (var)
-          (print (list 'setq var (list 'quote (symbol-value var)))
-                 buffer))
-        varlist))
-
-(defun dump-closing-variables ()
-  "Writes all of the variables in the list `closing-variables' to the file `closing-variables-filename'"
-  (interactive)
-  (dump-vars-to-file closing-variables closing-variables-filename))
-
 ;;; * Projects
 
 (use-package project
@@ -3137,7 +3092,6 @@ Each function is called with two arguments: the tag and the buffer.")
   :custom
   (anki-editor-latex-style 'mathjax)
   (anki-editor-ignored-org-tags '("project" "flashcards" "ex-flashcards"))
-  (add-to-list 'closing-variables 'anki-tag-list) ; TODO: Remove closing variables
   )
 
 (defvar anki-tag-list '()
