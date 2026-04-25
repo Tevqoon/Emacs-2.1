@@ -36,7 +36,7 @@
 ;; (setq package-check-signature nil)
 
 (require 'use-package)
-(defun use-package-require (name &optional no-require body)
+(defun use-package-require (name &optional no-require body) ; Improved error messaging in use-package
   (if use-package-expand-minimally
       (use-package-concat
        (unless no-require
@@ -100,12 +100,11 @@
 	 )
 
   :config
-  ;; weird keys ;;
-  (global-unset-key (kbd "C-z"))
-  (global-unset-key (kbd "s-p"))
+  (global-unset-key (kbd "C-z")) 	; Normally does a "hide" action on macos
+  (global-unset-key (kbd "s-p"))	; Puts up a print menu lol
   (setq disabled-command-function nil)
 
-  ;; utf-8 ;;
+  ;; utf-8
   (setq locale-coding-system 'utf-8)
   (set-selection-coding-system 'utf-8)
   (prefer-coding-system 'utf-8)
@@ -5209,27 +5208,6 @@ When pressed twice, make the sub/superscript roman."
 
 ;;; * Misc functions
 
-(defun copy-current-line ()
-  "Copy the current line into the kill ring without affecting the cursor position."
-  (interactive)
-  (let ((line-text (buffer-substring (line-beginning-position) (line-end-position))))
-    (kill-new line-text))
-  (message "Copied current line."))
-
-;; based on http://emacsredux.com/blog/2013/04/03/delete-file-and-buffer/
-(defun delete-file-and-buffer ()
-  "Kill the current buffer and deletes the file it is visiting."
-  (interactive)
-  (let ((filename (buffer-file-name)))
-    (if filename
-        (if (y-or-n-p (concat "Do you really want to delete file " filename " ?"))
-            (progn
-	      (move-file-to-trash filename)
-	      (message "Deleted file %s." filename)
-	      (kill-buffer)))
-      (message "Not a file visiting buffer!"))))
-
-
 (defun run-emacs-with-directory (directory &optional arg)
   (interactive "DDirectory: \nP")
   (let ((args (cond ((equal arg '(16)) '("-Q"))
@@ -5257,32 +5235,6 @@ Calling with double prefix ARG (C-u C-u) runs Emacs with -Q."
   "Jump to random line in the buffer."
   (interactive)
   (goto-line (1+ (random (count-lines (point-min) (point-max))))))
-
-(defvar-local hoagie-narrow-toggle-markers nil
-  "A cons cell (beginning . end) that is updated when using `hoagie-narrow-toggle'.")
-
-(defun hoagie-narrow-toggle ()
-  "Toggle widening/narrowing of the current buffer.
-If the buffer is narrowed, store the boundaries in
-`hoagie-narrow-toggle-markers' and widen.
-If the buffer is widened, then narrow to region if
-`hoagie-narrow-toggle-markers' is non nil (and then discard those
-markers, resetting the state)."
-  (interactive)
-  (if (buffer-narrowed-p)
-      (progn
-        (setf hoagie-narrow-toggle-markers (cons (point-min)
-                                                 (point-max)))
-        (widen))
-    ;; check for toggle markers
-    (if (not hoagie-narrow-toggle-markers)
-        (message "No narrow toggle markers.")
-      ;; do the thing
-      (narrow-to-region (car hoagie-narrow-toggle-markers)
-                        (cdr hoagie-narrow-toggle-markers))
-      (setf hoagie-narrow-toggle-markers nil))))
-
-(global-set-key (kbd "C-x n t") #'hoagie-narrow-toggle)
 
 (defun time-until-date ()
   "Calculate and display the time remaining until a target date and time.
