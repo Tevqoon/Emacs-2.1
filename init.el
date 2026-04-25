@@ -1381,7 +1381,7 @@ Produces multiple regions so expreg can step through them."
 ;;; ** GPTel
 
 (use-package gptel
-  :defer t
+  :defer nil
   :after org
   :bind
   (("C-c g k" . gptel-abort)
@@ -3249,7 +3249,7 @@ See `js/anki-derive-fields' for full hierarchy details."
 (use-package org-agenda
   :after org
   :ensure org
-  :defer t
+  :defer nil
   :custom
   (org-todo-keywords
    '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)"
@@ -3855,7 +3855,7 @@ With C-u C-u: pull static/ from remote."
 ;;; * Elfeed
 
 (use-package elfeed
-  :defer t
+  :defer nil
   :bind (("C-x w" . elfeed)
 	 :map elfeed-search-mode-map
          ("SPC" . elfeed-search-show-entry)
@@ -4509,7 +4509,7 @@ If none of the selected entries are downloaded, a message is shown."
   :ensure t)
 
 (use-package wallabag
-  :defer t
+  :defer nil
   :after request emacsql
   :bind (("C-x W" . wallabag)
          :map wallabag-search-mode-map
@@ -4987,7 +4987,7 @@ When pressed twice, make the sub/superscript roman."
 ;;; * Programming
 ;;; ** Magit and VC
 (use-package magit
-  :defer t
+  :defer nil
   :bind
   (("C-x g" . magit-status)
    ("C-x f" . magit-file-dispatch))
@@ -5011,7 +5011,7 @@ When pressed twice, make the sub/superscript roman."
   (magit-todos-mode 1))
 
 (use-package git-timemachine
-  :defer t)
+  :defer nil)
 
 ;;; ** Misc
 (use-package crdt)
@@ -5042,7 +5042,7 @@ When pressed twice, make the sub/superscript roman."
   (add-hook 'xref-backend-functions #'dumb-jump-xref-activate))
 
 (use-package flymake
-  :defer t
+  :defer nil
   :ensure nil  ; built-in package
   :hook
   (prog-mode . flymake-mode)
@@ -5060,7 +5060,7 @@ When pressed twice, make the sub/superscript roman."
 
 (use-package eglot
   :ensure nil
-  :defer t
+  :defer nil
   :hook ((python-mode . eglot-ensure)
          (c-mode . eglot-ensure)
          (c++-mode . eglot-ensure)
@@ -5101,7 +5101,7 @@ When pressed twice, make the sub/superscript roman."
 ;;; *** Racket
 
 (use-package racket-mode
-  :defer t)
+  :defer nil)
 
 ;;; *** Clojure
 
@@ -5125,7 +5125,7 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** Haskell
 
 (use-package haskell-mode
-  :defer t)
+  :defer nil)
 
 ;;; ** Nix
 
@@ -5171,7 +5171,7 @@ When pressed twice, make the sub/superscript roman."
 
 (use-package verb
   :ensure t
-  :defer t)
+  :defer nil)
 
 (use-package restclient
   :ensure t
