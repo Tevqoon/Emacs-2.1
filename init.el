@@ -436,7 +436,7 @@ are defining or executing a macro."
    ;; Macos Registers ;;
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
-   (set-register ?j `(file . ,(concat org-directory "/journals/Journelly.org")))
+   (set-register ?j `(file . ,(concat org-directory "/journal/Journelly.org")))
    (set-register ?p `(file . ,(concat org-directory "/20250823160311-software.org")))
 
 ;;; https://www.reddit.com/r/emacs/comments/1qlnde7/comment/o1fq5lj/
@@ -512,7 +512,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
-   (set-register ?p `(file . ,(concat org-directory "/journals/Journelly.org")))
+   (set-register ?p `(file . ,(concat org-directory "/journal/Journelly.org")))
    (set-register ?l '(file . "~/.stumpwm.d/init.lisp")) ;; StumpWM config
    (set-register ?n '(file . "/etc/nixos/configuration.nix")) ;; StumpWM config
    )
@@ -1308,7 +1308,7 @@ Produces multiple regions so expreg can step through them."
 (use-package info
   :ensure nil
   :init
-  (defvar js/info-directory (expand-file-name "info/" org-roam-directory))
+  (defvar js/info-directory (expand-file-name "info/" org-directory))
 
   (add-to-list 'Info-directory-list js/info-directory)
 
@@ -2037,9 +2037,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
 
 ;;; ** Org edna
 (use-package org-edna
-  :after org org-roam
-  :hook
-  org-mode
+  :hook org-mode
   (org-after-todo-state-change . mm/org-insert-trigger)
   (org-after-todo-statistics . org-summary-todo))
 
