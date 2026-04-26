@@ -2428,7 +2428,7 @@ Using the org-mac-link, this comes pre-formatted with the url title."
       (message "Adding to wallabag: %s" url)
       ;; (run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)
       (run-with-timer 2 nil #'wallabag-request-token)
-      (wallabag-add-entry url "")
+      (js/wallabag-add-entry url "")
       ;; Sync wallabag changes to server
       "added to wallabag")))
 
@@ -4189,7 +4189,7 @@ With C-u C-u: pull static/ from remote."
         (if url
 	    (progn
 	      (message "Adding to wallabag: %s" title)
-	      (wallabag-add-entry url "")
+	      (js/wallabag-add-entry url "")
 	      (cl-incf added-count))
           (message "No URL found for entry: %s" title))))
 
@@ -4861,7 +4861,7 @@ If none of the selected entries are downloaded, a message is shown."
                                   (_ (wallabag-get-item-value item entry))))
 	       " ")))
 
-(defun wallabag-add-entry (&optional url tags)
+(defun js/wallabag-add-entry (&optional url tags)
   "Add a new entry by URL and TAGS."
   (interactive)
   (let* ((url (pcase major-mode
