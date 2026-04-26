@@ -18,6 +18,7 @@
 ;;; ** Basic initialization
 
 (setq custom-file "~/.emacs.d/custom.el")
+(load "~/.emacs.d/private-config.el")
 (when (file-exists-p custom-file)
   (load custom-file))
 
@@ -207,6 +208,7 @@ are defining or executing a macro."
 ;;; * Projects
 
 (use-package project
+  :defer t
   :ensure nil
   :custom
   (project-switch-commands
@@ -296,6 +298,8 @@ are defining or executing a macro."
   :hook prog-mode)
 
 (use-package alert
+  :defer t
+  :commands alert
   :config
   (if (eq system-type 'darwin)
       (setq alert-default-style 'osx-notifier)))
@@ -837,19 +841,21 @@ Preserve original point position instead of jumping to the bottom of selection."
       (outline-end-of-subtree)
       (narrow-to-region beg (point)))))
 
-(use-package hydra)
+(use-package hydra
+  :defer t)
 
 ;;; *** Smerge
 
 (use-package smerge-mode
   :defer t
+  :after hydra
   :bind
   (:map smerge-mode-map
-	("C-c ^ ^" . unpackaged/smerge-hydra/body)))
-
-(defhydra unpackaged/smerge-hydra
-  (:color pink :hint nil :post (smerge-auto-leave))
-  "
+	("C-c ^ ^" . unpackaged/smerge-hydra/body))
+  :config
+  (defhydra unpackaged/smerge-hydra
+    (:color pink :hint nil :post (smerge-auto-leave))
+    "
 ^Move^       ^Keep^               ^Diff^                 ^Other^
 ^^-----------^^-------------------^^---------------------^^-------
 _n_ext       _b_ase               _<_: upper/base        _C_ombine
@@ -858,42 +864,65 @@ _p_rev       _u_pper              _=_: upper/lower       _r_esolve
 ^^           _a_ll                _R_efine
 ^^           _RET_: current       _E_diff
 "
-  ("n" smerge-next)
-  ("p" smerge-prev)
-  ("b" smerge-keep-base)
-  ("u" smerge-keep-upper)
-  ("l" smerge-keep-lower)
-  ("a" smerge-keep-all)
-  ("RET" smerge-keep-current)
-  ("\C-m" smerge-keep-current)
-  ("<" smerge-diff-base-upper)
-  ("=" smerge-diff-upper-lower)
-  (">" smerge-diff-base-lower)
-  ("R" smerge-refine)
-  ("E" smerge-ediff)
-  ("C" smerge-combine-with-next)
-  ("r" smerge-resolve)
-  ("k" smerge-kill-current)
-  ("ZZ" (lambda ()
-          (interactive)
-          (save-buffer)
-          (bury-buffer))
-   "Save and bury buffer" :color blue)
-  ("q" nil "cancel" :color blue))
+    ("n" smerge-next)
+    ("p" smerge-prev)
+    ("b" smerge-keep-base)
+    ("u" smerge-keep-upper)
+    ("l" smerge-keep-lower)
+    ("a" smerge-keep-all)
+    ("RET" smerge-keep-current)
+    ("\C-m" smerge-keep-current)
+    ("<" smerge-diff-base-upper)
+    ("=" smerge-diff-upper-lower)
+    (">" smerge-diff-base-lower)
+    ("R" smerge-refine)
+    ("E" smerge-ediff)
+    ("C" smerge-combine-with-next)
+    ("r" smerge-resolve)
+    ("k" smerge-kill-current)
+    ("ZZ" (lambda ()
+            (interactive)
+            (save-buffer)
+            (bury-buffer))
+     "Save and bury buffer" :color blue)
+    ("q" nil "cancel" :color blue)))
+
+
 
 ;;; *** Expreg
 
 (use-package expreg
-  :defer nil
+  :defer t
+  :commands expreg-expand
   :custom
   (expreg-restore-point-on-quit t)
   :bind ("s-f" . expreg-expand)
   :hook
-  (text-mode      . js/expreg-setup-text)
-  (org-mode       . js/expreg-setup-org) ; org derives text-mode, both fire — ok, add-to-list dedupes
+  (text-mode        . js/expreg-setup-text)
+  (org-mode         . js/expreg-setup-org)
   (latex-mode       . js/expreg-setup-latex)
-  (LaTeX-mode       . js/expreg-setup-latex) ; AUCTeX uses capital-L
-  (elfeed-show-mode . js/expreg-setup-elfeed))
+  (LaTeX-mode       . js/expreg-setup-latex)
+  (elfeed-show-mode . js/expreg-setup-elfeed)
+  :config
+  (defun js/expreg-setup-text ()
+    (add-to-list 'expreg-functions #'expreg--sentence t)
+    (add-to-list 'expreg-functions #'js/expreg--paragraph t))
+
+  (defun js/expreg-setup-org ()
+    (add-to-list 'expreg-functions #'expreg--sentence t)
+    (add-to-list 'expreg-functions #'js/expreg--paragraph t)
+    (add-to-list 'expreg-functions #'js/expreg--latex t)
+    (add-to-list 'expreg-functions #'js/expreg--org-block t)
+    (add-to-list 'expreg-functions #'js/expreg--org-heading t))
+
+  (defun js/expreg-setup-elfeed ()
+    (add-to-list 'expreg-functions #'expreg--sentence t)
+    (add-to-list 'expreg-functions #'js/expreg--paragraph t))
+
+  (defun js/expreg-setup-latex ()
+    (add-to-list 'expreg-functions #'expreg--sentence t)
+    (add-to-list 'expreg-functions #'js/expreg--paragraph t)
+    (add-to-list 'expreg-functions #'js/expreg--latex t)))
 
 (defun js/expreg--paragraph ()
   "Paragraph expansion without text-mode gate."
@@ -1049,28 +1078,12 @@ Produces multiple regions so expreg can step through them."
 
       (nreverse regions))))
 
-(defun js/expreg-setup-text ()
-  (add-to-list 'expreg-functions #'expreg--sentence t)
-  (add-to-list 'expreg-functions #'js/expreg--paragraph t))
-
-(defun js/expreg-setup-org ()
-  (add-to-list 'expreg-functions #'expreg--sentence t)
-  (add-to-list 'expreg-functions #'js/expreg--paragraph t)
-  (add-to-list 'expreg-functions #'js/expreg--latex t)
-  (add-to-list 'expreg-functions #'js/expreg--org-block t)
-  (add-to-list 'expreg-functions #'js/expreg--org-heading t))
-
-(defun js/expreg-setup-elfeed ()
-  (add-to-list 'expreg-functions #'expreg--sentence t)
-  (add-to-list 'expreg-functions #'js/expreg--paragraph t))
-
-(defun js/expreg-setup-latex ()
-  (add-to-list 'expreg-functions #'expreg--sentence t)
-  (add-to-list 'expreg-functions #'js/expreg--paragraph t)
-  (add-to-list 'expreg-functions #'js/expreg--latex t))
 
 
-(use-package phi-search)
+
+(use-package phi-search
+  :defer t
+  :commands phi-search)
 
 (use-package multiple-cursors
   :defer t
@@ -1210,6 +1223,7 @@ Produces multiple regions so expreg can step through them."
 	      (overlay-put overlay 'display desc))))))))
 
 (use-package wgrep
+  :defer t
   :ensure t)
 
 (use-package flash
@@ -1304,6 +1318,8 @@ Produces multiple regions so expreg can step through them."
 ;;; * Misc helper packages
 
 (use-package vterm
+  :defer t
+  :commands vterm
   :if (eq system-type 'darwin))
 
 (use-package stripspace
@@ -1318,10 +1334,12 @@ Produces multiple regions so expreg can step through them."
 ;;; ** PDFView
 
 (use-package pdf-tools
+  :defer t
   :if (not (eq system-type 'android))
   :ensure t
+  :magic ("%PDF" . pdf-view-mode)
   :mode ("\\.pdf\\'" . pdf-view-mode)
-  :init
+  :config
   ;; Build/install the helper binary on first run (quiet)
   (unless (featurep 'pdf-tools)
     (pdf-tools-install :noquery)))
@@ -1365,7 +1383,7 @@ Produces multiple regions so expreg can step through them."
 ;;; ** GPTel
 
 (use-package gptel
-  :after org mcp
+  :defer t
   :bind
   (("C-c g k" . gptel-abort)
    ("C-c g c" . gptel-add)
@@ -1373,7 +1391,7 @@ Produces multiple regions so expreg can step through them."
    ("C-c g s" . gptel-send)
    ("C-c g /" . gptel-menu)
    ("C-c g g" . gptel)
-   ("C-c g m" . mcp-hub)
+   ("C-c g M" . mcp-hub)
    (:map gptel-mode-map
 	 ("C-c g t o" . gptel-org-set-topic)))
   :custom
@@ -1400,12 +1418,15 @@ Produces multiple regions so expreg can step through them."
 ;;; ** Emacs MCP
 
 (use-package mcp-server-lib
+  :demand t
   :if (not (eq system-type 'android)))
 
 (use-package emacs-mcp-tool-server
+  :demand t
   :if (not (eq system-type 'android)) ; Seems not worth the hassle
   :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
-  :ensure mcp-server-lib
+  :after mcp-server-lib
+  :ensure nil
   :bind
   (("C-c g t i" . emacs-mcp-tool-install-stdio-script)
    ("C-c g t s" . emacs-mcp-tool-start-server)
@@ -1415,17 +1436,18 @@ Produces multiple regions so expreg can step through them."
   :config (require 'emacs-mcp-tool-server))
 
 (use-package mcp
+  :demand t
   :if (not (eq system-type 'android))
   :after emacs-mcp-tool-server
   :ensure t
-  :custom (mcp-hub-servers
-           `(("duckduckgo" . (:command "uvx" :args ("duckduckgo-mcp-server")))
-	     ("emacs-mcp-tool-server" .
-	      (:command ,(expand-file-name "~/.emacs.d/emacs-mcp-stdio.sh")
-			:args ("--init-function=emacs-mcp-tool-start-server"
-			       "--stop-function=emacs-mcp-tool-stop-server"
-			       "--server-id=default")))))
   :config
+  (setq mcp-hub-servers
+        `(("duckduckgo" . (:command "uvx" :args ("duckduckgo-mcp-server")))
+	  ("emacs-mcp-tool-server" .
+	   (:command ,(expand-file-name "~/.emacs.d/emacs-mcp-stdio.sh")
+		     :args ("--init-function=emacs-mcp-tool-start-server"
+			    "--stop-function=emacs-mcp-tool-stop-server"
+			    "--server-id=default")))))
   (require 'mcp-hub)
   (mcp-hub-start-all-server))
 
@@ -1558,6 +1580,7 @@ Produces multiple regions so expreg can step through them."
   "Buffer-local variable to enable/disable tag updating.")
 
 (use-package org
+  :defer t
   :custom
   (org-hide-emphasis-markers t)
   (org-image-actual-width nil)
@@ -1609,10 +1632,8 @@ Produces multiple regions so expreg can step through them."
   (add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
   ;; Open links in the same window
   (setf (alist-get 'file org-link-frame-setup) #'find-file)
-  )
 
-;; Org Exporting
-(setq org-latex-classes
+  (setq org-latex-classes
       '(("article" "\\documentclass[11pt,a4paper]{article}"
 	 ("\\section{%s}" . "\\section*{%s}")
 	 ("\\subsection{%s}" . "\\subsection*{%s}")
@@ -1630,13 +1651,17 @@ Produces multiple regions so expreg can step through them."
 	 ("\\section{%s}" . "\\section*{%s}")
 	 ("\\subsection{%s}" . "\\subsection*{%s}")
 	 ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
+  (setq org-export-with-section-numbers nil)
+
+  )
+
+;; Org Exporting
+
 
 (defun js/org-export-configure-numbering (backend)
   (pcase backend
     ('latex (setq-local org-export-with-section-numbers t))
     ('html  (setq-local org-export-with-section-numbers nil))))
-(setq org-export-with-section-numbers nil)
-
 
 (defun js/org-rename-buffer-to-title ()
   "Rename buffer to value of #+TITLE:."
@@ -1853,10 +1878,12 @@ Handles both |*abc*| and *|abc|* cases. Otherwise behave like self-insert."
 ;;; ** exporting
 ;;; TODO: Move the ox configs with heading splicing to a module
 (use-package js-ox-strip-heading	; Spliced exports
+  :defer t
   :load-path "~/.emacs.d/lisp/"
   :after ox)
 
 (use-package ox
+  :defer t
   :after org
   :ensure nil
   :custom
@@ -1987,30 +2014,36 @@ Falls back to #+attr_latex :options for backwards compatibility."
 ;;; ** Org-download
 
 (use-package org-download
+  :defer t
   :after org)
 
 ;;; ** Org-mac-link
 
 (use-package org-mac-link
+  :defer t
   :after org
   :if (eq system-type 'darwin)
   :ensure t)
 
 ;;; ** Org visuals
 (use-package org-appear
+  :defer t
   :hook org-mode)
 
 (use-package org-superstar
+  :defer t
   :custom
   (org-superstar-leading-bullet ?\u2002)
   :hook org-mode)
 
 (use-package org-pretty-table
+  :defer t
   :vc (:url "https://github.com/fuco1/org-pretty-table")
   :hook org-mode)
 
 ;;; ** Org edna
 (use-package org-edna
+  :defer t
   :hook org-mode
   (org-after-todo-state-change . mm/org-insert-trigger)
   (org-after-todo-statistics . org-summary-todo))
@@ -2064,10 +2097,6 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ("C-c n t" . org-roam-tag-add)
 	 ("C-c n n s" . org-roam-db-sync)
 
-	 ;; Blog
-	 ("C-c n b b" . org-static-blog-publish)
-	 ("C-c n b p" . js/sync-blog)
-	 ("C-c n b o" . js/blog-open-in-browser)
 
          :map org-mode-map
          ("C-M-i" . completion-at-point)
@@ -2923,156 +2952,11 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
   )
 
 ;;; * Vulpea
-;;; ** Tag management
-
-(defun org/project-p ()
-  "Return non-nil if current buffer has a todo entry.
-Ignores headlines under ARCHIVE-tagged ancestors."
-  (org-element-map
-      (org-element-parse-buffer 'headline)
-      'headline
-    (lambda (h)
-      ;; Skip if this headline or any ancestor has :ARCHIVE: tag
-      (unless (org-element-lineage-map h
-                  (lambda (ancestor)
-		    (member "ARCHIVE" (org-element-property :tags ancestor)))
-                'headline 'with-self 'first-match)
-        (eq (org-element-property :todo-type h) 'todo)))
-    nil 'first-match))
-
-(defun org/has-anki-flashcards-p ()
-  "Return non-nil if current buffer has ANKI-related properties in actual drawers.
-Ignores headlines under ARCHIVE-tagged ancestors."
-  (org-element-map
-      (org-element-parse-buffer 'headline)
-      'headline
-    (lambda (h)
-      ;; Skip if this headline or any ancestor has :ARCHIVE: tag
-      (unless (org-element-lineage-map h
-                  (lambda (ancestor)
-		    (member "ARCHIVE" (org-element-property :tags ancestor)))
-                'headline 'with-self 'first-match)
-        (or (org-element-property :ANKI_NOTE_TYPE h)
-	    (org-element-property :ANKI_DECK h)
-	    (org-element-property :ANKI_NOTE_ID h)
-	    (org-element-property :ANKI_TAGS h))))
-    nil 'first-match))
-
-(defun org/has-gptel-chatlog-p ()
-  "Return non-nil if current buffer has GPTEL-related properties in actual drawers."
-  (org-element-map
-      (org-element-parse-buffer 'headline)
-      'headline
-    (lambda (h)
-      (or (org-element-property :GPTEL_TOPIC h)
-          (org-element-property :GPTEL_MESSAGES h)
-          (org-element-property :GPTEL_MODEL h)
-          (org-element-property :GPTEL_CONTEXT h)))
-    nil 'first-match))
-
-(defvar tags/tag-added-hook nil
-  "Hook run when a tag is added to a file.
-Each function is called with two arguments: the tag and the buffer.")
-
-(defvar tags/tag-removed-hook nil
-  "Hook run when a tag is removed from a file.
-Each function is called with two arguments: the tag and the buffer.")
-
-(defun vulpea-buffer-p ()
-  "Return non-nil if the currently visited buffer is a note."
-  (and buffer-file-name
-       (string-prefix-p
-        (expand-file-name (file-name-as-directory org-roam-directory))
-        (file-name-directory buffer-file-name))))
-
-(defun tags/org-update-tag (tcpair)
-  "Update \\='(tag . checker) tag in the current buffer."
-  (when (and (not (member (buffer-name) prune/ignored-files))
-	     (not (active-minibuffer-window))
-	     (vulpea-buffer-p))
-    (save-excursion
-      (goto-char (point-min))
-      (let* ((tag-name (car tcpair))
-	     (tags (vulpea-buffer-tags-get))
-	     (original-tags tags)
-	     (had-tag (member tag-name tags)))
-
-        ;; Run checker and modify tags
-        (if (funcall (cdr tcpair))
-	    (setq tags (cons tag-name tags))
-          (setq tags (remove tag-name tags)))
-
-        ;; Cleanup duplicates
-        (setq tags (seq-uniq tags))
-
-        ;; Update tags if changed
-        (when (or (seq-difference tags original-tags)
-                  (seq-difference original-tags tags))
-          (apply #'vulpea-buffer-tags-set tags)
-
-          ;; Run appropriate hooks
-          (let ((now-has-tag (member tag-name tags)))
-	    (cond
-	     ;; Tag was added
-	     ((and (not had-tag) now-has-tag)
-	      (run-hook-with-args 'tags/tag-added-hook tag-name (current-buffer)))
-	     ;; Tag was removed
-	     ((and had-tag (not now-has-tag))
-	      (run-hook-with-args 'tags/tag-removed-hook tag-name (current-buffer))))))))))
-
-(defun tags/org-update-all-tags ()
-  (mapc #'tags/org-update-tag tag-checkers))
-
-(defmacro tags/make-db-searcher (tag)
-  "Define the function to return a list of note files containing the specified TAG."
-  (let ((func-name (intern (format "org-%s-files" tag))))
-    `(defun ,func-name ()
-       ,(format "Return a list of note files containing the '%s' tag." tag)
-       (seq-uniq
-	(seq-map
-	 #'car
-	 (org-roam-db-query
-	  [:select [nodes:file]
-		   :from tags
-		   :left-join nodes
-		   :on (= tags:node-id nodes:id)
-		   :where (like tag (quote ,(format "%%\"%s\"%%" tag)))]))))))
-
-(defvar-local tags/update-tags-enabled nil
-  "Buffer-local variable to enable/disable tag updating.")
-
-(defvar tags/tag-pause nil
-  "Global flag to pause tag updating during certain operations.")
-
-(defun tags/maybe-update-tags ()
-  "Update tags if enabled for the current buffer."
-  (when (and tags/update-tags-enabled
-	     (not tags/tag-pause)
-	     (not (member (buffer-name) prune/ignored-files))
-	     (not (active-minibuffer-window))
-	     (vulpea-buffer-p))
-    (message "Updating tags!")
-    (tags/org-update-all-tags)
-    ))
-
-(defun tags/enable-tag-updating ()
-  "Enable tag updating for the current buffer."
-  (setq-local tags/update-tags-enabled t)
-  (add-hook 'before-save-hook #'tags/maybe-update-tags nil t)
-  (tags/maybe-update-tags))
-
-;; Fixes weird tag insertion on extracting heading with `TODO' subheadings
-(defun tags/extract-subtree-with-tag-pause (orig-fun &rest args)
-  "Pause tag updating during extraction, then update tags after."
-  (let ((tags/tag-pause t))
-    (apply orig-fun args))
-  ;; Now we're in the new buffer, tags/tag-pause is nil again
-  (message (concat "The current value is: " tags/tag-pause))
-  (save-buffer))
-
 ;;; ** Basic config
 
 (use-package vulpea
+  :defer t
+  :after org
   :preface
   (setq prune/ignored-files '("tasks.org" "inbox.org")) ; These should always have project tags.
   (setq tag-checkers '(("project" . org/project-p)
@@ -3081,32 +2965,181 @@ Each function is called with two arguments: the tag and the buffer.")
   (setq tags/updating-tags (mapcar #'car tag-checkers))
 
   :init
-  (require 'vulpea-buffer)
   (dolist (tag (cons "interesting" (cons "summary" tags/updating-tags))) ;TODO: Remove double cons
     (add-to-list 'org-tags-exclude-from-inheritance tag))
+
+  (with-eval-after-load 'org
+      (vulpea-db-autosync-mode +1))
 
   :custom
   (vulpea-buffer-alias-property "ROAM_ALIASES")
 
-  :config
-  (vulpea-db-autosync-mode +1)
-  (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
-
   :hook
   (org-mode . tags/enable-tag-updating)
 
-  )
+  :config
+  (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
+;;; ** Tag management
+
+  (defun org/project-p ()
+    "Return non-nil if current buffer has a todo entry.
+Ignores headlines under ARCHIVE-tagged ancestors."
+    (org-element-map
+	(org-element-parse-buffer 'headline)
+	'headline
+      (lambda (h)
+	;; Skip if this headline or any ancestor has :ARCHIVE: tag
+	(unless (org-element-lineage-map h
+                    (lambda (ancestor)
+		      (member "ARCHIVE" (org-element-property :tags ancestor)))
+                  'headline 'with-self 'first-match)
+          (eq (org-element-property :todo-type h) 'todo)))
+      nil 'first-match))
+
+  (defun org/has-anki-flashcards-p ()
+    "Return non-nil if current buffer has ANKI-related properties in actual drawers.
+Ignores headlines under ARCHIVE-tagged ancestors."
+    (org-element-map
+	(org-element-parse-buffer 'headline)
+	'headline
+      (lambda (h)
+	;; Skip if this headline or any ancestor has :ARCHIVE: tag
+	(unless (org-element-lineage-map h
+                    (lambda (ancestor)
+		      (member "ARCHIVE" (org-element-property :tags ancestor)))
+                  'headline 'with-self 'first-match)
+          (or (org-element-property :ANKI_NOTE_TYPE h)
+	      (org-element-property :ANKI_DECK h)
+	      (org-element-property :ANKI_NOTE_ID h)
+	      (org-element-property :ANKI_TAGS h))))
+      nil 'first-match))
+
+  (defun org/has-gptel-chatlog-p ()
+    "Return non-nil if current buffer has GPTEL-related properties in actual drawers."
+    (org-element-map
+	(org-element-parse-buffer 'headline)
+	'headline
+      (lambda (h)
+	(or (org-element-property :GPTEL_TOPIC h)
+            (org-element-property :GPTEL_MESSAGES h)
+            (org-element-property :GPTEL_MODEL h)
+            (org-element-property :GPTEL_CONTEXT h)))
+      nil 'first-match))
+
+  (defvar tags/tag-added-hook nil
+    "Hook run when a tag is added to a file.
+Each function is called with two arguments: the tag and the buffer.")
+
+  (defvar tags/tag-removed-hook nil
+    "Hook run when a tag is removed from a file.
+Each function is called with two arguments: the tag and the buffer.")
+
+  (defun vulpea-buffer-p ()
+    "Return non-nil if the currently visited buffer is a note."
+    (and buffer-file-name
+	 (string-prefix-p
+          (expand-file-name (file-name-as-directory org-roam-directory))
+          (file-name-directory buffer-file-name))))
+
+  (defun tags/org-update-tag (tcpair)
+    "Update \\='(tag . checker) tag in the current buffer."
+    (when (and (not (member (buffer-name) prune/ignored-files))
+	       (not (active-minibuffer-window))
+	       (vulpea-buffer-p))
+      (save-excursion
+	(goto-char (point-min))
+	(let* ((tag-name (car tcpair))
+	       (tags (vulpea-buffer-tags-get))
+	       (original-tags tags)
+	       (had-tag (member tag-name tags)))
+
+          ;; Run checker and modify tags
+          (if (funcall (cdr tcpair))
+	      (setq tags (cons tag-name tags))
+            (setq tags (remove tag-name tags)))
+
+          ;; Cleanup duplicates
+          (setq tags (seq-uniq tags))
+
+          ;; Update tags if changed
+          (when (or (seq-difference tags original-tags)
+                    (seq-difference original-tags tags))
+            (apply #'vulpea-buffer-tags-set tags)
+
+            ;; Run appropriate hooks
+            (let ((now-has-tag (member tag-name tags)))
+	      (cond
+	       ;; Tag was added
+	       ((and (not had-tag) now-has-tag)
+		(run-hook-with-args 'tags/tag-added-hook tag-name (current-buffer)))
+	       ;; Tag was removed
+	       ((and had-tag (not now-has-tag))
+		(run-hook-with-args 'tags/tag-removed-hook tag-name (current-buffer))))))))))
+
+  (defun tags/org-update-all-tags ()
+    (mapc #'tags/org-update-tag tag-checkers))
+
+  (defmacro tags/make-db-searcher (tag)
+    "Define the function to return a list of note files containing the specified TAG."
+    (let ((func-name (intern (format "org-%s-files" tag))))
+      `(defun ,func-name ()
+	 ,(format "Return a list of note files containing the '%s' tag." tag)
+	 (seq-uniq
+	  (seq-map
+	   #'car
+	   (org-roam-db-query
+	    [:select [nodes:file]
+		     :from tags
+		     :left-join nodes
+		     :on (= tags:node-id nodes:id)
+		     :where (like tag (quote ,(format "%%\"%s\"%%" tag)))]))))))
+
+  (tags/make-db-searcher "flashcards")
+  (tags/make-db-searcher "project")
+
+  (defvar-local tags/update-tags-enabled nil
+    "Buffer-local variable to enable/disable tag updating.")
+
+  (defvar tags/tag-pause nil
+    "Global flag to pause tag updating during certain operations.")
+
+  (defun tags/maybe-update-tags ()
+    "Update tags if enabled for the current buffer."
+    (when (and tags/update-tags-enabled
+	       (not tags/tag-pause)
+	       (not (member (buffer-name) prune/ignored-files))
+	       (not (active-minibuffer-window))
+	       (vulpea-buffer-p))
+      (message "Updating tags!")
+      (tags/org-update-all-tags)
+      ))
+
+  (defun tags/enable-tag-updating ()
+    "Enable tag updating for the current buffer."
+    (setq-local tags/update-tags-enabled t)
+    (add-hook 'before-save-hook #'tags/maybe-update-tags nil t)
+    (tags/maybe-update-tags))
+
+  ;; Fixes weird tag insertion on extracting heading with `TODO' subheadings
+  (defun tags/extract-subtree-with-tag-pause (orig-fun &rest args)
+    "Pause tag updating during extraction, then update tags after."
+    (let ((tags/tag-pause t))
+      (apply orig-fun args))
+    ;; Now we're in the new buffer, tags/tag-pause is nil again
+    (message (concat "The current value is: " tags/tag-pause))
+    (save-buffer)))
 
 (use-package vulpea-ui
+  :after vulpea
   :defer t
   :bind ("C-c n v" . vulpea-ui-sidebar-toggle))
 
 (use-package vulpea-journal
+  :after vulpea
   :bind
-  (:map org-roam-dailies-map
-	("m" . js/vulpea-journal-month-today)
-	("M" . js/vulpea-journal-month-date))
-  :init
+  (("C-c n d m" . js/vulpea-journal-month-today)
+   ("C-c n d M" . js/vulpea-journal-month-date))
+  :config
   (defvar js/vulpea-monthly-template
     '(:file-name "journal/monthlies/%Y-%m-monthly.org"
 			 :title "%Y-%m"
@@ -3115,7 +3148,6 @@ Each function is called with two arguments: the tag and the buffer.")
 			 :entry-title "%Y-%m-%d %A"
 			 :head "#+created: %<[%Y-%m-%d]>\n#+startup: show2levels"))
 
-  :config
   (vulpea-journal-setup)
 
   (defun js/vulpea-journal-month-today ()
@@ -3143,6 +3175,9 @@ Each function is called with two arguments: the tag and the buffer.")
   :custom
   (anki-editor-latex-style 'mathjax)
   (anki-editor-ignored-org-tags '("project" "flashcards" "ex-flashcards"))
+  :config
+  (require 'js-anki-body-converter
+           (expand-file-name "lisp/js-anki-body-converter.el" user-emacs-directory))
   )
 
 (defvar anki-tag-list '()
@@ -3158,7 +3193,6 @@ Each function is called with two arguments: the tag and the buffer.")
       (setq anki-tag-list (delete nil (cons tag (remove tag anki-tag-list)))))
     tag))
 
-(tags/make-db-searcher "flashcards")
 
 ;;; *** Anki editor overrides
 
@@ -3188,9 +3222,6 @@ CONTENTS is nil. INFO is a plist holding contextual information."
     (if anki-editor-break-consecutive-braces-in-latex
         (replace-regexp-in-string "}}" "} } " code)
       code)))
-
-(require 'js-anki-body-converter
-         (expand-file-name "lisp/js-anki-body-converter.el" user-emacs-directory))
 
 (defun anki-editor-note-at-point ()
   "Make a note struct from current entry using block-aware field extraction.
@@ -3247,6 +3278,63 @@ See `js/anki-derive-fields' for full hierarchy details."
 			     :fields fields
 			     :hash   hash
 			     :marker (point-marker)))))
+
+;;; *** Push functions
+
+(defvar anki-flashcard-error-buffer "*Anki Flashcard Errors*"
+  "Buffer name for displaying Anki flashcard push errors.")
+
+(defun anki-flashcard-clear-error-buffer ()
+  "Clear the error buffer or create it if it doesn't exist."
+  (with-current-buffer (get-buffer-create anki-flashcard-error-buffer)
+    (erase-buffer)
+    (insert "Anki Flashcard Push Results:\n\n")))
+
+(defun anki-flashcard-report-error (file error-msg)
+  "Report ERROR-MSG for FILE in the error buffer."
+  (with-current-buffer (get-buffer-create anki-flashcard-error-buffer)
+    (goto-char (point-max))
+    (insert (format "ERROR pushing %s:\n%s\n\n" file error-msg))))
+
+(defun my/anki-flashcard-push-current-buffer ()
+  "Push current buffer's flashcards to Anki."
+  (interactive)
+  (if (buffer-file-name)
+      (progn
+        (anki-flashcard-clear-error-buffer)
+        (save-buffer)
+        (condition-case err
+            (progn
+              (save-excursion
+		(org-transclusion-mode +1)
+		(anki-editor-push-notes 'file))
+              (message "Successfully pushed %s to Anki" (buffer-file-name)))
+          (error
+           (anki-flashcard-report-error (buffer-file-name) (error-message-string err))
+           (message "Failed to push %s to Anki — see %s"
+                    (buffer-file-name) anki-flashcard-error-buffer))))
+    (message "Buffer is not visiting a file")))
+
+(defun my/anki-flashcard-push-all ()
+  "Push all flashcard files (via org-roam tag index) to Anki."
+  (interactive)
+  (anki-flashcard-clear-error-buffer)
+  (let* ((files (org-flashcards-files))
+         (total (length files))
+         (success 0))
+    (dolist (file files)
+      (condition-case err
+          (with-current-buffer (find-file-noselect file)
+	    (org-transclusion-mode +1)
+            (save-excursion (anki-editor-push-notes 'file))
+            (cl-incf success))
+        (error (anki-flashcard-report-error file (error-message-string err)))))
+    (if (< success total)
+        (progn
+          (message "Pushed %d/%d, %d errors — see %s"
+                   success total (- total success) anki-flashcard-error-buffer)
+          (display-buffer anki-flashcard-error-buffer))
+      (message "Pushed all %d flashcard files" total))))
 
 (defun my/anki-flashcard-push-all ()
   "Push all flashcard files (via org-roam tag index) to Anki."
@@ -3378,7 +3466,6 @@ See `js/anki-derive-fields' for full hierarchy details."
 	 )
   :config
   (add-to-list 'warning-suppress-types '(org-element))
-  (tags/make-db-searcher "project")
   )
 
 (defun roam-agenda-files-update (&rest _)
@@ -3499,7 +3586,7 @@ the current entry at point and move to the next line."
 ;;; ** Org triage
 (use-package js-triage-session
   :defer t
-  :after org-agenda
+  :after org-agenda hydra
   :load-path "~/.emacs.d/lisp"
   :bind
   (("C-c n j b p" . js/session-process)
@@ -3519,11 +3606,11 @@ the current entry at point and move to the next line."
    ("C-c n j ." . js/triage-goto-current)
    ("C-c n j ," . js/triage-status)
 
-   ("C-c n j j" . js/triage-hydra/body)))
-
-(defhydra js/triage-hydra
-  (:color pink :hint nil)
-  "
+   ("C-c n j j" . js/triage-hydra/body))
+  :config
+  (defhydra js/triage-hydra
+    (:color pink :hint nil)
+    "
 ^Move^              ^Action^             ^Meta^
 ^^-----------------^^------------------^^-----------
 _n_ext              _t_odo               _q_uit
@@ -3534,27 +3621,30 @@ _s_ooner            _w_org refile
 _l_ater             _a_rchive
 _S_manual
 "
-  ("." js/triage-goto-current)
-  ("," js/triage-status)
-  ("n" js/triage-next)
-  ("p" js/triage-goto-prev)
-  ("d" js/triage-done)
-  ("c" js/triage-cancel)
-  ("a" org-archive-subtree-default)
-  ("s" js/triage-snooze-soon)
-  ("l" js/triage-snooze-later)
-  ("S" js/triage-manual)
-  ("t" org-todo)
-  ("r" org-roam-refile)
-  ("w" org-refile)
-  ("R" js/roamify-url-at-point :exit t)
-  ("o" open-urls-at-point-or-region)
-  ("q" js/triage-quit :color blue))
+    ("." js/triage-goto-current)
+    ("," js/triage-status)
+    ("n" js/triage-next)
+    ("p" js/triage-goto-prev)
+    ("d" js/triage-done)
+    ("c" js/triage-cancel)
+    ("a" org-archive-subtree-default)
+    ("s" js/triage-snooze-soon)
+    ("l" js/triage-snooze-later)
+    ("S" js/triage-manual)
+    ("t" org-todo)
+    ("r" org-roam-refile)
+    ("w" org-refile)
+    ("R" js/roamify-url-at-point :exit t)
+    ("o" open-urls-at-point-or-region)
+    ("q" js/triage-quit :color blue)))
+
+
 
 
 ;;; ** Babel
 
 (use-package org ;;babel
+  :defer t
   :custom
   (org-babel-python-command "python3")
   (org-confirm-babel-evaluate nil)
@@ -3616,6 +3706,11 @@ _S_manual
 (use-package org-static-blog
   :defer t
   :after org-roam
+  :bind
+  ("C-c n b b" . org-static-blog-publish)
+  ("C-c n b p" . js/sync-blog)
+  ("C-c n b o" . js/blog-open-in-browser)
+
   :custom
   (org-static-blog-publish-title "My Blog")
   (org-static-blog-publish-url "https://www.jure-smolar.com/")
@@ -3684,24 +3779,11 @@ _S_manual
   (org-static-blog-index-front-matter "Recent posts.")
 
   :config
-  (defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page" "draft")
-    "Tags used for file management that shouldn't appear on the blog.")
-
-  (defvar blog-tags '("blog")
-    "Org-roam tags that mark nodes as published blog posts.")
-
-  (defvar static-tags '("blog-static-page" "draft" "lecture-notes")
-    "Org-roam tags that mark nodes as static pages, drafts, or lecture notes.")
 
   ;; These tags should not be inherited to facilitate future subtree publishing
   (add-to-list 'org-tags-exclude-from-inheritance "blog")
   (add-to-list 'org-tags-exclude-from-inheritance "note")
   (add-to-list 'org-tags-exclude-from-inheritance "lecture-notes")
-
-  (defun js/tags->or-clause (tags)
-    "Build an emacsql :where clause matching tags:tag against any tag in TAGS.
-Returns e.g. (or (= tags:tag \"blog\") (= tags:tag \"note\"))."
-    (cons 'or (mapcar (lambda (tag) `(= tags:tag ,tag)) tags)))
 
   ;; Override to use org-roam query instead of subfolders
   (defun org-static-blog-get-post-filenames ()
@@ -3710,8 +3792,8 @@ Returns e.g. (or (= tags:tag \"blog\") (= tags:tag \"note\"))."
      (mapcar #'car
              (org-roam-db-query
               `[:select :distinct [nodes:file] :from nodes
-                        :inner-join tags :on (= tags:node-id nodes:id)
-                        :where ,(js/tags->or-clause blog-tags)]))))
+			:inner-join tags :on (= tags:node-id nodes:id)
+			:where ,(js/tags->or-clause blog-tags)]))))
 
   (defun org-static-blog-get-draft-filenames ()
     "Get static pages from org-roam nodes tagged with any tag in `static-tags'."
@@ -3726,9 +3808,9 @@ Returns e.g. (or (= tags:tag \"blog\") (= tags:tag \"note\"))."
     (let ((case-fold-search t)
           (all-tags nil))
       (with-temp-buffer
-        (insert-file-contents post-filename)
-        (goto-char (point-min))
-        (when (or (search-forward-regexp "^\\#\\+filetags:[ ]*:\\(.*\\):$" nil t)
+	(insert-file-contents post-filename)
+	(goto-char (point-min))
+	(when (or (search-forward-regexp "^\\#\\+filetags:[ ]*:\\(.*\\):$" nil t)
                   (search-forward-regexp "^\\#\\+filetags:[ ]*\\(.+\\)$" nil t))
           (setq all-tags (if (match-string 1)
                              (split-string (match-string 1) ":")
@@ -3736,30 +3818,6 @@ Returns e.g. (or (= tags:tag \"blog\") (= tags:tag \"note\"))."
       (cl-remove-if (lambda (tag)
                       (member (downcase tag) orb-ignored-tags))
                     all-tags)))
-
-  (defun my/org-static-blog-link (link desc info)
-    "Transcode ID links to proper blog post URLs.
-Falls back to standard org-html-link for other link types."
-    (if (not (string= (org-element-property :type link) "id"))
-        (org-html-link link desc info)
-      (let* ((id (org-element-property :path link))
-             (node (org-roam-node-from-id id))
-             (tags (and node (org-roam-node-tags node)))
-             (published-p (and tags (seq-intersection tags (append blog-tags static-tags))))
-             (fallback-desc (if node (org-roam-node-title node) id)))
-        (if published-p
-            (format "<a href=\"/%s\">%s</a>"
-                    (org-static-blog-get-post-public-path (org-roam-node-file node))
-                    (or desc (org-roam-node-title node)))
-          (format "<a href=\"broken-link.html\" class=\"broken-link\">%s</a>"
-                  (or desc fallback-desc))))))
-
-  ;; Redefine the backend every time before rendering
-  (defun my/setup-blog-backend (&rest _args)
-    "Ensure our custom link and tikzcd handlers are in the backend."
-    (org-export-define-derived-backend 'org-static-blog-post-bare 'html
-      :translate-alist '((template . (lambda (contents info) contents))
-                         (link . my/org-static-blog-link))))
 
   ;; Turn on transclusions before exporting
   (defun org-static-blog-render-post-content (post-filename)
@@ -3790,94 +3848,75 @@ Falls back to standard org-html-link for other link types."
   ;; Hook into the render function
   (advice-add 'org-static-blog-render-post-content :before #'my/setup-blog-backend)
 
-  (defvar js/tikzcd-svg-directory "diagrams/"
-    "Directory for tikzcd SVG files, relative to org file.")
 
-  (defun js/tikzcd-to-svg ()
-    "Render tikzcd environment at point to SVG and insert link.
-Expects cursor to be inside a \\begin{tikzcd}...\\end{tikzcd} block."
-    (interactive)
-    (save-excursion
-      (let* ((start (progn (search-backward "\\begin{tikzcd}") (point)))
-             (end (progn (search-forward "\\end{tikzcd}") (point)))
-             (tikzcd-code (buffer-substring-no-properties start end))
-             (filename (read-string "SVG filename (without extension): "))
-             (svg-file (concat filename ".svg"))
-             (temp-dir (make-temp-file "tikzcd" t))
-             (temp-tex (expand-file-name "diagram.tex" temp-dir))
-             (temp-pdf (expand-file-name "diagram.pdf" temp-dir))
-             (temp-svg (expand-file-name "diagram.svg" temp-dir))
-             (org-dir (file-name-directory (buffer-file-name)))
-             (svg-dir (expand-file-name js/tikzcd-svg-directory org-dir))
-             (output-path (expand-file-name svg-file svg-dir))
-             (relative-link (concat js/tikzcd-svg-directory svg-file)))
+  )
 
-        ;; Create output directory if it doesn't exist
-        (unless (file-exists-p svg-dir)
-          (make-directory svg-dir t))
+(defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page" "draft")
+  "Tags used for file management that shouldn't appear on the blog.")
 
-        ;; Write LaTeX file
-        (with-temp-file temp-tex
-          (insert "\\documentclass[border=2pt]{standalone}\n")
-          (insert "\\usepackage{tikz-cd}\n")
-          (insert "\\usepackage{amsmath}\n")
-          (insert "\\usepackage{amssymb}\n")
-          (insert "\n\\begin{document}\n")
-          (insert tikzcd-code)
-          (insert "\n\\end{document}\n"))
+(defvar blog-tags '("blog")
+  "Org-roam tags that mark nodes as published blog posts.")
 
-        ;; Compile to PDF in temp directory
-        (message "Compiling LaTeX...")
-        (shell-command (format "cd %s && pdflatex -interaction=nonstopmode diagram.tex"
-                               temp-dir))
+(defvar static-tags '("blog-static-page" "draft" "lecture-notes")
+  "Org-roam tags that mark nodes as static pages, drafts, or lecture notes.")
 
-        ;; Convert to SVG and copy to destination
-        (if (file-exists-p temp-pdf)
-            (progn
-              (message "Converting to SVG...")
-              (shell-command (format "pdf2svg %s %s" temp-pdf temp-svg))
+(defun js/tags->or-clause (tags)
+  "Build an emacsql :where clause matching tags:tag against any tag in TAGS.
+Returns e.g. (or (= tags:tag \"blog\") (= tags:tag \"note\"))."
+  (cons 'or (mapcar (lambda (tag) `(= tags:tag ,tag)) tags)))
 
-              (if (file-exists-p temp-svg)
-                  (progn
-                    (copy-file temp-svg output-path t)
-                    (delete-directory temp-dir t)
-                    (goto-char end)
-                    (insert (format "\n\n[[file:%s]]\n" relative-link))
-                    (message "Created %s" output-path))
-                (progn
-                  (delete-directory temp-dir t)
-                  (error "SVG conversion failed"))))
-          (progn
-            (delete-directory temp-dir t)
-            (error "PDF compilation failed"))))))
+(defun my/org-static-blog-link (link desc info)
+  "Transcode ID links to proper blog post URLs.
+Falls back to standard org-html-link for other link types."
+  (if (not (string= (org-element-property :type link) "id"))
+      (org-html-link link desc info)
+    (let* ((id (org-element-property :path link))
+           (node (org-roam-node-from-id id))
+           (tags (and node (org-roam-node-tags node)))
+           (published-p (and tags (seq-intersection tags (append blog-tags static-tags))))
+           (fallback-desc (if node (org-roam-node-title node) id)))
+      (if published-p
+          (format "<a href=\"/%s\">%s</a>"
+                  (org-static-blog-get-post-public-path (org-roam-node-file node))
+                  (or desc (org-roam-node-title node)))
+        (format "<a href=\"broken-link.html\" class=\"broken-link\">%s</a>"
+                (or desc fallback-desc))))))
 
-  (defun js/sync-blog (arg)
-    "Sync blog to muffalo server via Makefile targets.
+;; Redefine the backend every time before rendering
+(defun my/setup-blog-backend (&rest _args)
+  "Ensure our custom link and tikzcd handlers are in the backend."
+  (org-export-define-derived-backend 'org-static-blog-post-bare 'html
+    :translate-alist '((template . (lambda (contents info) contents))
+                       (link . my/org-static-blog-link))))
+
+(defun js/sync-blog (arg)
+  "Sync blog to muffalo server via Makefile targets.
 
 No prefix: sync without static/.
 With C-u: sync including static/ (push).
 With C-u C-u: pull static/ from remote."
-    (interactive "P")
-    (let* ((default-directory (expand-file-name "~/Documents/blog/"))
-           (target (cond
-                    ((null arg) "sync")
-                    ((= (prefix-numeric-value arg) 16) "pull-static")
-                    (t "sync-static"))))
-      (compile (format "make %s" target))))
+  (interactive "P")
+  (let* ((default-directory (expand-file-name "~/Documents/blog/"))
+         (target (cond
+                  ((null arg) "sync")
+                  ((= (prefix-numeric-value arg) 16) "pull-static")
+                  (t "sync-static"))))
+    (compile (format "make %s" target))))
 
-  (defun js/makovec-rss ()
-    "Scrape makovec and add to blog"
-    (interactive)
-    (let* ((default-directory (expand-file-name "~/Documents/blog/")))
-      (compile "make makovec")))
+(defun js/makovec-rss ()
+  "Scrape makovec and add to blog"
+  (interactive)
+  (let* ((default-directory (expand-file-name "~/Documents/blog/")))
+    (compile "make makovec")))
 
-  (defun js/blog-open-in-browser ()
-    "Open the current org-roam file as its published blog URL."
-    (interactive)
-    (let* ((file (buffer-file-name))
-           (public-path (org-static-blog-get-post-public-path file))
-           (url (concat org-static-blog-publish-url public-path)))
-      (browse-url url))))
+(defun js/blog-open-in-browser ()
+  "Open the current org-roam file as its published blog URL."
+  (interactive)
+  (let* ((file (buffer-file-name))
+         (public-path (org-static-blog-get-post-public-path file))
+         (url (concat org-static-blog-publish-url public-path)))
+    (browse-url url)))
+
 
 ;;; * Elfeed
 
@@ -4658,6 +4697,7 @@ If none of the selected entries are downloaded, a message is shown."
 (use-package wallabag
   :defer t
   :after request emacsql
+  :commands wallabag
   :bind (("C-x W" . wallabag)
          :map wallabag-search-mode-map
          ;; Basic navigation and viewing
@@ -4669,9 +4709,9 @@ If none of the selected entries are downloaded, a message is shown."
          ("q" . wallabag-search-quit)
 
          ;; Filtering and display options
-         ("c" . my/wallabag-show-unarchived)          ; Mirror elfeed's clear filter - show default view
-         ("s" . my/wallabag-show-all)                 ; Show all entries including archived
-         ("S" . wallabag-search-live-filter)          ; Search functionality
+         ("c" . my/wallabag-show-unarchived) ; Mirror elfeed's clear filter - show default view
+         ("s" . my/wallabag-show-all) ; Show all entries including archived
+         ("S" . wallabag-search-live-filter) ; Search functionality
 
          ;; Tag and status management
          ("+" . wallabag-add-tags)
@@ -4711,7 +4751,7 @@ If none of the selected entries are downloaded, a message is shown."
 	 ("R" . js/wallabag-roamify-entry))
   :init
   ;; contains the wallabag info
-  (load "~/.emacs.d/private-config.el")
+
 
   :custom
   (wallabag-search-print-items '("title" "domain" "tag" "reading-time" "date"))
@@ -5301,7 +5341,11 @@ When pressed twice, make the sub/superscript roman."
 
 (use-package paredit
   :defer t
-  :hook lisp-mode
+  :hook
+  emacs-lisp-mode
+  clojure-mode
+  scheme-mode
+  racket-mode
   :bind
   (:map paredit-mode-map
 	("C-c k" . paredit-copy-as-kill)))
@@ -5309,16 +5353,19 @@ When pressed twice, make the sub/superscript roman."
 ;;; *** Common lisp
 
 (use-package sly
+  :defer t
   :custom
   (inferior-lisp-program "sbcl"))
 
 ;;; *** Racket
 
-(use-package racket-mode)
+(use-package racket-mode
+  :defer t)
 
 ;;; *** Clojure
 
 (use-package clojure-mode
+  :defer t
   :custom
   (clojure-indent-style 'always-indent)
   (clojure-indent-keyword-style 'always-indent)
@@ -5328,6 +5375,8 @@ When pressed twice, make the sub/superscript roman."
   (clojure-mode . aggressive-indent-mode))
 
 (use-package cider
+  :defer t
+  :mode "\\.clj[sc]?\\'"
   :custom (cider-edit-jack-in-command t))
 
 (use-package clj-refactor
@@ -5337,15 +5386,18 @@ When pressed twice, make the sub/superscript roman."
 
 ;;; ** Haskell
 
-(use-package haskell-mode)
+(use-package haskell-mode
+  :defer t)
 
 ;;; ** Nix
 
 (use-package nix-mode
+  :defer t
   :mode "\\.nix\\'")
 
 ;;; ** OCaml
 (use-package neocaml
+  :defer t
   :if (not (eq system-type 'android))
   :mode (("\\.ml\\'" . neocaml-mode)
          ("\\.mli\\'" . neocaml-interface-mode)
@@ -5355,6 +5407,7 @@ When pressed twice, make the sub/superscript roman."
     (neocaml--register-with-eglot)))
 
 (use-package ocaml-eglot
+  :defer t
   :if (not (eq system-type 'android))
   :ensure t
   :after neocaml
@@ -5365,6 +5418,7 @@ When pressed twice, make the sub/superscript roman."
   (setq ocaml-eglot-syntax-checker 'flymake))
 
 (use-package utop
+  :defer t
   :if (not (eq system-type 'android))
   :ensure t)
 
@@ -5401,18 +5455,23 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** Docker
 
 (use-package dockerfile-mode
+  :defer t
+  :mode "Dockerfile\\'"
   :ensure t)
 
 (use-package yaml-mode
+  :defer t
   :ensure t
   :mode ("\\.ya?ml\\'"))
 
 (use-package docker
+  :defer t
   :ensure t
   :bind ("M-s d" . docker))
 
 ;;; * Video Trimmer
 (use-package video-trimmer
+  :defer t
   :vc (:url "https://github.com/xenodium/video-trimmer")
   :bind (:map dired-mode-map
 	      ("V" . video-trimmer-trim))
