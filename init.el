@@ -113,6 +113,8 @@
   (set-terminal-coding-system 'utf-8)
   (set-keyboard-coding-system 'utf-8))
 
+(server-start)
+
 (define-advice keyboard-quit
     (:around (quit) quit-current-context)
   "Quit the current context.
