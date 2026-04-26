@@ -130,7 +130,6 @@ are defining or executing a macro."
       (funcall-interactively quit))))
 
 (use-package files
-  :defer nil
   :ensure nil
   :custom
   ;; Backup settings
@@ -164,13 +163,11 @@ are defining or executing a macro."
   (setq auto-save-visited-interval 30))	; Save every 30 seconds
 
 (use-package gcmh
-  :defer nil
   :ensure t
   :init
   (gcmh-mode 1))
 
 (use-package emacs-everywhere
-  :defer nil
   :bind
   ("<f16>" . js/goto-finder)
   :config
@@ -180,7 +177,6 @@ are defining or executing a macro."
     (shell-command "open .")))
 
 (use-package backup-walker
-  :defer nil
   :vc (:url "https://github.com/lewang/backup-walker")
   :init
   (defalias 'string-to-int 'string-to-number)  ; removed in 26.1
@@ -190,7 +186,6 @@ are defining or executing a macro."
 ;;; ** Browser Integration
 
 (use-package browser-setup
-  :defer nil
   :no-require t
   :ensure nil
   :if (eq system-type 'darwin)
@@ -212,7 +207,6 @@ are defining or executing a macro."
 ;;; * Projects
 
 (use-package project
-  :defer nil
   :ensure nil
   :custom
   (project-switch-commands
@@ -256,17 +250,14 @@ are defining or executing a macro."
   (message "Retoggled redshift"))
 
 (use-package doom-themes
-  :defer nil
   :init
   (my/apply-theme 'light))
 
-(use-package nerd-icons
-  :defer nil)
+(use-package nerd-icons)
 
 ;;; ** Modeline
 
 (use-package doom-modeline
-  :defer nil
   :init (doom-modeline-mode 1)
   :custom
   (doom-modeline-height 24)
@@ -276,13 +267,11 @@ are defining or executing a macro."
       (setq doom-modeline-height 12)))
 
 (use-package which-key
-  :defer nil
   :init (which-key-mode)
   :diminish which-key-mode
   :custom (which-key-idle-delay 0.01))
 
 (use-package paren
-  :defer nil
   :init
   (electric-pair-mode 1)
   (show-paren-mode 1)
@@ -298,16 +287,15 @@ are defining or executing a macro."
   (modify-syntax-entry ?> "."))
 
 (use-package surround
-  :defer nil
+  :defer t
   :ensure t
   :bind-keymap ("M-'" . surround-keymap))
 
 (use-package rainbow-delimiters
-  :defer nil
+  :defer t
   :hook prog-mode)
 
 (use-package alert
-  :defer nil
   :config
   (if (eq system-type 'darwin)
       (setq alert-default-style 'osx-notifier)))
@@ -316,7 +304,7 @@ are defining or executing a macro."
 ;; (alert "This is an alert" :title "My Alert" :category 'debug)
 
 (use-package helpful
-  :defer nil
+  :defer t
   :bind (("<f1> f" . helpful-callable)
          ("<f1> v" . helpful-variable)
          ("<f1> k" . helpful-key)
@@ -331,14 +319,13 @@ are defining or executing a macro."
   (help-window-select t))
 
 (use-package devdocs
-  :defer nil
+  :defer t
   :bind
   (("<f1> D" . devdocs-lookup)))
 
 ;;; ** Tabs, frames, windows
 
 (use-package tab-bar
-  :defer nil
   :custom
   (tab-bar-new-tab-choice 'scratch-buffer)
   (tab-bar-close-button-show nil)
@@ -357,7 +344,7 @@ are defining or executing a macro."
   (tab-bar-mode 1))
 
 (use-package visual-fill-column
-  :defer nil
+  :defer t
   :hook
   (visual-fill-column-mode . efs/org-mode-visual-fill)
   (text-mode . visual-line-mode)
@@ -372,14 +359,14 @@ are defining or executing a macro."
   (setq visual-fill-column-center-text t))
 
 (use-package unfill
-  :defer nil
+  :defer t
   :bind
   ("C-M-q" . unfill-region))
 
 ;; Also includes config from
 ;; https://www.masteringemacs.org/article/demystifying-emacs-window-manager
 (use-package ace-window
-  :defer nil
+  :defer t
   :bind
   ([remap other-window] . ace-window)
   :custom
@@ -388,19 +375,27 @@ are defining or executing a macro."
   (switch-to-buffer-obey-display-actions t))
 
 (use-package transpose-frame
-  :defer nil
+  :defer t
   :bind ("s-i" . transpose-frame))
 
 (use-package symbol-overlay
-  :defer nil
+  :defer t
   :hook prog-mode)
 
 ;; Keeps windows still when opening minibuffers
 (use-package sinister
-  :defer nil
   :vc (:url "https://github.com/positron-solutions/sinister")
   :config
-  (sinister-stillness-mode 1))
+  (sinister-stillness-mode 1)
+  (advice-add 'swiper--update-input-ivy :around ; Make swiper play well with sinister
+	    (defun js/swiper-update-input-no-initial-scroll (orig)
+	      "Skip the first recenter call when swiper initializes."
+	      (if (null swiper--current-window-start)
+		  ;; First call: run update but then restore window-start
+		  (let ((ws (window-start)))
+		    (funcall orig)
+		    (set-window-start (selected-window) ws))
+		(funcall orig)))))
 
 (defun js/swiper-preserve-window-start (orig &rest args)
   "Prevent swiper from scrolling the window on open."
@@ -411,22 +406,10 @@ are defining or executing a macro."
     (when (= (point) saved-point)
       (set-window-start (selected-window) saved-window-start))))
 
-(advice-add 'swiper--update-input-ivy :around ; Make swiper play well with sinister
-	    (defun js/swiper-update-input-no-initial-scroll (orig)
-	      "Skip the first recenter call when swiper initializes."
-	      (if (null swiper--current-window-start)
-		  ;; First call: run update but then restore window-start
-		  (let ((ws (window-start)))
-		    (funcall orig)
-		    (set-window-start (selected-window) ws))
-		(funcall orig))))
-
-
 (use-package occult
-  :defer nil)			; NOTE: Seems interesting to use more
+  :defer t)			; NOTE: Seems interesting to use more
 
 (use-package winpulse
-  :defer nil
   :vc (:url "https://github.com/xenodium/winpulse"
 	    :rev :newest)
   :config
@@ -633,7 +616,6 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 
    ;; macOS-specific mixed-pitch setup
    (use-package mixed-pitch
-     :defer nil
      :init
      (set-face-attribute 'default nil :height 140)
      (set-face-attribute 'default nil :family fixed-pitch-font :height 140)
@@ -689,7 +671,6 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 
    ;; Android-specific mixed-pitch setup
    (use-package mixed-pitch
-     :defer nil
      :init
      (set-face-attribute 'default nil :family fixed-pitch-font)
      (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
@@ -739,7 +720,6 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 
    ;; Linux-specific mixed-pitch setup
    (use-package mixed-pitch
-     :defer nil
      :init
      (set-face-attribute 'default nil :family fixed-pitch-font)
      (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
@@ -752,7 +732,6 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 ;;; * Searching and navigation
 
 (use-package isearch
-  :defer nil
   :ensure nil
   :custom
   (isearch-lazy-count t)
@@ -763,13 +742,11 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   ("M-s i" . isearch-forward))
 
 (use-package counsel
-  :defer nil
+  :defer 0.1
   :custom
   (ivy-use-virtual-buffers nil)
   (ivy-count-format "(%d/%d) ")
   (ivy-initial-inputs-alist nil)
-  (ivy-re-builders-alist '((t . ivy--regex-ignore-order)))
-  (swiper-use-visual-line-p #'ignore)
   :bind (("s-b" . counsel-switch-buffer)
 	 ("C-s" . swiper)
 	 ("M-s s" . swiper-isearch)
@@ -779,6 +756,8 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   :config
   (ivy-mode 1)
   (counsel-mode)
+  (setq ivy-re-builders-alist '((t . ivy--regex-ignore-order)))
+  (setq swiper-use-visual-line-p #'ignore)
   (add-to-list 'ivy-sort-functions-alist
                '(org-node-collection . js/ivy-org-node-mtime-compare)))
 
@@ -792,8 +771,24 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
           ((null mtime-b) t)
           (t (time-less-p mtime-b mtime-a)))))
 
+(use-package ivy-rich
+  :after ivy
+  :config (ivy-rich-mode 1))
+
+(use-package marginalia
+  :init (marginalia-mode))
+
+(use-package company
+  :defer t
+  :hook (prog-mode text-mode))
+
+(use-package company-box
+  :defer t
+  :hook company-mode)
+
+;;; *** Ibuffer
 (use-package ibuffer
-  :defer nil
+  :defer t
   :ensure nil
   :bind ("C-x C-b" . ibuffer)
   :custom
@@ -815,31 +810,17 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 (defun ibuffer-switch-to-default ()
   (ibuffer-switch-to-saved-filter-groups "default"))
 
-(use-package ivy-rich
-  :defer nil
-  :after ivy
-  :config (ivy-rich-mode 1))
-
-(use-package marginalia
-  :defer nil
-  :init (marginalia-mode))
-
-(use-package company
-  :defer nil
-  :hook (prog-mode text-mode))
-
-(use-package company-box
-  :defer nil
-  :hook company-mode)
-
+;;; *** Outline-stars
 (use-package outline-stars
-  :defer nil
+  :defer t
   :vc (:url "https://codeberg.org/phmcc/outline-stars")
   :custom
   (outline-stars-level-1-overline)
   (outline-start-default-state 'folded)
-  :config
-  (outline-stars-mode 1)
+  ;; :config
+  ;; (outline-stars-mode 1)
+  :hook
+  (prog-mode . outline-stars-setup)
   :bind
   (:map prog-mode-map
 	("<backtab>" . outline-stars-cycle-buffer)
@@ -856,11 +837,12 @@ Preserve original point position instead of jumping to the bottom of selection."
       (outline-end-of-subtree)
       (narrow-to-region beg (point)))))
 
-(use-package hydra
-  :defer nil)
+(use-package hydra)
+
+;;; *** Smerge
 
 (use-package smerge-mode
-  :defer nil
+  :defer t
   :bind
   (:map smerge-mode-map
 	("C-c ^ ^" . unpackaged/smerge-hydra/body)))
@@ -898,6 +880,8 @@ _p_rev       _u_pper              _=_: upper/lower       _r_esolve
           (bury-buffer))
    "Save and bury buffer" :color blue)
   ("q" nil "cancel" :color blue))
+
+;;; *** Expreg
 
 (use-package expreg
   :defer nil
@@ -1086,11 +1070,10 @@ Produces multiple regions so expreg can step through them."
   (add-to-list 'expreg-functions #'js/expreg--latex t))
 
 
-(use-package phi-search
-  :defer nil)
+(use-package phi-search)
 
 (use-package multiple-cursors
-  :defer nil
+  :defer t
   :bind (("s-<down>" . mc/mark-next-like-this)
 	 ("s-<up>" . mc/mark-previous-like-this)
 	 ("s-M-<up>" . mc/unmark-next-like-this)
@@ -1102,22 +1085,20 @@ Produces multiple regions so expreg can step through them."
 	 ("<return>" . nil)))
 
 (use-package iedit
-  :defer nil
+  :defer t
   :bind ("C-;" . iedit-mode))
 
 (use-package imenu-list
-  :defer nil
+  :defer t
   :bind
   ("C-c n h" . imenu-list-smart-toggle)
   :custom
   (imenu-list-focus-after-activation t)
   (use-package-enable-imenu-support t)
-  :defer nil
   :hook (org-mode . (lambda () (imenu-add-to-menubar "Imenu")))
   )
 
 (use-package yasnippet
-  :defer nil
   :init (yas-global-mode 1)
   :custom
   (yas-fallback-behavior 'return-nil))
@@ -1145,19 +1126,19 @@ Produces multiple regions so expreg can step through them."
              (not (re-search-backward "\\\\end{logicproof}" begin-pos t)))))))
 
 (use-package undo-fu
-  :defer nil
+  :defer t
   :bind (("s-z" . undo-fu-only-undo)
 	 ("s-Z" . undo-fu-only-redo)))
 
 (use-package vundo
-  :defer nil
+  :defer t
   :custom
   (vundo-glyph-alist vundo-unicode-symbols)
   :bind
   ("C-x u" . vundo))
 
 (use-package deadgrep
-  :defer nil
+  :defer t
   :after org-roam
   :hook (deadgrep-finished . my/deadgrep-activate-org-links)
   :bind (("<f5>" . deadgrep)
@@ -1229,11 +1210,10 @@ Produces multiple regions so expreg can step through them."
 	      (overlay-put overlay 'display desc))))))))
 
 (use-package wgrep
-  :defer nil
   :ensure t)
 
 (use-package flash
-  :defer nil
+  :defer t
   :bind ("s-j" . flash-jump)
   :custom
   (flash-multi-window t)
@@ -1242,7 +1222,7 @@ Produces multiple regions so expreg can step through them."
   (flash-autojump nil))
 
 (use-package ace-link
-  :defer nil
+  :defer t
   :hook
   (prog-mode . goto-address-prog-mode)
   :bind (("s-u" . counsel-ace-link)
@@ -1303,14 +1283,14 @@ Produces multiple regions so expreg can step through them."
 	(message "No link found in the current agenda line")))))
 
 (use-package crux
-  :defer nil
+  :defer t
   :bind (([remap kill-line] . crux-smart-kill-line)
 	 ([remap move-beginning-of-line] . crux-move-beginning-of-line)))
 
 ;;; ** Move text
 
 (use-package move-text
-  :defer nil
+  :defer t
   :bind
   ("M-<up>" . move-text-up)
   ("M-<down>" . move-text-down))
@@ -1318,22 +1298,16 @@ Produces multiple regions so expreg can step through them."
 ;;; ** Additional keybinds
 
 (use-package key-chord			; TODO: Play around with more key chords
-  :defer nil
-  :config
-  (key-chord-mode 1))
+  :defer t
+  )
 
 ;;; * Misc helper packages
 
-(use-package function-groups
-  :defer nil
-  :load-path "~/.emacs.d/lisp/function-groups/")
-
 (use-package vterm
-  :defer nil
   :if (eq system-type 'darwin))
 
 (use-package stripspace
-  :defer nil
+  :defer t
   :ensure t
   :hook ((prog-mode . stripspace-local-mode)
          (conf-mode . stripspace-local-mode))
@@ -1344,7 +1318,6 @@ Produces multiple regions so expreg can step through them."
 ;;; ** PDFView
 
 (use-package pdf-tools
-  :defer nil
   :if (not (eq system-type 'android))
   :ensure t
   :mode ("\\.pdf\\'" . pdf-view-mode)
@@ -1356,14 +1329,13 @@ Produces multiple regions so expreg can step through them."
 ;;; ** Uptime
 
 (use-package js-uptime
-  :defer nil
+  :defer t
   :load-path "~/.emacs.d/lisp"
-  :config
-  (add-hook 'kill-emacs-hook #'js/uptime-log-session))
+  :hook
+  (kill-emacs . js/uptime-log-session))
 
 ;;; ** Info
 (use-package info
-  :defer nil
   :ensure nil
   :init
   (defvar js/info-directory (expand-file-name "info/" org-directory))
@@ -1393,7 +1365,6 @@ Produces multiple regions so expreg can step through them."
 ;;; ** GPTel
 
 (use-package gptel
-  :defer nil
   :after org mcp
   :bind
   (("C-c g k" . gptel-abort)
@@ -1429,11 +1400,9 @@ Produces multiple regions so expreg can step through them."
 ;;; ** Emacs MCP
 
 (use-package mcp-server-lib
-  :defer nil
   :if (not (eq system-type 'android)))
 
 (use-package emacs-mcp-tool-server
-  :defer nil
   :if (not (eq system-type 'android)) ; Seems not worth the hassle
   :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
   :ensure mcp-server-lib
@@ -1446,7 +1415,6 @@ Produces multiple regions so expreg can step through them."
   :config (require 'emacs-mcp-tool-server))
 
 (use-package mcp
-  :defer nil
   :if (not (eq system-type 'android))
   :after emacs-mcp-tool-server
   :ensure t
@@ -1464,7 +1432,7 @@ Produces multiple regions so expreg can step through them."
 ;;; ** Xenodium Agent shell
 
 (use-package agent-shell
-  :defer nil
+  :defer t
   :if (not (eq system-type 'android))
   :ensure t
   :ensure-system-package
@@ -1482,7 +1450,7 @@ Produces multiple regions so expreg can step through them."
 	("C-c C-f" . agent-shell-prompt-compose)))
 
 (use-package agent-shell-manager
-  :defer nil
+  :defer t
   :if (not (eq system-type 'android))
   :vc (:url "https://github.com/jethrokuan/agent-shell-manager"
 	    :rev :newest)
@@ -1492,7 +1460,6 @@ Produces multiple regions so expreg can step through them."
   (agent-shell-manager-side 'bottom))
 
 (use-package agent-shell-attention
-  :defer nil
   :if (not (eq system-type 'android))
   :vc (:url "https://github.com/ultronozm/agent-shell-attention.el"
 	    :rev :newest)
@@ -1511,7 +1478,6 @@ Produces multiple regions so expreg can step through them."
 
 ;;; * Dired
 (use-package dired
-  :defer nil
   :ensure nil
   :bind (:map dired-mode-map
               ("C-a" . js/dired-smart-bol)
@@ -1577,12 +1543,12 @@ Produces multiple regions so expreg can step through them."
       (apply operation args)))))
 
 (use-package dired-preview
-  :defer nil
+  :defer t
   :bind (:map dired-mode-map ("P" . dired-preview-mode)))
 ;;; * Markdown
 
 (use-package markdown-mode
-  :defer nil
+  :defer t
   :ensure t
   :mode ("\\.md\\'" . markdown-mode))
 
@@ -1592,7 +1558,6 @@ Produces multiple regions so expreg can step through them."
   "Buffer-local variable to enable/disable tag updating.")
 
 (use-package org
-  :defer nil
   :custom
   (org-hide-emphasis-markers t)
   (org-image-actual-width nil)
@@ -1883,17 +1848,15 @@ Handles both |*abc*| and *|abc|* cases. Otherwise behave like self-insert."
 ;;; ** Org-present
 
 (use-package org-present
-  :defer nil)
+  :defer t)
 
 ;;; ** exporting
 ;;; TODO: Move the ox configs with heading splicing to a module
 (use-package js-ox-strip-heading	; Spliced exports
-  :defer nil
   :load-path "~/.emacs.d/lisp/"
   :after ox)
 
 (use-package ox
-  :defer nil
   :after org
   :ensure nil
   :custom
@@ -2024,36 +1987,30 @@ Falls back to #+attr_latex :options for backwards compatibility."
 ;;; ** Org-download
 
 (use-package org-download
-  :defer nil
   :after org)
 
 ;;; ** Org-mac-link
 
 (use-package org-mac-link
-  :defer nil
   :after org
   :if (eq system-type 'darwin)
   :ensure t)
 
 ;;; ** Org visuals
 (use-package org-appear
-  :defer nil
   :hook org-mode)
 
 (use-package org-superstar
-  :defer nil
   :custom
   (org-superstar-leading-bullet ?\u2002)
   :hook org-mode)
 
 (use-package org-pretty-table
-  :defer nil
   :vc (:url "https://github.com/fuco1/org-pretty-table")
   :hook org-mode)
 
 ;;; ** Org edna
 (use-package org-edna
-  :defer nil
   :hook org-mode
   (org-after-todo-state-change . mm/org-insert-trigger)
   (org-after-todo-statistics . org-summary-todo))
@@ -2088,7 +2045,6 @@ Falls back to #+attr_latex :options for backwards compatibility."
 ;;; * Org-roam
 
 (use-package org-roam
-  :defer nil
   :after org
   :ensure t
   :init
@@ -2107,7 +2063,6 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ("C-c n r" . js/roamify-url-at-point)
 	 ("C-c n t" . org-roam-tag-add)
 	 ("C-c n n s" . org-roam-db-sync)
-	 ("C-c n v" . vulpea-ui-sidebar-toggle)
 
 	 ;; Blog
 	 ("C-c n b b" . org-static-blog-publish)
@@ -2811,7 +2766,6 @@ you can catch it with `condition-case'."
 ;;; ** Org-transclusion
 
 (use-package org-transclusion
-  :defer nil
   :ensure t
   :after org
   :bind
@@ -2826,16 +2780,14 @@ you can catch it with `condition-case'."
    :foreground "green"
    :background "green"))
 
-(use-package org-transclusion-font-lock
-  :defer nil
-  :ensure nil
-  :after org-transclusion
-  :config (org-transclusion-font-lock-mode +1))
+;; (use-package org-transclusion-font-lock
+;;   :ensure nil
+;;   :after org-transclusion
+;;   :config (org-transclusion-font-lock-mode +1))
 
 ;;; ** Org-roam-ui
 
 (use-package org-roam-ui
-  :defer nil
   :after org-roam
   :custom
   (org-roam-ui-sync-theme t)
@@ -2845,7 +2797,6 @@ you can catch it with `condition-case'."
 ;;; ** Org-node
 
 (use-package org-mem
-  :defer nil
   :defer
   :custom
   (org-mem-do-sync-with-org-id t)
@@ -2853,7 +2804,6 @@ you can catch it with `condition-case'."
   (org-mem-updater-mode))
 
 (use-package org-node
-  :defer nil
   :if (not (eq system-type 'android))	; For some reason not working well on Android
   :after org-roam
   :bind
@@ -3123,7 +3073,6 @@ Each function is called with two arguments: the tag and the buffer.")
 ;;; ** Basic config
 
 (use-package vulpea
-  :defer nil
   :preface
   (setq prune/ignored-files '("tasks.org" "inbox.org")) ; These should always have project tags.
   (setq tag-checkers '(("project" . org/project-p)
@@ -3149,10 +3098,10 @@ Each function is called with two arguments: the tag and the buffer.")
   )
 
 (use-package vulpea-ui
-  :defer nil)
+  :defer t
+  :bind ("C-c n v" . vulpea-ui-sidebar-toggle))
 
 (use-package vulpea-journal
-  :defer nil
   :bind
   (:map org-roam-dailies-map
 	("m" . js/vulpea-journal-month-today)
@@ -3183,14 +3132,13 @@ Each function is called with two arguments: the tag and the buffer.")
 ;;; ** Anki
 
 (use-package anki-editor
-  :defer nil
+  :defer t
   :if (not (eq system-type 'android))
   :bind
   (:map org-mode-map
         ("C-c n p" . my/anki-flashcard-push-current-buffer)
         ("C-c n n p" . my/anki-flashcard-push-all))
   :after org
-  :defer nil
   :vc (:url "https://github.com/anki-editor/anki-editor" :rev :newest)
   :custom
   (anki-editor-latex-style 'mathjax)
@@ -3324,10 +3272,8 @@ See `js/anki-derive-fields' for full hierarchy details."
 ;;; ** Agenda
 
 (use-package org-agenda
-  :defer nil
   :after org
   :ensure org
-  :defer nil
   :custom
   (org-todo-keywords
    '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)"
@@ -3552,7 +3498,7 @@ the current entry at point and move to the next line."
 
 ;;; ** Org triage
 (use-package js-triage-session
-  :defer nil
+  :defer t
   :after org-agenda
   :load-path "~/.emacs.d/lisp"
   :bind
@@ -3609,7 +3555,6 @@ _S_manual
 ;;; ** Babel
 
 (use-package org ;;babel
-  :defer nil
   :custom
   (org-babel-python-command "python3")
   (org-confirm-babel-evaluate nil)
@@ -3656,7 +3601,7 @@ _S_manual
   (add-to-list 'org-structure-template-alist '("ax" . "axiom")))
 
 (use-package corg			; Completion for org blocks
-  :defer nil
+  :defer t
   :vc (:url "https://github.com/isamert/corg.el")
   :hook (org-mode . corg-setup))
 
@@ -3664,13 +3609,12 @@ _S_manual
 ;;; Blog + Personal website configuration
 
 (use-package htmlize
-  :defer nil
   :ensure t
   :custom
   (org-html-htmlize-output-type 'css))
 
 (use-package org-static-blog
-  :defer nil
+  :defer t
   :after org-roam
   :custom
   (org-static-blog-publish-title "My Blog")
@@ -3938,7 +3882,7 @@ With C-u C-u: pull static/ from remote."
 ;;; * Elfeed
 
 (use-package elfeed
-  :defer nil
+  :defer t
   :bind (("C-x w" . elfeed)
 	 :map elfeed-search-mode-map
          ("SPC" . elfeed-search-show-entry)
@@ -4361,7 +4305,6 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
 
 ;;; ** Elfeed cuckoo-search
 (use-package cuckoo-search
-  :defer nil
   ;; :vc (:url "https://github.com/rtrppl/cuckoo-search" :rev :newest)
   :after (elfeed)
   :bind
@@ -4371,7 +4314,6 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
 	))
 
 (use-package elfeed-org
-  :defer nil
   :after elfeed
   :custom
   (rmh-elfeed-org-files (list (concat org-roam-directory "/elfeed.org")))
@@ -4513,7 +4455,6 @@ If a key is provided, use it instead of the default capture template."
 ;;; TODO: Rewrite the elfeed downloader
 
 (use-package elfeed-tube
-  :defer nil
   :after elfeed
   :bind
   (:map elfeed-show-mode-map
@@ -4689,7 +4630,7 @@ If none of the selected entries are downloaded, a message is shown."
 ;;; ** Elfeed-score
 
 (use-package elfeed-score
-  :defer nil
+  :after elfeed
   :ensure t
   :config
   (progn
@@ -4700,7 +4641,6 @@ If none of the selected entries are downloaded, a message is shown."
 ;;; * Annotation importer
 
 (use-package org-roam-annotation-import
-  :defer nil
   :after org
   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
   :config
@@ -4709,14 +4649,14 @@ If none of the selected entries are downloaded, a message is shown."
 ;;; * Wallabag
 
 (use-package request
-  :defer nil
+  :defer t
   :ensure t)
+
 (use-package emacsql
-  :defer nil
   :ensure t)
 
 (use-package wallabag
-  :defer nil
+  :defer t
   :after request emacsql
   :bind (("C-x W" . wallabag)
          :map wallabag-search-mode-map
@@ -4980,7 +4920,6 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
 ;;; * LaTeX
 ;;; ** AucTex
 (use-package tex
-  :defer nil
   :ensure auctex
   :custom
   (font-latex-fontify-script nil)
@@ -5013,7 +4952,6 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
 
 ;;; ** CDLaTeX
 (use-package cdlatex
-  :defer nil
   :config
   (defun js/cdlatex-sub-superscript ()
     "Insert ^{} or _{} unless the number of backslashes before point is odd.
@@ -5184,7 +5122,6 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** Math delimiters
 
 (use-package math-delimiters
-  :defer nil
   :load-path "~/.emacs.d/lisp/math-delimiters"
   :bind
   (:map org-mode-map
@@ -5196,7 +5133,6 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** Xenops/fragtog/org latex
 
 (use-package xenops
-  :defer nil
   :after org
   :bind
   (:map org-mode-map
@@ -5220,10 +5156,8 @@ When pressed twice, make the sub/superscript roman."
 	 :org-babel-info org-babel-info))))
 
 (use-package org-fragtog
-  :defer nil
   ;; :disabled ;; Seems like xenops is working again
   ;; Not disabled but unhooked - I set some C-c C-x C-l stuff here
-  :defer nil
   :after org
   :custom
   (org-latex-create-formula-image-program 'imagemagick-lualatex)
@@ -5259,7 +5193,7 @@ When pressed twice, make the sub/superscript roman."
 ;;; * Programming
 ;;; ** Magit and VC
 (use-package magit
-  :defer nil
+  :defer t
   :bind
   (("C-x g" . magit-status)
    ("C-x f" . magit-file-dispatch))
@@ -5271,29 +5205,31 @@ When pressed twice, make the sub/superscript roman."
     (setq magit-git-executable "/opt/homebrew/bin/git")))
 
 (use-package magit-delta
-  :defer nil
+  :defer t
+  :after magit
   :hook (magit-mode . magit-delta-mode))
 
 (use-package hl-todo
-  :defer nil
+  :defer t
+  :after magit
   :config
   (global-hl-todo-mode 1))
 
 (use-package magit-todos
-  :defer nil
+  :defer t
   :after (magit)
   :config
   (magit-todos-mode 1))
 
 (use-package git-timemachine
-  :defer nil)
+  :defer t)
 
 ;;; ** Misc
 (use-package crdt
-  :defer nil)
+  :defer t)
 
 (use-package quickrun
-  :defer nil
+  :defer t
   :bind (("C-c C-r" . js/quickrun-dwim))
   :config
   (quickrun-add-command "python"
@@ -5311,7 +5247,6 @@ When pressed twice, make the sub/superscript roman."
   )
 
 (use-package dumb-jump
-  :defer nil
   :custom
   (dumb-jump-force-searcher 'rg)
   (dumb-jump-prefer-searcher 'rg)
@@ -5320,7 +5255,7 @@ When pressed twice, make the sub/superscript roman."
   (add-hook 'xref-backend-functions #'dumb-jump-xref-activate))
 
 (use-package flymake
-  :defer nil
+  :defer t
   :ensure nil  ; built-in package
   :hook
   (prog-mode . flymake-mode)
@@ -5337,9 +5272,8 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** LSP Eglot
 
 (use-package eglot
-  :defer nil
+  :defer t
   :ensure nil
-  :defer nil
   :hook ((python-mode . eglot-ensure)
          (c-mode . eglot-ensure)
          (c++-mode . eglot-ensure)
@@ -5354,7 +5288,7 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** Lisp
 
 (use-package lisp-mode
-  :defer nil
+  :defer t
   :ensure nil  ; built-in package
   :hook ((emacs-lisp-mode . setup-check-parens)
          (lisp-mode . setup-check-parens)
@@ -5366,29 +5300,25 @@ When pressed twice, make the sub/superscript roman."
     (add-hook 'before-save-hook #'check-parens nil t)))
 
 (use-package paredit
-  :defer nil
-  :init
-  (add-hook 'emacs-lisp-mode-hook 'paredit-mode)
-  (add-hook 'clojure-mode-hook 'paredit-mode)
-  :config
-  (define-key paredit-mode-map (kbd "C-c k") 'paredit-copy-as-kill))
+  :defer t
+  :hook lisp-mode
+  :bind
+  (:map paredit-mode-map
+	("C-c k" . paredit-copy-as-kill)))
 
 ;;; *** Common lisp
 
 (use-package sly
-  :defer nil
   :custom
   (inferior-lisp-program "sbcl"))
 
 ;;; *** Racket
 
-(use-package racket-mode
-  :defer nil)
+(use-package racket-mode)
 
 ;;; *** Clojure
 
 (use-package clojure-mode
-  :defer nil
   :custom
   (clojure-indent-style 'always-indent)
   (clojure-indent-keyword-style 'always-indent)
@@ -5398,29 +5328,24 @@ When pressed twice, make the sub/superscript roman."
   (clojure-mode . aggressive-indent-mode))
 
 (use-package cider
-  :defer nil
   :custom (cider-edit-jack-in-command t))
 
 (use-package clj-refactor
-  :defer nil
   :hook (clojure-mode . clj-refactor-mode)
   :config
   (cljr-add-keybindings-with-prefix "C-c C-m"))
 
 ;;; ** Haskell
 
-(use-package haskell-mode
-  :defer nil)
+(use-package haskell-mode)
 
 ;;; ** Nix
 
 (use-package nix-mode
-  :defer nil
   :mode "\\.nix\\'")
 
 ;;; ** OCaml
 (use-package neocaml
-  :defer nil
   :if (not (eq system-type 'android))
   :mode (("\\.ml\\'" . neocaml-mode)
          ("\\.mli\\'" . neocaml-interface-mode)
@@ -5430,7 +5355,6 @@ When pressed twice, make the sub/superscript roman."
     (neocaml--register-with-eglot)))
 
 (use-package ocaml-eglot
-  :defer nil
   :if (not (eq system-type 'android))
   :ensure t
   :after neocaml
@@ -5441,7 +5365,6 @@ When pressed twice, make the sub/superscript roman."
   (setq ocaml-eglot-syntax-checker 'flymake))
 
 (use-package utop
-  :defer nil
   :if (not (eq system-type 'android))
   :ensure t)
 
@@ -5454,18 +5377,16 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** Octave
 
 (use-package octave
-  :defer nil
   :mode (("\\.m\\'" . octave-mode)))
 
 ;;; ** HTTP
 
 (use-package verb
-  :defer nil
-  :ensure t
-  :defer nil)
+  :defer t
+  :ensure t)
 
 (use-package restclient
-  :defer nil
+  :defer t
   :ensure t
   :mode (("\\.http\\'" . restclient-mode))
   :bind (:map restclient-mode-map
@@ -5480,22 +5401,18 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** Docker
 
 (use-package dockerfile-mode
-  :defer nil
   :ensure t)
 
 (use-package yaml-mode
-  :defer nil
   :ensure t
   :mode ("\\.ya?ml\\'"))
 
 (use-package docker
-  :defer nil
   :ensure t
   :bind ("M-s d" . docker))
 
 ;;; * Video Trimmer
 (use-package video-trimmer
-  :defer nil
   :vc (:url "https://github.com/xenodium/video-trimmer")
   :bind (:map dired-mode-map
 	      ("V" . video-trimmer-trim))

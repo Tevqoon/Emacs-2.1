@@ -107,9 +107,8 @@
 	org-timestamp
 	org-todo
 	org-yank
+	paredit-RET
 	paredit-backward-kill-word
-	paredit-delete-char
-	paredit-kill
 	paredit-raise-sexp
 	phi-search
 	racket-insert-closing
