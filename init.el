@@ -3936,7 +3936,42 @@ With C-u C-u: pull static/ from remote."
   :bind
   ("C-x m" . notmuch)
   ("C-x M" . compose-mail)
-  :if (eq system-type 'darwin))
+  :if (eq system-type 'darwin)
+  :config
+  (defface notmuch-link
+    '((t :foreground "SeaGreen4" :underline t))
+    "Face for notmuch links.")
+
+  (org-link-set-parameters "notmuch"
+			   :follow 'org-notmuch-open
+			   :store 'org-notmuch-store-link
+			   :face 'notmuch-link))
+
+(defun org-notmuch-open (id)
+  "Visit the notmuch message or thread with id ID."
+  (notmuch-show id))
+
+(defun org-notmuch-store-link ()
+  "Store a link to a notmuch mail message."
+  (pcase major-mode
+    ('notmuch-show-mode
+     ;; Store link to the current message
+     (let* ((id (notmuch-show-get-message-id))
+	    (link (concat "notmuch:" id))
+	    (description (format "Mail: %s" (notmuch-show-get-subject))))
+       (org-store-link-props
+	:type "notmuch"
+	:link link
+	:description description)))
+    ('notmuch-search-mode
+     ;; Store link to the thread on the current line
+     (let* ((id (notmuch-search-find-thread-id))
+	    (link (concat "notmuch:" id))
+	    (description (format "Mail: %s" (notmuch-search-find-subject))))
+       (org-store-link-props
+	:type "notmuch"
+	:link link
+	:description description)))))
 
 ;;; * Elfeed
 
