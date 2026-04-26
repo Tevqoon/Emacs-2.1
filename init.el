@@ -5260,6 +5260,7 @@ When pressed twice, make the sub/superscript roman."
   :custom
   (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1)
   (magit-process-connection-type nil)
+  (magit-auto-revert-mode t)
   :config
   (when (eq system-type 'darwin)
     (setq magit-git-executable "/opt/homebrew/bin/git")))
