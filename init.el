@@ -4357,7 +4357,7 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
 (use-package elfeed-org
   :after elfeed
   :custom
-  (rmh-elfeed-org-files (list (concat org-roam-directory "/elfeed.org")))
+  (rmh-elfeed-org-files (list (expand-file-name "elfeed.org" org-directory)))
 
   :config
   (elfeed-org)
