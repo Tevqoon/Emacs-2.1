@@ -2081,10 +2081,9 @@ Falls back to #+attr_latex :options for backwards compatibility."
 ;;; * Org-roam
 
 (use-package org-roam
-  :after org
+  :defer t
+  ;; :after org
   :ensure t
-  :init
-  (require 'org-roam-dailies)
   :bind (("C-c n n b " . org-roam-buffer-toggle)
          ("C-c n f" . js/org-roam-node-find)
          ("C-c n i" . js/org-roam-node-insert)
@@ -2139,6 +2138,8 @@ Falls back to #+attr_latex :options for backwards compatibility."
 			 :show-backlink-p #'archived-backlink-p
 			 :section-heading "Archived backlinks: "))))
   :config
+  (require 'org-roam-dailies)
+
   ;; Color roam links differently
   (defface org-roam-link
     '((t :foreground "orange" :underline t))
@@ -3363,8 +3364,9 @@ See `js/anki-derive-fields' for full hierarchy details."
 ;;; ** Agenda
 
 (use-package org-agenda
-  :after org
-  :ensure org
+  :defer t
+  :commands open-org-agenda
+  :ensure nil
   :custom
   (org-todo-keywords
    '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)"
@@ -3468,23 +3470,28 @@ See `js/anki-derive-fields' for full hierarchy details."
 	 ("O" . js/agenda-roamify)
 	 )
   :config
+  (require 'org-roam)
+  (require 'vulpea)
+  ;; Automatically update the agenda files to those roam entries with the `project' tag.
+  (advice-add 'org-agenda :before #'roam-agenda-files-update)
+
   (add-to-list 'warning-suppress-types '(org-element))
+
+
+  (defun roam-agenda-files-update (&rest _)
+    (interactive)
+    "Update the value of `org-agenda-files'."
+    (setq org-agenda-files (org-project-files))
+    (message "Updated agenda files."))
+
+
+  (defun open-org-agenda (&optional arg)
+    (interactive "P")
+    (if arg
+	(call-interactively 'org-agenda)
+      (org-agenda nil "d")))
+
   )
-
-(defun roam-agenda-files-update (&rest _)
-  (interactive)
-  "Update the value of `org-agenda-files'."
-  (setq org-agenda-files (org-project-files))
-  (message "Updated agenda files."))
-
-;; Automatically update the agenda files to those roam entries with the `project' tag.
-(advice-add 'org-agenda :before #'roam-agenda-files-update)
-
-(defun open-org-agenda (&optional arg)
-  (interactive "P")
-  (if arg
-      (call-interactively 'org-agenda)
-    (org-agenda nil "d")))
 
 (defun air-org-skip-subtree-if-priority (priority)
   "Skip an agenda subtree if it has a priority of PRIORITY.
@@ -3920,6 +3927,16 @@ With C-u C-u: pull static/ from remote."
          (url (concat org-static-blog-publish-url public-path)))
     (browse-url url)))
 
+
+;;; * Notmuch
+
+(use-package notmuch
+  :defer t
+  :commands notmuch
+  :bind
+  ("C-x m" . notmuch)
+  ("C-x M" . compose-mail)
+  :if (eq system-type 'darwin))
 
 ;;; * Elfeed
 
