@@ -1421,11 +1421,12 @@ Produces multiple regions so expreg can step through them."
 
 (use-package mcp-server-lib
   :demand t
-  :if (not (eq system-type 'android)))
+  ;; :if (not (eq system-type 'android))
+  )
 
 (use-package emacs-mcp-tool-server
   :demand t
-  :if (not (eq system-type 'android)) ; Seems not worth the hassle
+  ;; :if (not (eq system-type 'android)) ; Seems not worth the hassle
   :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
   :after mcp-server-lib
   :ensure nil
@@ -1439,7 +1440,7 @@ Produces multiple regions so expreg can step through them."
 
 (use-package mcp
   :demand t
-  :if (not (eq system-type 'android))
+  ;; :if (not (eq system-type 'android))
   :after emacs-mcp-tool-server
   :ensure t
   :config
@@ -1457,7 +1458,7 @@ Produces multiple regions so expreg can step through them."
 
 (use-package agent-shell
   :defer t
-  :if (not (eq system-type 'android))
+  ;; :if (not (eq system-type 'android))
   :ensure t
   :ensure-system-package
   ((opencode . "npm install -g opencode-ai"))
@@ -1475,7 +1476,7 @@ Produces multiple regions so expreg can step through them."
 
 (use-package agent-shell-manager
   :defer t
-  :if (not (eq system-type 'android))
+  ;; :if (not (eq system-type 'android))
   :vc (:url "https://github.com/jethrokuan/agent-shell-manager"
 	    :rev :newest)
   :after agent-shell
@@ -1484,7 +1485,7 @@ Produces multiple regions so expreg can step through them."
   (agent-shell-manager-side 'bottom))
 
 (use-package agent-shell-attention
-  :if (not (eq system-type 'android))
+  ;; :if (not (eq system-type 'android))
   :vc (:url "https://github.com/ultronozm/agent-shell-attention.el"
 	    :rev :newest)
   :after agent-shell
