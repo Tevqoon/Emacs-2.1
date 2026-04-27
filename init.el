@@ -4242,6 +4242,11 @@ With C-u C-u: pull static/ from remote."
 
 ;;; ** Dispatcher
 
+(defun js/elfeed-entry-has-tag-p (tag)
+  "Closure to see if elfeed entry has given `TAG'."
+  (lambda (entry)
+    (member tag (elfeed-entry-tags entry))))
+
 (defvar js/elfeed-dispatch-rules
   (list
    (cons (js/elfeed-entry-has-tag-p 'text) #'js/elfeed-entry-to-wallabag)
@@ -4273,11 +4278,6 @@ Rules are checked in order; FIRST MATCH WINS per entry.")
     (when unmatched
       (message "No rule matched: %s"
                (mapconcat #'elfeed-entry-title (nreverse unmatched) ", ")))))
-
-(defun js/elfeed-entry-has-tag-p (tag)
-  "Closure to see if elfeed entry has given `TAG'."
-  (lambda (entry)
-    (member tag (elfeed-entry-tags entry))))
 
 ;;; ** Wallabag integration
 
