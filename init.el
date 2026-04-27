@@ -3938,6 +3938,13 @@ With C-u C-u: pull static/ from remote."
   ("C-x M" . compose-mail)
   :if (eq system-type 'darwin)
   :config
+  (setq message-send-mail-function 'message-send-mail-with-sendmail
+	sendmail-program "/opt/homebrew/bin/msmtp"
+        message-sendmail-f-is-evil t
+	message-sendmail-extra-arguments '("--read-envelope-from"))
+  (setq notmuch-fcc-dirs nil)
+  (setq message-kill-buffer-on-exit t)
+
   (defface notmuch-link
     '((t :foreground "SeaGreen4" :underline t))
     "Face for notmuch links.")
