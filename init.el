@@ -4253,6 +4253,11 @@ Each predicate is a function taking an entry and returning non-nil if
 the action should apply. Each action is a function taking a list of entries.
 Rules are checked in order; FIRST MATCH WINS per entry.")
 
+(defun js/elfeed-entry-has-tag-p (tag)
+  "Closure to see if elfeed entry has given `TAG'."
+  (lambda (entry)
+    (member tag (elfeed-entry-tags entry))))
+
 (defun js/elfeed-dispatch-entries (&optional entries)
   (interactive)
   (let* ((entries (or entries
@@ -4273,11 +4278,6 @@ Rules are checked in order; FIRST MATCH WINS per entry.")
     (when unmatched
       (message "No rule matched: %s"
                (mapconcat #'elfeed-entry-title (nreverse unmatched) ", ")))))
-
-(defun js/elfeed-entry-has-tag-p (tag)
-  "Closure to see if elfeed entry has given `TAG'."
-  (lambda (entry)
-    (member tag (elfeed-entry-tags entry))))
 
 ;;; ** Wallabag integration
 
