@@ -4242,6 +4242,11 @@ With C-u C-u: pull static/ from remote."
 
 ;;; ** Dispatcher
 
+(defun js/elfeed-entry-has-tag-p (tag)
+  "Closure to see if elfeed entry has given `TAG'."
+  (lambda (entry)
+    (member tag (elfeed-entry-tags entry))))
+
 (defvar js/elfeed-dispatch-rules
   (list
    (cons (js/elfeed-entry-has-tag-p 'text) #'js/elfeed-entry-to-wallabag)
@@ -4252,11 +4257,6 @@ With C-u C-u: pull static/ from remote."
 Each predicate is a function taking an entry and returning non-nil if
 the action should apply. Each action is a function taking a list of entries.
 Rules are checked in order; FIRST MATCH WINS per entry.")
-
-(defun js/elfeed-entry-has-tag-p (tag)
-  "Closure to see if elfeed entry has given `TAG'."
-  (lambda (entry)
-    (member tag (elfeed-entry-tags entry))))
 
 (defun js/elfeed-dispatch-entries (&optional entries)
   (interactive)
