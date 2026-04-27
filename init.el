@@ -2085,10 +2085,10 @@ Falls back to #+attr_latex :options for backwards compatibility."
   :defer t
   ;; :after org
   :ensure t
+  :bind-keymap ("C-c n d" . org-roam-dailies-map)
   :bind (("C-c n n b " . org-roam-buffer-toggle)
          ("C-c n f" . js/org-roam-node-find)
          ("C-c n i" . js/org-roam-node-insert)
-         ("C-c n d" . org-roam-dailies-map)
          ("C-c n n r" . org-roam-refile)
          ("C-c n n g" . org-id-get-create)
          ("C-c n n t" . js/org-roam-extract-subtree)
