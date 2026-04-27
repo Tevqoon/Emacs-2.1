@@ -3151,9 +3151,10 @@ Each function is called with two arguments: the tag and the buffer.")
 
 (use-package vulpea-journal
   :after vulpea
+  :commands js/vulpea-journal-month-today js/vulpea-journal-month-date
   :bind
-  (("C-c n d m" . js/vulpea-journal-month-today)
-   ("C-c n d M" . js/vulpea-journal-month-date))
+  (("C-c n m" . js/vulpea-journal-month-today)
+   ("C-c n M" . js/vulpea-journal-month-date))
   :config
   (defvar js/vulpea-monthly-template
     '(:file-name "journal/monthlies/%Y-%m-monthly.org"
@@ -3173,8 +3174,7 @@ Each function is called with two arguments: the tag and the buffer.")
   (defun js/vulpea-journal-month-date (date)
     (interactive (list (vulpea-journal--read-date "Journal date: ")))
     (let ((vulpea-journal-default-template js/vulpea-monthly-template))
-      (vulpea-journal date)))
-  )
+      (vulpea-journal date))))
 
 ;;; ** Anki
 
