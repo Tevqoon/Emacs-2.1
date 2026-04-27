@@ -3145,12 +3145,10 @@ Each function is called with two arguments: the tag and the buffer.")
     (save-buffer)))
 
 (use-package vulpea-ui
-  :after vulpea
   :defer t
   :bind ("C-c n v" . vulpea-ui-sidebar-toggle))
 
 (use-package vulpea-journal
-  :after vulpea
   :commands js/vulpea-journal-month-today js/vulpea-journal-month-date
   :bind
   (("C-c n m" . js/vulpea-journal-month-today)
