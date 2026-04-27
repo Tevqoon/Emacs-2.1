@@ -1155,6 +1155,7 @@ Produces multiple regions so expreg can step through them."
 (use-package deadgrep
   :defer t
   :after org-roam
+  :commands deadgrep deadgrep-search-org-roam deadgrep-search-org-roam-dailies
   :hook (deadgrep-finished . my/deadgrep-activate-org-links)
   :bind (("<f5>" . deadgrep)
 	 ("C-c n e d" . deadgrep-search-org-roam-dailies)
