@@ -2167,6 +2167,16 @@ Falls back to #+attr_latex :options for backwards compatibility."
 		(emacsql-with-transaction (org-roam-db)
                   (apply fn args)))))
 
+(defun js/org-sort-siblings-by-todo ()
+  "Sort sibling entries by todo state order."
+  (interactive)
+  (save-excursion
+    (if (org-up-heading-safe)
+        (org-sort-entries nil ?o)
+      ;; At top level, sort the whole file's top-level headings
+      (goto-char (point-min))
+      (org-sort-entries nil ?o))))
+
 ;;; ** Managing headings
 (defun js/org-roam-node-not-archived-p (node)
   "Return non-nil if NODE should be shown.
