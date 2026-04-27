@@ -3992,9 +3992,10 @@ With C-u C-u: pull static/ from remote."
 	:description description)))))
 
 ;;; * Elfeed
-
+;;; ** Basic configuration
 (use-package elfeed
   :defer t
+  :commands elfeed
   :bind (("C-x w" . elfeed)
 	 :map elfeed-search-mode-map
          ("SPC" . elfeed-search-show-entry)
@@ -4009,7 +4010,7 @@ With C-u C-u: pull static/ from remote."
 	 ("U" . js/log-elfeed-process)
 	 ("B" . elfeed-browse-with-secondary-browser)
 	 ("W" . js/elfeed-entries-to-wallabag)
-	 ("O" . js/elfeed-entries-to-podcastify)
+	 ("O" . js/elfeed-dispatch-entries)
 	 ("<wheel-up>" . previous-line)
 	 ("<wheel-down>" . next-line)
 	 ("y" . elfeed-search-yank)
@@ -4025,14 +4026,17 @@ With C-u C-u: pull static/ from remote."
 	 ("M-o" . ace-link-safari)
 	 ("B" . elfeed-browse-with-secondary-browser)
 	 ("W" . js/elfeed-entries-to-wallabag)
-	 ("O" . js/elfeed-entries-to-podcastify)
+	 ("O" . js/elfeed-dispatch-entries)
 	 ("V" . elpapers-ingest-full)
 	 ("y" . elfeed-show-yank))
   :hook
   (elfeed-show-mode . mixed-pitch-mode)
   (elfeed-show-mode . visual-line-mode)
   (elfeed-show-mode . efs/org-mode-visual-fill)
-  (elfeed-search-mode . my/setup-elfeed-scroll))
+  (elfeed-search-mode . my/setup-elfeed-scroll)
+  :config
+  (advice-add 'elfeed-search-clear-filter
+	      :after (lambda () (message "Clearing filter."))))
 
 ;; Note: the following function looks useless since deleting an item will just refetch it.
 ;; I'm using it for testing some RSS feeds and such.
@@ -4108,8 +4112,7 @@ With C-u C-u: pull static/ from remote."
 
 ;; Give a visual indicator of the filter being cleared.
 ;; Helps with an inbox zero approach to elfeed.
-(advice-add 'elfeed-search-clear-filter
-	    :after (lambda () (message "Clearing filter.")))
+
 
 (defun elfeed-filter-maker (filter &optional message)
   "Sets the elfeed search filter and displays a message if there is one."
@@ -4237,7 +4240,53 @@ With C-u C-u: pull static/ from remote."
         (browse-url (elfeed-entry-link elfeed-show-entry))
       (elfeed-search-browse-url))))
 
+;;; ** Dispatcher
+
+(defvar js/elfeed-dispatch-rules
+  (list
+   (cons (js/elfeed-entry-has-tag-p 'text) #'js/elfeed-entry-to-wallabag)
+   (cons (js/elfeed-entry-has-tag-p 'podcast) #'js/elfeed-send-to-podcastify)
+   (cons (js/elfeed-entry-has-tag-p 'videos) #'js/elfeed-download-entry)
+   )
+  "List of (predicate . action) pairs for routing elfeed entries.
+Each predicate is a function taking an entry and returning non-nil if
+the action should apply. Each action is a function taking a list of entries.
+Rules are checked in order; FIRST MATCH WINS per entry.")
+
+(defun js/elfeed-dispatch-entries (&optional entries)
+  (interactive)
+  (let* ((entries (or entries
+                      (cond
+                       ((derived-mode-p 'elfeed-show-mode) (list elfeed-show-entry))
+                       ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
+                       (t (user-error "Not in an Elfeed buffer")))))
+         (action-buckets (make-hash-table :test 'eq))
+         unmatched)
+    (dolist (entry entries)
+      (if-let ((action (cl-loop for (pred . action) in js/elfeed-dispatch-rules
+                                when (funcall pred entry) return action)))
+          (push entry (gethash action action-buckets))
+        (push entry unmatched)))
+    (maphash (lambda (action entries)
+               (mapc action (nreverse entries))) ; calls action once per entry
+             action-buckets)
+    (when unmatched
+      (message "No rule matched: %s"
+               (mapconcat #'elfeed-entry-title (nreverse unmatched) ", ")))))
+
+(defun js/elfeed-entry-has-tag-p (tag)
+  "Closure to see if elfeed entry has given `TAG'."
+  (lambda (entry)
+    (member tag (elfeed-entry-tags entry))))
+
 ;;; ** Wallabag integration
+
+(defun js/elfeed-entry-to-wallabag (entry)
+  (let ((url (elfeed-entry-link entry)))
+    (wallabag-request-token)
+    (js/wallabag-add-entry url "")
+    (run-with-timer 2 nil #'wallabag-request-and-synchronize-entries)))
+
 (defun js/elfeed-entries-to-wallabag (&optional entries)
   "Add elfeed entries to wallabag and sync to server.
     If ENTRIES is provided, use those instead of the selected entries.
@@ -4309,82 +4358,56 @@ Returns the feed name, defaulting to 'default' if no rules match."
 ;;                  (string-match-p pattern (or feed-title "")))
 ;;                channel-patterns)))
 
+(defun js/elfeed-send-to-podcastify (feed-name entry)
+  "Send a single elfeed ENTRY to podcastify FEED-NAME."
+  (let ((url (elfeed-entry-link entry))
+        (title (elfeed-entry-title entry)))
+    (if (not (string-match-p "youtube\\.com\\|youtu\\.be" (or url "")))
+        (message "Skipping non-YouTube entry: %s" title)
+      (condition-case err
+          (progn
+            (message "Adding to podcastify: %s" title)
+            (url-retrieve
+             (format "http://localhost:8081/add?url=%s&feed=%s"
+                     (url-encode-url url)
+                     (url-encode-url feed-name))
+             (lambda (status)
+               (if (plist-get status :error)
+                   (message "Failed to add %s to podcastify: %s" title (plist-get status :error))
+                 (message "Successfully added %s to podcastify" title)))
+             nil nil t)
+            (elfeed-untag entry 'unread)
+            (elfeed-tag entry 'podcastify))
+        (error
+         (message "Error processing %s: %s" title (error-message-string err)))))))
+
 (defun js/elfeed-entries-to-podcastify (&optional prompt-for-feed entries feed-name)
   "Send elfeed entries to podcastify and mark as read.
 PROMPT-FOR-FEED when non-nil (or called with C-u), prompts for feed selection.
-If ENTRIES is provided, use those instead of the selected entries.
-FEED-NAME specifies which feed to add videos to.
-In show mode, adds the current entry; in search mode, adds all selected entries."
+FEED-NAME specifies which feed to add videos to; falls back to auto-classification."
   (interactive "P")
-  (let* ((entries
-          (cond
-           (entries entries)
-           ((derived-mode-p 'elfeed-show-mode) (list elfeed-show-entry))
-           ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
-           (t (user-error "Not in an Elfeed buffer or no entries provided"))))
-         ;; Handle feed selection logic
+  (let* ((entries (cond
+                   (entries entries)
+                   ((derived-mode-p 'elfeed-show-mode) (list elfeed-show-entry))
+                   ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
+                   (t (user-error "Not in an Elfeed buffer or no entries provided"))))
          (feed (cond
-                ;; If prompt-for-feed (C-u was used), prompt user
                 (prompt-for-feed
-                 (let* ((rule-feeds (mapcar 'car my/elfeed-podcastify-feed-rules))
-                        (all-feeds (cl-remove-duplicates
-				    (append rule-feeds '("default"))
-				    :test 'string=)))
-                   (completing-read "Podcastify feed: " all-feeds nil nil nil nil "default")))
-                ;; If feed-name was explicitly provided, use it
+                 (completing-read "Podcastify feed: "
+                                  (cl-remove-duplicates
+                                   (append (mapcar #'car my/elfeed-podcastify-feed-rules) '("default"))
+                                   :test #'string=)
+                                  nil nil nil nil "default"))
                 (feed-name feed-name)
-                ;; Otherwise, use automatic classification for first entry
-                (t (my/podcastify-determine-feed (car entries)))))
-         (added-count 0)
-         (failed-count 0))
-
-    ;; Show which feed is being used
-    (unless prompt-for-feed
-      (message "Using podcastify feed: %s" feed))
-
-    ;; Process each entry
-    (dolist (entry entries)
-      (let ((url (elfeed-entry-link entry))
-	    (title (elfeed-entry-title entry)))
-        (if (and url (string-match-p "youtube\\.com\\|youtu\\.be" url))
-	    (condition-case err
-                (progn
-                  (message "Adding to podcastify: %s" title)
-                  ;; Send to podcastify API
-                  (url-retrieve
-                   (format "http://localhost:8081/add?url=%s&feed=%s"
-                           (url-encode-url url)
-                           (url-encode-url feed))
-                   (lambda (status)
-		     (if (plist-get status :error)
-                         (message "Failed to add %s to podcastify: %s"
-                                  title (plist-get status :error))
-		       (message "Successfully added %s to podcastify" title)))
-                   nil nil t)
-
-                  ;; Mark entry as read in elfeed
-                  (elfeed-untag entry 'unread)
-                  (elfeed-tag entry 'podcastify)
-
-                  ;; Move point to next entry in search mode
-                  (when (derived-mode-p 'elfeed-search-mode)
-		    (forward-line 1))
-
-                  (cl-incf added-count))
-	      (error
-	       (message "Error processing %s: %s" title (error-message-string err))
-	       (cl-incf failed-count)))
-          (message "Skipping non-YouTube entry: %s" title))))
-
-    ;; Update elfeed display
+                (t (my/podcastify-determine-feed (car entries))))))
+    (message "Using podcastify feed: %s" feed)
+    (mapc (lambda (entry) (js/elfeed-send-to-podcastify feed entry)) entries)
     (when (derived-mode-p 'elfeed-search-mode)
       (elfeed-search-update--force))
-
-    ;; Show summary
-    (if (> failed-count 0)
-        (message "Added %d entries to podcastify (feed: %s), %d failed"
-                 added-count feed failed-count)
-      (message "Added %d entries to podcastify (feed: %s)" added-count feed))))
+    (message "Sent %d entr%s to podcastify (feed: %s)"
+             (length entries)
+             (if (= 1 (length entries)) "y" "ies")
+             feed)))
 
 (defun my/podcastify-add-link ()
   "Interactively add a link to podcastify.
@@ -4425,6 +4448,7 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
 	;; ("x" . cuckoo-search-saved-searches)
 	))
 
+;;; ** Elfeed-org and logging
 (use-package elfeed-org
   :after elfeed
   :custom
@@ -4459,14 +4483,13 @@ Prompts for a URL and feed name, then adds the link to the specified podcastify 
 	  (format "%s (%s)" desc url))
       (format "%s (%s)" desc link)))
 
-
-;;; Elfeed autologging
   (advice-add 'elfeed-search-browse-url :before #'js/log-elfeed-entries)
   (advice-add 'elfeed-search-show-entry :after #'js/elfeed-search-logger)
   (advice-add 'open-youtube-in-iina :before #'js/log-elfeed-entries)
   (advice-add 'js/elfeed-entries-to-wallabag :before #'js/log-elfeed-entries)
   (advice-add 'js/elfeed-entries-to-podcastify :before #'js/log-elfeed-entries)
   (advice-add 'js/elfeed-entries-to-deluge :before #'js/log-elfeed-entries)
+  (advice-add 'js/elfeed-dispatch-entries :before #'js/log-elfeed-entries)
   ;; (advice-add 'open-downloaded-youtube-in-iina :before #'js/log-elfeed-entries)
 
   (defun js/elfeed-search-logger (entry)
@@ -4674,32 +4697,30 @@ If the file doesn't exist, removes the +downloaded tag and skips it."
   "Escape characters in STR to make it safe for a filename."
   (replace-regexp-in-string "/" "_" str))
 
+(defun js/elfeed-download-entry (entry)
+  "Download a single YouTube video for elfeed ENTRY using yt-dlp."
+  (let* ((subfolder (or (determine-subfolder entry) ""))
+         (author-name (plist-get (car (elfeed-meta entry :authors)) :name))
+         (upload-date (elfeed-search-format-date (elfeed-entry-date entry)))
+         (base-filename (concat (file-name-as-directory subfolder)
+                                (file-name-as-directory author-name)
+                                upload-date
+                                " - "
+                                (escape-slashes (elfeed-entry-title entry))))
+         (output-template (concat (file-name-as-directory yt-dlp-folder)
+                                  (escape-single-quotes base-filename)
+                                  ".%(ext)s"))
+         (yt-dlp-command (format "yt-dlp --no-progress -S 'res:1080' --embed-subs --sub-lang 'en.*' --sponsorblock-mark all --sponsorblock-remove 'sponsor' -o '%s' '%s'"
+                                 output-template (elfeed-entry-link entry)))
+         (process (start-process-shell-command "yt-dlp" "*yt-dlp-output*" yt-dlp-command)))
+    (set-process-sentinel process (eval (create-single-entry-sentinel entry base-filename)))
+    (message "Downloading: %s" (elfeed-entry-title entry))))
+
 (defun download-selected-youtube-videos (entries)
   "Download selected YouTube videos using yt-dlp."
   (interactive (list (elfeed-search-selected)))
-  (dolist (entry entries)
-    (let* ((subfolder (or (determine-subfolder entry) ""))
-           (author-plist (car (elfeed-meta entry :authors)))
-           (author-name (plist-get author-plist :name))
-           (upload-date (elfeed-search-format-date (elfeed-entry-date entry)))
-           (elfeed-title (escape-slashes (elfeed-entry-title entry)))
-
-           ;; The base filename is stored relative to the Youtube folder
-           ;; It is later reconstructed with the yt-dlp-folder variable
-           (base-filename (concat (file-name-as-directory subfolder)
-                                  (file-name-as-directory author-name)
-                                  upload-date
-                                  " - "
-                                  elfeed-title))
-           (output-template (concat (file-name-as-directory yt-dlp-folder)
-				    (escape-single-quotes base-filename)
-				    ".%(ext)s"))
-           (yt-dlp-command
-	    (format "yt-dlp --no-progress -S 'res:1080' --embed-subs --sub-lang 'en.*' --sponsorblock-mark all --sponsorblock-remove 'sponsor' -o '%s' '%s'" output-template (elfeed-entry-link entry)))
-           (process (start-process-shell-command "yt-dlp" "*yt-dlp-output*" yt-dlp-command)))
-      ;; Use the constructed sentinel for each entry
-      (set-process-sentinel process (eval (create-single-entry-sentinel entry base-filename)))))
-  (message "Downloading selected YouTube videos..."))
+  (mapc #'js/elfeed-download-entry entries)
+  (message "Downloading %d YouTube video(s)..." (length entries)))
 
 (defun js/elfeed-delete-downloaded-videos ()
   "Delete downloaded video files for selected entries from the filesystem.
