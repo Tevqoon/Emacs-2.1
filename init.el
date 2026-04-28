@@ -1465,7 +1465,7 @@ Produces multiple regions so expreg can step through them."
   ((opencode . "npm install -g opencode-ai"))
   :custom
   (agent-shell-preferred-agent-config 'opencode)
-  (agent-shell-opencode-default-model-id "github-copilot/gpt-5-mini")
+  (agent-shell-opencode-default-model-id "github-copilot/claude-haiku-4.5")
   (agent-shell-prefer-viewport-interaction t)
   (agent-shell-session-strategy 'new)
   (agent-shell-show-usage-at-turn-end t)
@@ -2607,6 +2607,10 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 	 (outline (plist-get properties :outline)))
     (equal "Archived today" (car outline))))
 
+;; (defun archived-backlink-p (backlink)
+;;   (let ((node (vulpea-db-get-by-id (org-roam-backlink-source-id backlink))))
+;;     (member "ARCHIVE" (vulpea-note-tags node))))
+
 ;; https://freerangebits.com/posts/2024/01/archiving-in-org-mode/
 (defun js/org-archive-subtree-to-daily (&optional _find-done)
   "Archive the current subtree to the roam daily file."
@@ -2984,7 +2988,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
     (add-to-list 'org-tags-exclude-from-inheritance tag))
 
   (with-eval-after-load 'org
-      (vulpea-db-autosync-mode +1))
+    (vulpea-db-autosync-mode +1))
 
   :custom
   (vulpea-buffer-alias-property "ROAM_ALIASES")
@@ -3109,8 +3113,26 @@ Each function is called with two arguments: the tag and the buffer.")
 		     :on (= tags:node-id nodes:id)
 		     :where (like tag (quote ,(format "%%\"%s\"%%" tag)))]))))))
 
-  (tags/make-db-searcher "flashcards")
-  (tags/make-db-searcher "project")
+  ;; (tags/make-db-searcher "flashcards")
+  ;; (tags/make-db-searcher "project")
+
+  (defun org-project-files ()
+    "Return files with 'project' tag, excluding archived nodes."
+    (let* ((notes (vulpea-db-query-by-tags-some '("project")))
+           (filtered (seq-filter
+                      (lambda (note)
+			(not (member "ARCHIVE" (vulpea-note-tags note))))
+                      notes)))
+      (seq-uniq (mapcar #'vulpea-note-path filtered))))
+
+  (defun org-flashcards-files ()
+    "Return files with 'flashcards' tag, excluding archived nodes."
+    (let* ((notes (vulpea-db-query-by-tags-some '("flashcards")))
+           (filtered (seq-filter
+                      (lambda (note)
+			(not (member "ARCHIVE" (vulpea-note-tags note))))
+                      notes)))
+      (seq-uniq (mapcar #'vulpea-note-path filtered))))
 
   (defvar-local tags/update-tags-enabled nil
     "Buffer-local variable to enable/disable tag updating.")
@@ -3945,6 +3967,10 @@ With C-u C-u: pull static/ from remote."
   :bind
   ("C-x m" . notmuch)
   ("C-x M" . compose-mail)
+  (:map notmuch-hello-mode-map
+	("G" . refresh-email))
+  (:map notmuch-show-mode-map
+	("G" . refresh-email))
   :if (eq system-type 'darwin)
   :config
   (setq message-send-mail-function 'message-send-mail-with-sendmail
@@ -3962,6 +3988,10 @@ With C-u C-u: pull static/ from remote."
 			   :follow 'org-notmuch-open
 			   :store 'org-notmuch-store-link
 			   :face 'notmuch-link))
+
+(defun refresh-email ()
+  (interactive)
+  (compile "~/Mail/scripts/sync.sh"))
 
 (defun org-notmuch-open (id)
   "Visit the notmuch message or thread with id ID."
