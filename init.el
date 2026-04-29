@@ -404,20 +404,42 @@ are defining or executing a macro."
   :defer t
   :hook prog-mode)
 
+;;; *** Sinister
+
 ;; Keeps windows still when opening minibuffers
 (use-package sinister
   :vc (:url "https://github.com/positron-solutions/sinister")
   :config
   (sinister-stillness-mode 1)
+  ;; These two functions sidestep some stuff to fix org-calendar integration
+  (defun sinister-stillness--enter (&rest _)
+    "Adjust window points to prevent implicit scrolling."
+    (unless (> (minibuffer-depth) 1)
+      ;; Save all window positions
+      (setq sinister-stillness--window-states
+            (mapcar (lambda (w)
+                      (cons w (window-start w)))
+                    (window-at-side-list (window-frame (selected-window)) 'bottom)))))
+
+  (defun sinister-stillness--exit ()
+    "Restore window positions that were saved on entry."
+    (when (and sinister-stillness--window-states (= (minibuffer-depth) 1))
+      (dolist (state sinister-stillness--window-states)
+	(let ((w (car state))
+              (start (cdr state)))
+          (when (window-live-p w)
+            (set-window-start w start))))
+      (setq sinister-stillness--window-states nil)))
+
   (advice-add 'swiper--update-input-ivy :around ; Make swiper play well with sinister
-	    (defun js/swiper-update-input-no-initial-scroll (orig)
-	      "Skip the first recenter call when swiper initializes."
-	      (if (null swiper--current-window-start)
-		  ;; First call: run update but then restore window-start
-		  (let ((ws (window-start)))
-		    (funcall orig)
-		    (set-window-start (selected-window) ws))
-		(funcall orig)))))
+	      (defun js/swiper-update-input-no-initial-scroll (orig)
+		"Skip the first recenter call when swiper initializes."
+		(if (null swiper--current-window-start)
+		    ;; First call: run update but then restore window-start
+		    (let ((ws (window-start)))
+		      (funcall orig)
+		      (set-window-start (selected-window) ws))
+		  (funcall orig)))))
 
 (defun js/swiper-preserve-window-start (orig &rest args)
   "Prevent swiper from scrolling the window on open."
