@@ -886,7 +886,81 @@ Preserve original point position instead of jumping to the bottom of selection."
 (use-package hydra
   :defer t)
 
-;;; *** Smerge
+;;; *** Outline-indent
+
+(use-package outline-indent
+  :defer t
+  :commands outline-indent-minor-mode
+  :custom
+  (outline-indent-ellipsis " ▼")
+  :hook
+  (python-mode . outline-indent-minor-mode)
+  (python-ts-mode . outline-indent-minor-mode)
+  (haskell-mode . outline-indent-minor-mode)
+  (neocaml-mode . outline-indent-minor-mode)
+  )
+
+;;; *** Better outline binds
+
+;;; Note: There's also https://github.com/jamescherti/kirigami.el, but it seems heavier than I need
+(use-package outline
+  :ensure nil
+  :bind (:map outline-minor-mode-map
+              ;; Visibility
+              ("C-c @ a" . outline-show-all)
+              ("C-c @ c" . outline-hide-entry)
+              ("C-c @ d" . outline-hide-subtree)
+              ("C-c @ e" . outline-show-entry)
+              ("C-c @ k" . outline-show-branches)
+              ("C-c @ l" . outline-hide-leaves)
+              ("C-c @ o" . outline-hide-other)
+              ("C-c @ q" . outline-hide-sublevels)
+              ("C-c @ s" . outline-show-subtree)
+              ("C-c @ t" . outline-hide-body)
+              ;; Navigation
+              ("C-c @ b" . outline-backward-same-level)
+              ("C-c @ f" . outline-forward-same-level)
+              ("C-c @ n" . outline-next-visible-heading)
+              ("C-c @ p" . outline-previous-visible-heading)
+              ("C-c @ u" . outline-up-heading)
+              ;; Structure
+              ("C-c @ <" . outline-promote)
+              ("C-c @ >" . outline-demote)
+              ("C-c @ ^" . outline-move-subtree-up)
+              ("C-c @ v" . outline-move-subtree-down)
+              ("C-c @ @" . outline-mark-subtree)
+              ("C-c @ RET" . outline-insert-heading))
+  :config
+  (defvar js/outline-repeat-map
+    (let ((map (make-sparse-keymap)))
+      (define-key map "n" #'outline-next-visible-heading)
+      (define-key map "p" #'outline-previous-visible-heading)
+      (define-key map "f" #'outline-forward-same-level)
+      (define-key map "b" #'outline-backward-same-level)
+      (define-key map "u" #'outline-up-heading)
+      (define-key map "s" #'outline-show-subtree)
+      (define-key map "d" #'outline-hide-subtree)
+      (define-key map "<" #'outline-promote)
+      (define-key map ">" #'outline-demote)
+      (define-key map "^" #'outline-move-subtree-up)
+      (define-key map "v" #'outline-move-subtree-down)
+      map)
+    "Repeat map for outline navigation and structure editing.")
+
+  (dolist (cmd '(outline-next-visible-heading
+                 outline-previous-visible-heading
+                 outline-forward-same-level
+                 outline-backward-same-level
+                 outline-up-heading
+                 outline-show-subtree
+                 outline-hide-subtree
+                 outline-promote
+                 outline-demote
+                 outline-move-subtree-up
+                 outline-move-subtree-down))
+    (put cmd 'repeat-map 'js/outline-repeat-map)))
+
+;;; ** Smerge
 
 (use-package smerge-mode
   :defer t
@@ -3931,7 +4005,6 @@ _S_manual
 
   ;; Hook into the render function
   (advice-add 'org-static-blog-render-post-content :before #'my/setup-blog-backend)
-
 
   )
 
