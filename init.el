@@ -69,6 +69,7 @@
 
 (use-package shannon-max
   :vc (:url "https://github.com/sstraust/shannonmax")
+  :if (not (eq system-type 'android))
   :custom
   (shannon-max-jar-file (expand-file-name "elpa/shannon-max/target/emacskeys-0.1.1-SNAPSHOT-standalone.jar"))
   :init
@@ -1471,8 +1472,13 @@ Produces multiple regions so expreg can step through them."
   (kill-emacs . js/uptime-log-session))
 
 ;;; ** Info
+
 (use-package info
   :ensure nil
+  :bind
+  (:map Info-mode-map
+	("<volume-down>" . Info-scroll-up)
+	("<volume-up>" . Info-scroll-down))
   :init
   (defvar js/info-directory (expand-file-name "info/" org-directory))
 
