@@ -3959,7 +3959,7 @@ With C-u C-u: pull static/ from remote."
     (browse-url url)))
 
 
-;;; * Notmuch
+;;; * Notmuch - email
 
 (use-package notmuch
   :defer t
@@ -3988,6 +3988,20 @@ With C-u C-u: pull static/ from remote."
 			   :follow 'org-notmuch-open
 			   :store 'org-notmuch-store-link
 			   :face 'notmuch-link))
+
+(use-package messages-are-flowing
+  :hook
+  (message-mode . messages-are-flowing-use-and-mark-hard-newlines)
+  (message-mode . (lambda () (auto-fill-mode -1)))
+  :bind
+  (:map message-mode-map
+	("<return>" . insert-soft-newline)
+	("S-<return>" . newline)))
+
+(defun insert-soft-newline ()
+  (interactive)
+  (insert "\n")
+  (put-text-property (1- (point)) (point) 'hard nil))
 
 (defun refresh-email ()
   (interactive)
