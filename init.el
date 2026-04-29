@@ -61,8 +61,22 @@
   :ensure t
   :init (benchmark-init/activate)
   :hook (after-init . benchmark-init/deactivate))
+;;; ** Bug hunter - bisect init file for bugs
 
 (use-package bug-hunter)
+
+;;; ** Shannonmax
+
+(use-package shannon-max
+  :vc (:url "https://github.com/sstraust/shannonmax")
+  :custom
+  (shannon-max-jar-file (expand-file-name "elpa/shannon-max/target/emacskeys-0.1.1-SNAPSHOT-standalone.jar"))
+  :init
+  (require 'shannon-max)
+  (shannon-max-start-logger)
+  ;; Use with M-x shannon-max-analyze
+  )
+
 
 ;;; ** Basic setup
 (use-package emacs
@@ -101,9 +115,11 @@
 	 )
 
   :config
-  (global-unset-key (kbd "C-z")) 	; Normally does a "hide" action on macos
-  (global-unset-key (kbd "s-p"))	; Puts up a print menu lol
+  (global-unset-key (kbd "C-z")) ; Normally does a "hide" action on macos
+  (global-unset-key (kbd "s-p")) ; Puts up a print menu lol
   (setq disabled-command-function nil)
+
+  (repeat-mode +1)
 
   ;; utf-8
   (setq locale-coding-system 'utf-8)
@@ -412,9 +428,11 @@ are defining or executing a macro."
     (when (= (point) saved-point)
       (set-window-start (selected-window) saved-window-start))))
 
+;;; *** Occult
 (use-package occult
   :defer t)			; NOTE: Seems interesting to use more
 
+;;; *** Winpulse
 (use-package winpulse
   :vc (:url "https://github.com/xenodium/winpulse"
 	    :rev :newest)
@@ -891,7 +909,7 @@ _p_rev       _u_pper              _=_: upper/lower       _r_esolve
 
 
 
-;;; *** Expreg
+;;; ** Expreg
 
 (use-package expreg
   :defer t
@@ -1110,6 +1128,7 @@ Produces multiple regions so expreg can step through them."
   :custom
   (imenu-list-focus-after-activation t)
   (use-package-enable-imenu-support t)
+  (org-imenu-depth 3)
   :hook (org-mode . (lambda () (imenu-add-to-menubar "Imenu")))
   )
 
@@ -3202,11 +3221,11 @@ Each function is called with two arguments: the tag and the buffer.")
 (use-package anki-editor
   :defer t
   :if (not (eq system-type 'android))
+  :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all
   :bind
   (:map org-mode-map
         ("C-c n p" . my/anki-flashcard-push-current-buffer)
         ("C-c n n p" . my/anki-flashcard-push-all))
-  :after org
   :vc (:url "https://github.com/anki-editor/anki-editor" :rev :newest)
   :custom
   (anki-editor-latex-style 'mathjax)
@@ -3214,23 +3233,8 @@ Each function is called with two arguments: the tag and the buffer.")
   :config
   (require 'js-anki-body-converter
            (expand-file-name "lisp/js-anki-body-converter.el" user-emacs-directory))
-  )
 
-(defvar anki-tag-list '()
-  "Keeps track of the most recently used flashcard tags.")
-
-(defun anki/my/after-snippet-tag-handler ()
-  "Select or create an Anki tag, prioritizing recent tags."
-  (let* ((tag (completing-read "Enter tag: "
-                               (delete-dups (cons "" anki-tag-list))
-                               nil nil
-                               (car anki-tag-list))))
-    (when (not (string-empty-p tag))
-      (setq anki-tag-list (delete nil (cons tag (remove tag anki-tag-list)))))
-    tag))
-
-
-;;; *** Anki editor overrides
+  ;;; *** Anki editor overrides
 
 (defcustom anki-editor-builtin-latex-environments '("tikzcd" "bprooftree" "prooftree" "logicproof")
   "LaTeX environments that will always be translated using Anki's built-in LaTeX.
@@ -3314,6 +3318,21 @@ See `js/anki-derive-fields' for full hierarchy details."
 			     :fields fields
 			     :hash   hash
 			     :marker (point-marker)))))
+
+  )
+
+(defvar anki-tag-list '()
+  "Keeps track of the most recently used flashcard tags.")
+
+(defun anki/my/after-snippet-tag-handler ()
+  "Select or create an Anki tag, prioritizing recent tags."
+  (let* ((tag (completing-read "Enter tag: "
+                               (delete-dups (cons "" anki-tag-list))
+                               nil nil
+                               (car anki-tag-list))))
+    (when (not (string-empty-p tag))
+      (setq anki-tag-list (delete nil (cons tag (remove tag anki-tag-list)))))
+    tag))
 
 ;;; *** Push functions
 
@@ -3761,6 +3780,7 @@ _S_manual
   (org-static-blog-drafts-directory org-roam-directory)
   (org-static-blog-enable-tags t)
   (org-export-with-toc nil)
+  (org-export-with-todo-keywords nil) 	; I don't want to export the TODO and stuff to drafts
 
   ;; This is destructive.
   ;; (org-export-with-section-numbers nil)
@@ -5431,18 +5451,14 @@ When pressed twice, make the sub/superscript roman."
     (setq magit-git-executable "/opt/homebrew/bin/git")))
 
 (use-package magit-delta
-  :defer t
   :after magit
   :hook (magit-mode . magit-delta-mode))
 
 (use-package hl-todo
-  :defer t
   :after magit
-  :config
-  (global-hl-todo-mode 1))
+  :hook prog-mode)
 
 (use-package magit-todos
-  :defer t
   :after (magit)
   :config
   (magit-todos-mode 1))
@@ -5490,11 +5506,13 @@ When pressed twice, make the sub/superscript roman."
   :config
   (setq flymake-diagnostic-format-alist
         '((t . (origin code message))))
-  :bind (:map flymake-mode-map
-	      ("M-n" . flymake-goto-next-error)
-	      ("M-p" . flymake-goto-prev-error)
-	      ("M-l" . flymake-show-buffer-diagnostics)
-	      ))
+  ;; :bind (:map flymake-mode-map
+  ;; 	      ("M-n" . flymake-goto-next-error)
+  ;; 	      ("M-p" . flymake-goto-prev-error)
+  ;; 	      ("M-l" . flymake-show-buffer-diagnostics)
+  ;; 	      )
+  )
+
 ;;; ** LSP Eglot
 
 (use-package eglot
