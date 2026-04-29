@@ -2089,7 +2089,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
   :bind (("C-c n n b " . org-roam-buffer-toggle)
          ("C-c n f" . js/org-roam-node-find)
          ("C-c n i" . js/org-roam-node-insert)
-         ("C-c n n r" . org-roam-refile)
+         ("C-c n n r" . org-node-refile)
          ("C-c n n g" . org-id-get-create)
          ("C-c n n t" . js/org-roam-extract-subtree)
          ("C-c n n a" . org-roam-alias-add)
@@ -2860,6 +2860,7 @@ you can catch it with `condition-case'."
 
   :custom
   (org-node-alter-candidates t) ; OLP support
+  (org-node-stay-in-source-buffer t)
 
   ;; Performance tuning
   (org-node-perf-keep-file-name-handlers nil)  ; Max speed
@@ -3589,7 +3590,7 @@ EXTRA-STATES is an optional list of additional states to block on."
   (interactive)
   (let ((dest-node (org-roam-node-read nil nil nil 'require-match)))
     (org-agenda-with-point-at-orig-entry nil
-      (org-roam-refile dest-node)))
+      (org-node-refile dest-node)))
   (next-line))
 
 (defun js/agenda-refile ()
@@ -3611,7 +3612,7 @@ the current entry at point and move to the next line."
 		 (marker-position marker))
 	(with-current-buffer (marker-buffer marker)
 	  (goto-char (marker-position marker))
-	  (org-roam-refile dest-node)))))
+	  (org-node-refile dest-node)))))
 
   ;; Clear marks and move cursor
   (org-agenda-bulk-unmark-all)
@@ -3673,7 +3674,7 @@ _S_manual
     ("l" js/triage-snooze-later)
     ("S" js/triage-manual)
     ("t" org-todo)
-    ("r" org-roam-refile)
+    ("r" org-node-refile)
     ("w" org-refile)
     ("R" js/roamify-url-at-point :exit t)
     ("o" open-urls-at-point-or-region)

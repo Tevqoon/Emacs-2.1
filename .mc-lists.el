@@ -65,6 +65,7 @@
 	kill-visual-line
 	kmacro-end-or-call-macro
 	lean4-tab-indent
+	magit-stage
 	markdown-outdent-or-delete
 	math-delimiters-insert
 	my/org-wrap-or-toggle
