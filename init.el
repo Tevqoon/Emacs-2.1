@@ -3990,6 +3990,7 @@ With C-u C-u: pull static/ from remote."
 			   :face 'notmuch-link))
 
 (use-package messages-are-flowing
+  :defer t
   :hook
   (message-mode . messages-are-flowing-use-and-mark-hard-newlines)
   (message-mode . (lambda () (auto-fill-mode -1)))
@@ -3997,6 +3998,53 @@ With C-u C-u: pull static/ from remote."
   (:map message-mode-map
 	("<return>" . insert-soft-newline)
 	("S-<return>" . newline)))
+
+(use-package message
+  :ensure nil
+  :bind
+  (:map message-mode-map
+	("<tab>" . js/message-field-forward)
+	("<backtab>" . js/message-field-backward)))
+
+(autoload 'mail-hist-forward-header "mail-hist")
+(autoload 'mail-text-start          "sendmail")
+
+;; [[https://emacs.stackexchange.com/questions/18292/how-to-tab-between-fields-in-message-mode][email - How to TAB between fields in message-mode? - Emacs Stack Exchange]]
+(defun js/message-signature-start ()
+  "Return value of point at start of message signature."
+  (save-mark-and-excursion
+    (message-goto-signature)
+    (point)))
+
+(defun js/message-field-forward ()
+  "Move point to next \"field\" in a `message-mode' buffer.
+With each invocation, point is moved to the next field of
+interest amongst header values, message body and message
+signature, in that order."
+  (interactive)
+  (cond ((message-point-in-header-p)
+         (unless (mail-hist-forward-header 1)
+           (call-interactively #'message-goto-body)))
+        ((>= (point) ( js/message-signature-start))
+         (message "No further field"))
+        ((message-in-body-p)
+         (message-goto-signature))
+        (t ; Probably on `mail-header-separator' line
+         (call-interactively #'message-goto-body))))
+
+(defun js/message-field-backward ()
+  "Like  js/message-field-forward', but in opposite direction."
+  (interactive)
+  (cond ((or (message-point-in-header-p)
+             (<= (point) (mail-text-start)))
+         (unless (mail-hist-forward-header
+                  (if (message-point-in-header-p) -1 0))
+           (message "No further field")))
+        ((<= (point) ( js/message-signature-start))
+         (call-interactively #'message-goto-body))
+        (t ; Beyond start of signature
+         (message-goto-signature))))
+
 
 (defun insert-soft-newline ()
   (interactive)
