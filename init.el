@@ -3326,9 +3326,9 @@ Each function is called with two arguments: the tag and the buffer.")
 ;;; ** Anki
 
 (use-package anki-editor
-  :defer t
+  :after org
   :if (not (eq system-type 'android))
-  :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all
+  :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all anki-editor-push-notes
   :bind
   (:map org-mode-map
         ("C-c n p" . my/anki-flashcard-push-current-buffer)
@@ -3426,8 +3426,6 @@ See `js/anki-derive-fields' for full hierarchy details."
 			     :hash   hash
 			     :marker (point-marker)))))
 
-  )
-
 (defvar anki-tag-list '()
   "Keeps track of the most recently used flashcard tags.")
 
@@ -3439,85 +3437,84 @@ See `js/anki-derive-fields' for full hierarchy details."
                                (car anki-tag-list))))
     (when (not (string-empty-p tag))
       (setq anki-tag-list (delete nil (cons tag (remove tag anki-tag-list)))))
-    tag))
+    tag)
 
-;;; *** Push functions
+  (defvar anki-flashcard-error-buffer "*Anki Flashcard Errors*"
+    "Buffer name for displaying Anki flashcard push errors.")
 
-(defvar anki-flashcard-error-buffer "*Anki Flashcard Errors*"
-  "Buffer name for displaying Anki flashcard push errors.")
+  (defun anki-flashcard-clear-error-buffer ()
+    "Clear the error buffer or create it if it doesn't exist."
+    (with-current-buffer (get-buffer-create anki-flashcard-error-buffer)
+      (erase-buffer)
+      (insert "Anki Flashcard Push Results:\n\n")))
 
-(defun anki-flashcard-clear-error-buffer ()
-  "Clear the error buffer or create it if it doesn't exist."
-  (with-current-buffer (get-buffer-create anki-flashcard-error-buffer)
-    (erase-buffer)
-    (insert "Anki Flashcard Push Results:\n\n")))
+  (defun anki-flashcard-report-error (file error-msg)
+    "Report ERROR-MSG for FILE in the error buffer."
+    (with-current-buffer (get-buffer-create anki-flashcard-error-buffer)
+      (goto-char (point-max))
+      (insert (format "ERROR pushing %s:\n%s\n\n" file error-msg))))
 
-(defun anki-flashcard-report-error (file error-msg)
-  "Report ERROR-MSG for FILE in the error buffer."
-  (with-current-buffer (get-buffer-create anki-flashcard-error-buffer)
-    (goto-char (point-max))
-    (insert (format "ERROR pushing %s:\n%s\n\n" file error-msg))))
+  (defun my/anki-flashcard-push-current-buffer ()
+    "Push current buffer's flashcards to Anki."
+    (interactive)
+    (if (buffer-file-name)
+	(progn
+          (anki-flashcard-clear-error-buffer)
+          (save-buffer)
+          (condition-case err
+              (progn
+		(save-excursion
+		  (org-transclusion-mode +1)
+		  (anki-editor-push-notes 'file))
+		(message "Successfully pushed %s to Anki" (buffer-file-name)))
+            (error
+             (anki-flashcard-report-error (buffer-file-name) (error-message-string err))
+             (message "Failed to push %s to Anki — see %s"
+                      (buffer-file-name) anki-flashcard-error-buffer))))
+      (message "Buffer is not visiting a file")))
 
-(defun my/anki-flashcard-push-current-buffer ()
-  "Push current buffer's flashcards to Anki."
-  (interactive)
-  (if (buffer-file-name)
-      (progn
-        (anki-flashcard-clear-error-buffer)
-        (save-buffer)
-        (condition-case err
-            (progn
-              (save-excursion
-		(org-transclusion-mode +1)
-		(anki-editor-push-notes 'file))
-              (message "Successfully pushed %s to Anki" (buffer-file-name)))
-          (error
-           (anki-flashcard-report-error (buffer-file-name) (error-message-string err))
-           (message "Failed to push %s to Anki — see %s"
-                    (buffer-file-name) anki-flashcard-error-buffer))))
-    (message "Buffer is not visiting a file")))
+  (defun my/anki-flashcard-push-all ()
+    "Push all flashcard files (via org-roam tag index) to Anki."
+    (interactive)
+    (anki-flashcard-clear-error-buffer)
+    (let* ((files (org-flashcards-files))
+           (total (length files))
+           (success 0))
+      (dolist (file files)
+	(condition-case err
+            (with-current-buffer (find-file-noselect file)
+	      (org-transclusion-mode +1)
+              (save-excursion (anki-editor-push-notes 'file))
+              (cl-incf success))
+          (error (anki-flashcard-report-error file (error-message-string err)))))
+      (if (< success total)
+          (progn
+            (message "Pushed %d/%d, %d errors — see %s"
+                     success total (- total success) anki-flashcard-error-buffer)
+            (display-buffer anki-flashcard-error-buffer))
+	(message "Pushed all %d flashcard files" total))))
 
-(defun my/anki-flashcard-push-all ()
-  "Push all flashcard files (via org-roam tag index) to Anki."
-  (interactive)
-  (anki-flashcard-clear-error-buffer)
-  (let* ((files (org-flashcards-files))
-         (total (length files))
-         (success 0))
-    (dolist (file files)
-      (condition-case err
-          (with-current-buffer (find-file-noselect file)
-	    (org-transclusion-mode +1)
-            (save-excursion (anki-editor-push-notes 'file))
-            (cl-incf success))
-        (error (anki-flashcard-report-error file (error-message-string err)))))
-    (if (< success total)
-        (progn
-          (message "Pushed %d/%d, %d errors — see %s"
-                   success total (- total success) anki-flashcard-error-buffer)
-          (display-buffer anki-flashcard-error-buffer))
-      (message "Pushed all %d flashcard files" total))))
-
-(defun my/anki-flashcard-push-all ()
-  "Push all flashcard files (via org-roam tag index) to Anki."
-  (interactive)
-  (anki-flashcard-clear-error-buffer)
-  (let* ((files (org-flashcards-files))
-         (total (length files))
-         (success 0))
-    (dolist (file files)
-      (condition-case err
-          (with-current-buffer (find-file-noselect file)
-	    (org-transclusion-mode +1)
-            (save-excursion (anki-editor-push-notes 'file))
-            (cl-incf success))
-        (error (anki-flashcard-report-error file (error-message-string err)))))
-    (if (< success total)
-        (progn
-          (message "Pushed %d/%d, %d errors — see %s"
-                   success total (- total success) anki-flashcard-error-buffer)
-          (display-buffer anki-flashcard-error-buffer))
-      (message "Pushed all %d flashcard files" total))))
+  (defun my/anki-flashcard-push-all ()
+    "Push all flashcard files (via org-roam tag index) to Anki."
+    (interactive)
+    (anki-flashcard-clear-error-buffer)
+    (let* ((files (org-flashcards-files))
+           (total (length files))
+           (success 0))
+      (dolist (file files)
+	(condition-case err
+            (with-current-buffer (find-file-noselect file)
+	      (org-transclusion-mode +1)
+              (save-excursion (anki-editor-push-notes 'file))
+              (cl-incf success))
+          (error (anki-flashcard-report-error file (error-message-string err)))))
+      (if (< success total)
+          (progn
+            (message "Pushed %d/%d, %d errors — see %s"
+                     success total (- total success) anki-flashcard-error-buffer)
+            (display-buffer anki-flashcard-error-buffer))
+	(message "Pushed all %d flashcard files" total))))
+  )
 
 ;;; ** Agenda
 
@@ -3659,7 +3656,7 @@ See `js/anki-derive-fields' for full hierarchy details."
 	(pri-current (org-get-priority (thing-at-point 'line t))))
     (if (= pri-value pri-current)
 	subtree-end
-      nil)))
+      nil))))
 
 (defun air-org-skip-subtree-if-habit ()
   "Skip an agenda entry if it has a STYLE property equal to \"habit\"."
