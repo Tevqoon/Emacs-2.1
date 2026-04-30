@@ -1706,7 +1706,6 @@ Produces multiple regions so expreg can step through them."
 
 (use-package org
   :ensure nil
-  :defer t
   :custom
   (org-hide-emphasis-markers t)
   (org-image-actual-width nil)
@@ -1715,14 +1714,11 @@ Produces multiple regions so expreg can step through them."
   (org-insert-heading-respect-content t)
   (org-export-with-broken-links t)
   (org-loop-over-headlines-in-active-region 'start-level)
-  (org-num-skip-unnumbered t)
-  (org-num-skip-tags '("nonumber" "noexport"))
 
   (org-special-ctrl-a/e t)
   (org-auto-align-tags nil)
   (org-tags-column 0)
   (org-catch-invisible-edits 'show-and-error)
-  (org-insert-heading-respect-content t)
 
   (org-goto-auto-isearch nil)
   (org-M-RET-may-split-line nil)
@@ -1780,6 +1776,14 @@ Produces multiple regions so expreg can step through them."
   (setq org-export-with-section-numbers nil)
 
   )
+
+(use-package org-num
+  :ensure nil
+  :after org
+  :commands org-num-mode
+  :custom
+  (org-num-skip-unnumbered t)
+  (org-num-skip-tags '("nonumber" "noexport")))
 
 ;; Org Exporting
 
