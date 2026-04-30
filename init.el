@@ -1705,6 +1705,7 @@ Produces multiple regions so expreg can step through them."
   "Buffer-local variable to enable/disable tag updating.")
 
 (use-package org
+  :ensure nil
   :defer t
   :custom
   (org-hide-emphasis-markers t)
@@ -5265,8 +5266,10 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
 
 ;;; * LaTeX
 ;;; ** AucTex
+
 (use-package tex
   :ensure auctex
+  :defines TeX-mode-map
   :custom
   (font-latex-fontify-script nil)
   (latex-run-command "lualatex")
@@ -5290,7 +5293,6 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
   :config
   (setq-default TeX-master nil)
 
-
   :hook
   (LaTeX-mode . turn-on-reftex)
   (LaTeX-mode . visual-line-mode)
@@ -5298,6 +5300,7 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
 
 ;;; ** CDLaTeX
 (use-package cdlatex
+  :defer t
   :config
   (defun js/cdlatex-sub-superscript ()
     "Insert ^{} or _{} unless the number of backslashes before point is odd.
@@ -5465,17 +5468,28 @@ When pressed twice, make the sub/superscript roman."
   :hook
   (org-mode . org-cdlatex-mode)
   (LaTeX-mode . turn-on-cdlatex))
+
 ;;; ** Math delimiters
 
 (use-package math-delimiters
   :load-path "~/.emacs.d/lisp/math-delimiters"
-  :bind
-  (:map org-mode-map
-	("$" . math-delimiters-insert))
-  (:map TeX-mode-map
-	("$" . math-delimiters-insert))
   :custom
   (math-delimiters-compressed-display-math nil))
+
+(use-package math-delimiters-tex
+  :ensure nil
+  :after (tex math-delimiters)
+  :bind
+  (:map TeX-mode-map
+	("$" . math-delimiters-insert)))
+
+(use-package math-delimiters-org
+  :ensure nil
+  :after (org math-delimiters)
+  :bind
+  (:map org-mode-map
+	("$" . math-delimiters-insert)))
+
 ;;; ** Xenops/fragtog/org latex
 
 (use-package xenops
@@ -5556,7 +5570,6 @@ When pressed twice, make the sub/superscript roman."
   :hook (magit-mode . magit-delta-mode))
 
 (use-package hl-todo
-  :after magit
   :hook prog-mode)
 
 (use-package magit-todos
