@@ -1502,6 +1502,16 @@ Produces multiple regions so expreg can step through them."
            (result (shell-command-to-string script)))
       (setq Info-dir-contents nil)
       (message "Info dir rebuilt"))))
+;;; *** Man
+
+(use-package man
+  :ensure nil
+  :bind
+  (:map Man-mode-map
+	("o" . ace-link-man))
+  :custom
+  (Man-switches "-a")
+  (Man-notify-method 'pushy))
 
 ;;; * AI configuration
 ;;; ** GPTel
@@ -5744,8 +5754,9 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** Agda
 
 (when (eq system-type 'darwin)
-  (let ((coding-system-for-read 'utf-8))
-    (shell-command-to-string "agda --emacs-mode locate")))
+  (load-file
+   (let ((coding-system-for-read 'utf-8))
+     (shell-command-to-string "agda --emacs-mode locate"))))
 
 ;;; ** Octave
 
