@@ -3718,7 +3718,7 @@ EXTRA-STATES is an optional list of additional states to block on."
 
 ;;; *** Agenda Refiling integration
 
-(defun js/agenda-refile ()
+(defun js/agenda-refile-old ()
   "From org-agenda, refile the subtree into the selected org-roam node."
   (interactive)
   (let ((dest-node (org-roam-node-read nil nil nil 'require-match)))
@@ -3727,27 +3727,29 @@ EXTRA-STATES is an optional list of additional states to block on."
   (next-line))
 
 (defun js/agenda-refile ()
-  "Refile marked entries or the entry at point into the selected org-roam node.
+  "Refile marked entries or the entry at point into the selected org-node.
 
 If there are marked entries, refile all of them. Otherwise, refile
 the current entry at point and move to the next line."
   (interactive)
-  ;; If no marks exist, mark the current entry for single-entry refile
   (if (not org-agenda-bulk-marked-entries)
       (save-excursion (org-agenda-bulk-mark)))
 
-  (let ((dest-node (org-roam-node-read nil nil nil 'require-match)))
+  (let* ((input (org-node-read-candidate "Refile into ID-node: " t))
+         (org-mem-entry (or (gethash input org-node--candidate<>entry)
+                            (error "Node not found: %s" input)))
+         (node-id (org-mem-entry-id org-mem-entry))
+         (dest-node (or (org-roam-node-from-id node-id)
+                        (error "No org-roam node found for ID: %s" node-id))))
     (dolist (marker (reverse org-agenda-bulk-marked-entries))
-      ;; Navigate to each marked entry and refile it
       (when (and (markerp marker)
-		 (marker-buffer marker)
-		 (buffer-live-p (marker-buffer marker))
-		 (marker-position marker))
-	(with-current-buffer (marker-buffer marker)
-	  (goto-char (marker-position marker))
-	  (org-node-refile dest-node)))))
+                 (marker-buffer marker)
+                 (buffer-live-p (marker-buffer marker))
+                 (marker-position marker))
+        (with-current-buffer (marker-buffer marker)
+          (goto-char (marker-position marker))
+          (org-roam-refile dest-node)))))
 
-  ;; Clear marks and move cursor
   (org-agenda-bulk-unmark-all)
   (next-line))
 
