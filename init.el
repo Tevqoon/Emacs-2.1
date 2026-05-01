@@ -3353,35 +3353,35 @@ Each function is called with two arguments: the tag and the buffer.")
 
   ;;; *** Anki editor overrides
 
-(defcustom anki-editor-builtin-latex-environments '("tikzcd" "bprooftree" "prooftree" "logicproof")
-  "LaTeX environments that will always be translated using Anki's built-in LaTeX.
+  (defcustom anki-editor-builtin-latex-environments '("tikzcd" "bprooftree" "prooftree" "logicproof")
+    "LaTeX environments that will always be translated using Anki's built-in LaTeX.
 This is useful for environments not supported by MathJax."
-  :type '(repeat string))
+    :type '(repeat string))
 
-(defun anki-editor--contains-builtin-env (latex-code)
-  "Check if LATEX-CODE contains any environment that should use builtin LaTeX."
-  (cl-some (lambda (env)
-	     (string-match-p (format "\\\\begin{%s}" env) latex-code))
-           anki-editor-builtin-latex-environments))
+  (defun anki-editor--contains-builtin-env (latex-code)
+    "Check if LATEX-CODE contains any environment that should use builtin LaTeX."
+    (cl-some (lambda (env)
+	       (string-match-p (format "\\\\begin{%s}" env) latex-code))
+             anki-editor-builtin-latex-environments))
 
-(defun anki-editor--ox-latex (latex _contents _info)
-  "Transcode LATEX from Org to HTML.
+  (defun anki-editor--ox-latex (latex _contents _info)
+    "Transcode LATEX from Org to HTML.
 CONTENTS is nil. INFO is a plist holding contextual information."
-  (let* ((code (org-remove-indentation (org-element-property :value latex)))
-         (original-style anki-editor-latex-style)
-         (contains-special-env (anki-editor--contains-builtin-env code)))
-    (when (and (eq original-style 'mathjax) contains-special-env)
-      (setq anki-editor-latex-style 'builtin))
-    (setq code (cl-ecase (org-element-type latex)
-                 (latex-fragment (anki-editor--translate-latex-fragment code))
-                 (latex-environment (anki-editor--translate-latex-env code))))
-    (setq anki-editor-latex-style original-style)
-    (if anki-editor-break-consecutive-braces-in-latex
-        (replace-regexp-in-string "}}" "} } " code)
-      code)))
+    (let* ((code (org-remove-indentation (org-element-property :value latex)))
+           (original-style anki-editor-latex-style)
+           (contains-special-env (anki-editor--contains-builtin-env code)))
+      (when (and (eq original-style 'mathjax) contains-special-env)
+	(setq anki-editor-latex-style 'builtin))
+      (setq code (cl-ecase (org-element-type latex)
+                   (latex-fragment (anki-editor--translate-latex-fragment code))
+                   (latex-environment (anki-editor--translate-latex-env code))))
+      (setq anki-editor-latex-style original-style)
+      (if anki-editor-break-consecutive-braces-in-latex
+          (replace-regexp-in-string "}}" "} } " code)
+	code)))
 
-(defun anki-editor-note-at-point ()
-  "Make a note struct from current entry using block-aware field extraction.
+  (defun anki-editor-note-at-point ()
+    "Make a note struct from current entry using block-aware field extraction.
 
 Field sources, in priority order:
 
@@ -3390,64 +3390,64 @@ Field sources, in priority order:
   Back  : '** Back' subheading  > proof/solution blocks + residual text > raw body
 
 See `js/anki-derive-fields' for full hierarchy details."
-  ()
-  (let* ((deck      (org-entry-get-with-inheritance anki-editor-prop-deck))
-         (note-id   (org-entry-get nil anki-editor-prop-note-id))
-         (hash      (org-entry-get nil anki-editor-prop-note-hash))
-         (note-type (or (org-entry-get nil anki-editor-prop-note-type)
-                        anki-editor-default-note-type))
-         (tags      (cl-set-difference (anki-editor--get-tags)
-                                       anki-editor-ignored-org-tags
-                                       :test #'string=))
-         (heading   (substring-no-properties (org-get-heading t t t t)))
-         (body      (anki-editor--note-contents-before-subheading))
-         (explicit-front nil)
-         (explicit-hint  nil)
-         (explicit-back  nil))
-    (save-excursion
-      (when (org-goto-first-child)
-        (cl-loop
-         for element    = (org-element-at-point)
-         for subheading = (substring-no-properties
-                           (org-element-property :raw-value element))
-         for begin      = (save-excursion (anki-editor--skip-drawer element))
-         for end        = (org-element-property :contents-end element)
-         for content    = (and begin end
-                               (buffer-substring-no-properties
-                                begin (min (point-max) end)))
-         when (string= subheading "Front") do (setq explicit-front content)
-         when (string= subheading "Hint")  do (setq explicit-hint  content)
-         when (string= subheading "Back")  do (setq explicit-back  content)
-         while (org-get-next-sibling))))
-    (let* ((derived (js/anki-derive-fields
-		     heading body explicit-front explicit-hint explicit-back))
-           (fields (sort (list (cons "Front" (plist-get derived :front))
-                               (cons "Hint"  (plist-get derived :hint))
+    ()
+    (let* ((deck      (org-entry-get-with-inheritance anki-editor-prop-deck))
+           (note-id   (org-entry-get nil anki-editor-prop-note-id))
+           (hash      (org-entry-get nil anki-editor-prop-note-hash))
+           (note-type (or (org-entry-get nil anki-editor-prop-note-type)
+                          anki-editor-default-note-type))
+           (tags      (cl-set-difference (anki-editor--get-tags)
+					 anki-editor-ignored-org-tags
+					 :test #'string=))
+           (heading   (substring-no-properties (org-get-heading t t t t)))
+           (body      (anki-editor--note-contents-before-subheading))
+           (explicit-front nil)
+           (explicit-hint  nil)
+           (explicit-back  nil))
+      (save-excursion
+	(when (org-goto-first-child)
+          (cl-loop
+           for element    = (org-element-at-point)
+           for subheading = (substring-no-properties
+                             (org-element-property :raw-value element))
+           for begin      = (save-excursion (anki-editor--skip-drawer element))
+           for end        = (org-element-property :contents-end element)
+           for content    = (and begin end
+				 (buffer-substring-no-properties
+                                  begin (min (point-max) end)))
+           when (string= subheading "Front") do (setq explicit-front content)
+           when (string= subheading "Hint")  do (setq explicit-hint  content)
+           when (string= subheading "Back")  do (setq explicit-back  content)
+           while (org-get-next-sibling))))
+      (let* ((derived (js/anki-derive-fields
+		       heading body explicit-front explicit-hint explicit-back))
+             (fields (sort (list (cons "Front" (plist-get derived :front))
+				 (cons "Hint"  (plist-get derived :hint))
 
-                               (cons "Back"  (plist-get derived :back)))
-                         (lambda (a b) (string< (car a) (car b))))))
-      (unless deck      (user-error "Missing deck"))
-      (unless note-type (user-error "Missing note type"))
-      (make-anki-editor-note :id     note-id
-			     :model  note-type
-			     :deck   deck
-			     :tags   tags
-			     :fields fields
-			     :hash   hash
-			     :marker (point-marker)))))
+				 (cons "Back"  (plist-get derived :back)))
+                           (lambda (a b) (string< (car a) (car b))))))
+	(unless deck      (user-error "Missing deck"))
+	(unless note-type (user-error "Missing note type"))
+	(make-anki-editor-note :id     note-id
+			       :model  note-type
+			       :deck   deck
+			       :tags   tags
+			       :fields fields
+			       :hash   hash
+			       :marker (point-marker)))))
 
-(defvar anki-tag-list '()
-  "Keeps track of the most recently used flashcard tags.")
+  (defvar anki-tag-list '()
+    "Keeps track of the most recently used flashcard tags.")
 
-(defun anki/my/after-snippet-tag-handler ()
-  "Select or create an Anki tag, prioritizing recent tags."
-  (let* ((tag (completing-read "Enter tag: "
-                               (delete-dups (cons "" anki-tag-list))
-                               nil nil
-                               (car anki-tag-list))))
-    (when (not (string-empty-p tag))
-      (setq anki-tag-list (delete nil (cons tag (remove tag anki-tag-list)))))
-    tag)
+  (defun anki/my/after-snippet-tag-handler ()
+    "Select or create an Anki tag, prioritizing recent tags."
+    (let* ((tag (completing-read "Enter tag: "
+				 (delete-dups (cons "" anki-tag-list))
+				 nil nil
+				 (car anki-tag-list))))
+      (when (not (string-empty-p tag))
+	(setq anki-tag-list (delete nil (cons tag (remove tag anki-tag-list)))))
+      tag))
 
   (defvar anki-flashcard-error-buffer "*Anki Flashcard Errors*"
     "Buffer name for displaying Anki flashcard push errors.")
@@ -3529,9 +3529,23 @@ See `js/anki-derive-fields' for full hierarchy details."
 ;;; ** Agenda
 
 (use-package org-agenda
-  :defer t
   :commands open-org-agenda
   :ensure nil
+  :bind (("C-c a" . open-org-agenda)
+	 :map org-agenda-mode-map
+	 ("o" . my/ace-link-agenda-current-line)
+	 ("M-o" . my/ace-link-org-agenda-urls)
+	 ;; This one doesn't change the view
+	 ("g" . org-agenda-redo)
+	 ("r" . roam-agenda-files-update)
+	 ("<tab>" . outline-toggle-children)
+	 ("<backtab>" . outline-cycle-buffer)
+	 ("<return>" . org-agenda-goto)
+	 ("S-<return>" . org-agenda-switch-to)
+	 ("R" . js/agenda-refile)
+	 ("O" . js/agenda-roamify)
+	 )
+
   :custom
   (org-todo-keywords
    '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)"
@@ -3619,21 +3633,6 @@ See `js/anki-derive-fields' for full hierarchy details."
 	     (todo "HOLD" ((org-agenda-overriding-header "* Currently on hold: ")))
 	     (todo "EXPLORE" ((org-agenda-overriding-header "* Things to explore: ")))
 	     )))))
-
-  :bind (("C-c a" . open-org-agenda)
-	 :map org-agenda-mode-map
-	 ("o" . my/ace-link-agenda-current-line)
-	 ("M-o" . my/ace-link-org-agenda-urls)
-	 ;; This one doesn't change the view
-	 ("g" . org-agenda-redo)
-	 ("r" . roam-agenda-files-update)
-	 ("<tab>" . outline-toggle-children)
-	 ("<backtab>" . outline-cycle-buffer)
-	 ("<return>" . org-agenda-goto)
-	 ("S-<return>" . org-agenda-switch-to)
-	 ("R" . js/agenda-refile)
-	 ("O" . js/agenda-roamify)
-	 )
   :config
   (require 'org-roam)
   (require 'vulpea)
@@ -3666,7 +3665,7 @@ See `js/anki-derive-fields' for full hierarchy details."
 	(pri-current (org-get-priority (thing-at-point 'line t))))
     (if (= pri-value pri-current)
 	subtree-end
-      nil))))
+      nil)))
 
 (defun air-org-skip-subtree-if-habit ()
   "Skip an agenda entry if it has a STYLE property equal to \"habit\"."
