@@ -54,13 +54,17 @@
             ,@body))))))
 ;; (setq use-package-vec-prefer-newest nil)
 
+(use-package use-package
+  :custom
+  (use-package-hook-name-suffix nil))
+
 (use-package exec-path-from-shell
   :init (exec-path-from-shell-initialize))
 
 (use-package benchmark-init
   :ensure t
   :init (benchmark-init/activate)
-  :hook (after-init . benchmark-init/deactivate))
+  :hook (after-init-hook . benchmark-init/deactivate))
 ;;; ** Bug hunter - bisect init file for bugs
 
 (use-package bug-hunter)
@@ -182,10 +186,10 @@ are defining or executing a macro."
   (auto-save-visited-mode 1)
   (setq auto-save-visited-interval 30))	; Save every 30 seconds
 
-(use-package gcmh
-  :ensure t
-  :init
-  (gcmh-mode 1))
+;; (use-package gcmh
+;;   :ensure t
+;;   :init
+;;   (gcmh-mode 1))
 
 (use-package emacs-everywhere
   :bind
@@ -241,7 +245,7 @@ are defining or executing a macro."
    '(".dir-locals.el" "flake.nix" "package.json" "Cargo.toml" "pyproject.toml"))
   (project-kill-buffers-display-buffer-list t)
   :config (project-forget-zombie-projects)
-  :hook (find-file . (lambda ()
+  :hook (find-file-hook . (lambda ()
 		       (when-let ((pr (project-current)))
 			 (project-remember-project pr)))))
 
@@ -299,8 +303,8 @@ are defining or executing a macro."
   :custom
   (show-paren-delay 0)
   :hook
-  (LaTeX-mode . js/fix-angle-bracket-syntax)
-  (org-mode . js/fix-angle-bracket-syntax))
+  (LaTeX-mode-hook . js/fix-angle-bracket-syntax)
+  (org-mode-hook . js/fix-angle-bracket-syntax))
 
 (defun js/fix-angle-bracket-syntax ()
   "Make < and > punctuation instead of paired delimiters."
@@ -314,7 +318,7 @@ are defining or executing a macro."
 
 (use-package rainbow-delimiters
   :defer t
-  :hook prog-mode)
+  :hook prog-mode-hook)
 
 (use-package alert
   :defer t
@@ -369,10 +373,10 @@ are defining or executing a macro."
 (use-package visual-fill-column
   :defer t
   :hook
-  (visual-fill-column-mode . efs/org-mode-visual-fill)
-  (text-mode . visual-line-mode)
-  (visual-line-mode . visual-wrap-prefix-mode)
-  text-mode)
+  (visual-fill-column-mode-hook . efs/org-mode-visual-fill)
+  (text-mode-hook . visual-line-mode)
+  (visual-line-mode-hook . visual-wrap-prefix-mode)
+  text-mode-hook)
 
 (defun efs/org-mode-visual-fill ()
   "Sets the width just so that there's a little bit
@@ -403,7 +407,7 @@ are defining or executing a macro."
 
 (use-package symbol-overlay
   :defer t
-  :hook prog-mode)
+  :hook prog-mode-hook)
 
 ;;; *** Sinister
 
@@ -672,7 +676,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
        (set-fontset-font t nil (font-spec :family (car font)) nil 'append))
      :custom
      (mixed-pitch-set-height 160)
-     :hook text-mode))
+     :hook text-mode-hook))
 
   ;; ===================================
   ;; android Configuration
@@ -721,7 +725,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
      :init
      (set-face-attribute 'default nil :family fixed-pitch-font)
      (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
-     :hook text-mode))
+     :hook text-mode-hook))
 
   ;; ===================================
   ;; Linux Font Configuration
@@ -770,7 +774,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
      :init
      (set-face-attribute 'default nil :family fixed-pitch-font)
      (set-face-attribute 'variable-pitch nil :family variable-pitch-font)
-     :hook text-mode
+     :hook text-mode-hook
      )
    (set-face-attribute 'default nil :height 165))
 
@@ -827,11 +831,11 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 
 (use-package company
   :defer t
-  :hook (prog-mode text-mode))
+  :hook (prog-mode-hook text-mode-hook))
 
 (use-package company-box
   :defer t
-  :hook company-mode)
+  :hook company-mode-hook)
 
 ;;; *** Ibuffer
 (use-package ibuffer
@@ -851,8 +855,8 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 		      (name . "^\\*scratch\\*$")
 		      (name . "^\\*Messages\\*$")))))))
   :hook
-  (ibuffer-mode . ibuffer-switch-to-default)
-  (ibuffer-mode . ibuffer-auto-mode))
+  (ibuffer-mode-hook . ibuffer-switch-to-default)
+  (ibuffer-mode-hook . ibuffer-auto-mode))
 
 (defun ibuffer-switch-to-default ()
   (ibuffer-switch-to-saved-filter-groups "default"))
@@ -867,7 +871,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   ;; :config
   ;; (outline-stars-mode 1)
   :hook
-  (prog-mode . outline-stars-setup)
+  (prog-mode-hook . outline-stars-setup)
   :bind
   (:map prog-mode-map
 	("<backtab>" . outline-stars-cycle-buffer)
@@ -895,10 +899,10 @@ Preserve original point position instead of jumping to the bottom of selection."
   :custom
   (outline-indent-ellipsis " ▼")
   :hook
-  (python-mode . outline-indent-minor-mode)
-  (python-ts-mode . outline-indent-minor-mode)
-  (haskell-mode . outline-indent-minor-mode)
-  (neocaml-mode . outline-indent-minor-mode)
+  (python-mode-hook . outline-indent-minor-mode)
+  (python-ts-mode-hook . outline-indent-minor-mode)
+  (haskell-mode-hook . outline-indent-minor-mode)
+  (neocaml-mode-hook . outline-indent-minor-mode)
   )
 
 ;;; *** Better outline binds
@@ -1015,11 +1019,11 @@ _p_rev       _u_pper              _=_: upper/lower       _r_esolve
   (expreg-restore-point-on-quit t)
   :bind ("s-f" . expreg-expand)
   :hook
-  (text-mode        . js/expreg-setup-text)
-  (org-mode         . js/expreg-setup-org)
-  (latex-mode       . js/expreg-setup-latex)
-  (LaTeX-mode       . js/expreg-setup-latex)
-  (elfeed-show-mode . js/expreg-setup-elfeed)
+  (text-mode-hook        . js/expreg-setup-text)
+  (org-mode-hook         . js/expreg-setup-org)
+  (latex-mode-hook       . js/expreg-setup-latex)
+  (LaTeX-mode-hook       . js/expreg-setup-latex)
+  (elfeed-show-mode-hook . js/expreg-setup-elfeed)
   :config
   (defun js/expreg-setup-text ()
     (add-to-list 'expreg-functions #'expreg--sentence t)
@@ -1226,7 +1230,7 @@ Produces multiple regions so expreg can step through them."
   (imenu-list-focus-after-activation t)
   (use-package-enable-imenu-support t)
   (org-imenu-depth 3)
-  :hook (org-mode . (lambda () (imenu-add-to-menubar "Imenu")))
+  :hook (org-mode-hook . (lambda () (imenu-add-to-menubar "Imenu")))
   )
 
 (use-package yasnippet
@@ -1272,7 +1276,7 @@ Produces multiple regions so expreg can step through them."
   :defer t
   :after org-roam
   :commands deadgrep deadgrep-search-org-roam deadgrep-search-org-roam-dailies
-  :hook (deadgrep-finished . my/deadgrep-activate-org-links)
+  :hook (deadgrep-finished-hook . my/deadgrep-activate-org-links)
   :bind (("<f5>" . deadgrep)
 	 ("C-c n e d" . deadgrep-search-org-roam-dailies)
 	 ("C-c n e n" . deadgrep-search-org-roam)
@@ -1357,7 +1361,7 @@ Produces multiple regions so expreg can step through them."
 (use-package ace-link
   :defer t
   :hook
-  (prog-mode . goto-address-prog-mode)
+  (prog-mode-hook . goto-address-prog-mode)
   :bind (("s-u" . counsel-ace-link)
          :map prog-mode-map
          ("M-o" . ace-link-addr)
@@ -1444,8 +1448,8 @@ Produces multiple regions so expreg can step through them."
 (use-package stripspace
   :defer t
   :ensure t
-  :hook ((prog-mode . stripspace-local-mode)
-         (conf-mode . stripspace-local-mode))
+  :hook ((prog-mode-hook . stripspace-local-mode)
+         (conf-mode-hook . stripspace-local-mode))
   :custom
   (stripspace-only-if-initially-clean t)
   (stripspace-restore-column t))
@@ -1469,7 +1473,7 @@ Produces multiple regions so expreg can step through them."
   :defer t
   :load-path "~/.emacs.d/lisp"
   :hook
-  (kill-emacs . js/uptime-log-session))
+  (kill-emacs-hook . js/uptime-log-session))
 
 ;;; ** Info
 
@@ -1532,7 +1536,7 @@ Produces multiple regions so expreg can step through them."
   (gptel-default-mode 'org-mode)
 
   :config
-  (setq gptel-model 'gpt-5-mini)
+  (setq gptel-model 'claude-haiku-4.5)
   (setq gptel-backend (gptel-make-gh-copilot "Copilot"))
 
   (setq-default gptel-include-reasoning nil)
@@ -1751,7 +1755,7 @@ Produces multiple regions so expreg can step through them."
   (org-outline-path-complete-in-steps nil)
 
   :hook
-  (org-mode . js/org-rename-buffer-to-title-enable)
+  (org-mode-hook . js/org-rename-buffer-to-title-enable)
   :bind
   (("C-c l" . org-store-link)
    ("C-c C-l" . ar/org-insert-link-dwim)
@@ -2168,23 +2172,23 @@ Falls back to #+attr_latex :options for backwards compatibility."
 ;;; ** Org visuals
 (use-package org-appear
   :defer t
-  :hook org-mode)
+  :hook org-mode-hook)
 
 (use-package org-superstar
   :defer t
   :custom
   (org-superstar-leading-bullet ?\u2002)
-  :hook org-mode)
+  :hook org-mode-hook)
 
 (use-package org-pretty-table
   :defer t
   :vc (:url "https://github.com/fuco1/org-pretty-table")
-  :hook org-mode)
+  :hook org-mode-hook)
 
 ;;; ** Org edna
 (use-package org-edna
   :defer t
-  :hook org-mode
+  :hook org-mode-hook
   (org-after-todo-state-change . mm/org-insert-trigger)
   (org-after-todo-statistics . org-summary-todo))
 
@@ -2250,7 +2254,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ("C-c n <" . js/org-goto-first-sibling)
 	 ("C-c n s d" . js/org-sort-siblings-by-todo)
          )
-  :hook (org-roam-mode . visual-line-mode)
+  :hook (org-roam-mode-hook . visual-line-mode)
 
   :custom
   (org-roam-completion-everywhere nil)	; It's actually bothersome
@@ -3131,7 +3135,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
   (vulpea-buffer-alias-property "ROAM_ALIASES")
 
   :hook
-  (org-mode . tags/enable-tag-updating)
+  (org-mode-hook . tags/enable-tag-updating)
 
   :config
   (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
@@ -3869,7 +3873,7 @@ _S_manual
 (use-package corg			; Completion for org blocks
   :defer t
   :vc (:url "https://github.com/isamert/corg.el")
-  :hook (org-mode . corg-setup))
+  :hook (org-mode-hook . corg-setup))
 
 ;;; * org-static-blog
 ;;; Blog + Personal website configuration
@@ -4127,8 +4131,8 @@ With C-u C-u: pull static/ from remote."
 (use-package messages-are-flowing
   :defer t
   :hook
-  (message-mode . messages-are-flowing-use-and-mark-hard-newlines)
-  (message-mode . (lambda () (auto-fill-mode -1)))
+  (message-mode-hook . messages-are-flowing-use-and-mark-hard-newlines)
+  (message-mode-hook . (lambda () (auto-fill-mode -1)))
   :bind
   (:map message-mode-map
 	("<return>" . insert-soft-newline)
@@ -4255,10 +4259,10 @@ signature, in that order."
 	 ("V" . elpapers-ingest-full)
 	 ("y" . elfeed-show-yank))
   :hook
-  (elfeed-show-mode . mixed-pitch-mode)
-  (elfeed-show-mode . visual-line-mode)
-  (elfeed-show-mode . efs/org-mode-visual-fill)
-  (elfeed-search-mode . my/setup-elfeed-scroll)
+  (elfeed-show-mode-hook . mixed-pitch-mode)
+  (elfeed-show-mode-hook . visual-line-mode)
+  (elfeed-show-mode-hook-hook . efs/org-mode-visual-fill)
+  (elfeed-search-mode-hook . my/setup-elfeed-scroll)
   :config
   (advice-add 'elfeed-search-clear-filter
 	      :after (lambda () (message "Clearing filter."))))
@@ -5306,9 +5310,9 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
   (setq-default TeX-master nil)
 
   :hook
-  (LaTeX-mode . turn-on-reftex)
-  (LaTeX-mode . visual-line-mode)
-  (LaTeX-mode . turn-on-reftex))
+  (LaTeX-mode-hook . turn-on-reftex)
+  (LaTeX-mode-hook . visual-line-mode)
+  (LaTeX-mode-hook . turn-on-reftex))
 
 ;;; ** CDLaTeX
 (use-package cdlatex
@@ -5478,8 +5482,8 @@ When pressed twice, make the sub/superscript roman."
      ))
 
   :hook
-  (org-mode . org-cdlatex-mode)
-  (LaTeX-mode . turn-on-cdlatex))
+  (org-mode-hook . org-cdlatex-mode)
+  (LaTeX-mode-hook . turn-on-cdlatex))
 
 ;;; ** Math delimiters
 
@@ -5578,14 +5582,13 @@ When pressed twice, make the sub/superscript roman."
     (setq magit-git-executable "/opt/homebrew/bin/git")))
 
 (use-package magit-delta
-  :after magit
-  :hook (magit-mode . magit-delta-mode))
+  :hook (magit-mode-hook . magit-delta-mode))
 
 (use-package hl-todo
-  :hook prog-mode)
+  :hook prog-mode-hook)
 
 (use-package magit-todos
-  :after (magit)
+  :after magit
   :config
   (magit-todos-mode 1))
 
@@ -5619,15 +5622,18 @@ When pressed twice, make the sub/superscript roman."
   (dumb-jump-force-searcher 'rg)
   (dumb-jump-prefer-searcher 'rg)
   (xref-show-definitions-function #'xref-show-definitions-completing-read)
-  :config
-  (add-hook 'xref-backend-functions #'dumb-jump-xref-activate))
+  :init
+  (add-hook 'xref-backend-functions #'dumb-jump-xref-activate)
+  ;; :hook
+  ;; (xref-backend-functions . dumb-jump-xref-activate)
+  )
 
 (use-package flymake
   :defer t
   :ensure nil  ; built-in package
   :hook
-  (prog-mode . flymake-mode)
-  (prog-mode . subword-mode)
+  (prog-mode-hook . flymake-mode)
+  (prog-mode-hook . subword-mode)
   (lisp-interaction-mode . (lambda () (flymake-mode -1)))
   :config
   (setq flymake-diagnostic-format-alist
@@ -5644,27 +5650,31 @@ When pressed twice, make the sub/superscript roman."
 (use-package eglot
   :defer t
   :ensure nil
-  :hook ((python-mode . eglot-ensure)
-         (c-mode . eglot-ensure)
-         (c++-mode . eglot-ensure)
-         (rust-mode . eglot-ensure)
-         ;; (haskell-ts-mode . eglot-ensure)
+  :hook ((python-mode-hook . eglot-ensure)
+         (c-mode-hook . eglot-ensure)
+         (C++-mode-hook . eglot-ensure)
+         (rust-mode-hook . eglot-ensure)
+         ;; (haskell-ts-mode-hook . eglot-ensure)
 	 )
 
   :custom
   (eglot-autoshutdown t)
   (eglot-sync-connect nil))
 
+(use-package eldoc
+  :init
+  (global-eldoc-mode +1))
+
 ;;; ** Lisp
 
 (use-package lisp-mode
   :defer t
-  :ensure nil  ; built-in package
-  :hook ((emacs-lisp-mode . setup-check-parens)
-         (lisp-mode . setup-check-parens)
-         (scheme-mode . setup-check-parens)
-         (clojure-mode . setup-check-parens)
-	 (racket-mode . setup-check-parens))
+  :ensure nil				; built-in package
+  :hook ((emacs-lisp-mode-hook . setup-check-parens)
+         (lisp-mode-hook . setup-check-parens)
+         (scheme-mode-hook . setup-check-parens)
+         (clojure-mode-hook . setup-check-parens)
+	 (racket-mode-hook . setup-check-parens))
   :config
   (defun setup-check-parens ()
     (add-hook 'before-save-hook #'check-parens nil t)))
@@ -5672,10 +5682,10 @@ When pressed twice, make the sub/superscript roman."
 (use-package paredit
   :defer t
   :hook
-  emacs-lisp-mode
-  clojure-mode
-  scheme-mode
-  racket-mode
+  emacs-lisp-mode-hook
+  clojure-mode-hook
+  scheme-mode-hook
+  racket-mode-hook
   :bind
   (:map paredit-mode-map
 	("C-c k" . paredit-copy-as-kill)))
@@ -5702,7 +5712,7 @@ When pressed twice, make the sub/superscript roman."
   (clojure-enable-indent-specs nil)
   (clojure-align-forms-automatically t)
   :hook
-  (clojure-mode . aggressive-indent-mode))
+  (clojure-mode-hook . aggressive-indent-mode))
 
 (use-package cider
   :defer t
@@ -5710,7 +5720,7 @@ When pressed twice, make the sub/superscript roman."
   :custom (cider-edit-jack-in-command t))
 
 (use-package clj-refactor
-  :hook (clojure-mode . clj-refactor-mode)
+  :hook (clojure-mode-hook . clj-refactor-mode)
   :config
   (cljr-add-keybindings-with-prefix "C-c C-m"))
 
@@ -5742,8 +5752,8 @@ When pressed twice, make the sub/superscript roman."
   :ensure t
   :after neocaml
   :hook
-  (neocaml-base-mode . ocaml-eglot-mode)
-  (ocaml-eglot-mode . eglot-ensure)
+  (neocaml-base-mode-hook . ocaml-eglot-mode)
+  (ocaml-eglot-mode-hook . eglot-ensure)
   :config
   (setq ocaml-eglot-syntax-checker 'flymake))
 
@@ -5758,6 +5768,22 @@ When pressed twice, make the sub/superscript roman."
   (load-file
    (let ((coding-system-for-read 'utf-8))
      (shell-command-to-string "agda --emacs-mode locate"))))
+;;; ** Lean
+
+;; The "basic" version which seems heavy etc
+;; (use-package lean4-mode
+;;   :commands lean4-mode
+;;   :vc (:url "https://github.com/leanprover-community/lean4-mode.git"
+;; 	    :rev :last-release
+;; 	    ;; Or, if you prefer the bleeding edge version of Lean4-Mode:
+;; 	    ;; :rev :newest
+;; 	    ))
+
+(use-package nael
+  :mode (("\\.lean\\'" . nael-mode))
+  :hook
+  (nael-mode-hook . abbrev-mode)
+  (nael-mode-hook . eglot-ensure))
 
 ;;; ** Octave
 

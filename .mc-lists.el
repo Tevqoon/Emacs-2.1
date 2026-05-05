@@ -110,6 +110,7 @@
 	org-yank
 	paredit-RET
 	paredit-backward-kill-word
+	paredit-forward-kill-word
 	paredit-raise-sexp
 	phi-search
 	racket-insert-closing
