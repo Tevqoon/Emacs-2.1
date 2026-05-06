@@ -5665,6 +5665,14 @@ When pressed twice, make the sub/superscript roman."
   :init
   (global-eldoc-mode +1))
 
+(use-package eldoc-box
+  :defer t
+  :after eglot
+  :bind (:map eglot-mode-map
+         ("<f1> ," . eldoc-box-help-at-point))
+  :custom
+  (eldoc-box-clear-with-C-g t))
+
 ;;; ** Lisp
 
 (use-package lisp-mode
@@ -5769,15 +5777,6 @@ When pressed twice, make the sub/superscript roman."
    (let ((coding-system-for-read 'utf-8))
      (shell-command-to-string "agda --emacs-mode locate"))))
 ;;; ** Lean
-
-;; The "basic" version which seems heavy etc
-;; (use-package lean4-mode
-;;   :commands lean4-mode
-;;   :vc (:url "https://github.com/leanprover-community/lean4-mode.git"
-;; 	    :rev :last-release
-;; 	    ;; Or, if you prefer the bleeding edge version of Lean4-Mode:
-;; 	    ;; :rev :newest
-;; 	    ))
 
 (use-package nael
   :mode (("\\.lean\\'" . nael-mode))
