@@ -3342,7 +3342,7 @@ Each function is called with two arguments: the tag and the buffer.")
 (use-package anki-editor
   :after org
   :if (not (eq system-type 'android))
-  :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all anki-editor-push-notes
+  :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all anki-editor-push-notes anki/my/after-snippet-tag-handler
   :bind
   (:map org-mode-map
         ("C-c n p" . my/anki-flashcard-push-current-buffer)
@@ -3535,8 +3535,8 @@ See `js/anki-derive-fields' for full hierarchy details."
 (use-package org-agenda
   :commands open-org-agenda
   :ensure nil
-  :bind (("C-c a" . open-org-agenda)
-	 :map org-agenda-mode-map
+  :bind* ("C-c a" . open-org-agenda)
+  :bind (:map org-agenda-mode-map
 	 ("o" . my/ace-link-agenda-current-line)
 	 ("M-o" . my/ace-link-org-agenda-urls)
 	 ;; This one doesn't change the view
@@ -5660,6 +5660,14 @@ When pressed twice, make the sub/superscript roman."
   :custom
   (eglot-autoshutdown t)
   (eglot-sync-connect nil))
+
+(use-package eglot-booster
+  :vc (:url "https://github.com/jdtsmith/eglot-booster")
+  :after eglot
+  :custom
+  (eglot-booster-io-only t) 		; Emacs 30+ has better JSON parsing
+  :config
+  (eglot-booster-mode))
 
 (use-package eldoc
   :init
