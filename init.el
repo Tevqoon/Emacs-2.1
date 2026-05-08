@@ -3809,6 +3809,7 @@ _S_manual
     ("a" org-archive-subtree-default)
     ("s" js/triage-snooze-soon)
     ("l" js/triage-snooze-later)
+    ("<space>" js/triage-snooze-later)
     ("S" js/triage-manual)
     ("t" org-todo)
     ("r" org-node-refile)
@@ -4094,7 +4095,6 @@ With C-u C-u: pull static/ from remote."
 ;;; * Notmuch - email
 
 (use-package notmuch
-  :defer t
   :commands notmuch
   :bind
   ("C-x m" . notmuch)
@@ -4105,12 +4105,7 @@ With C-u C-u: pull static/ from remote."
 	("G" . refresh-email))
   :if (eq system-type 'darwin)
   :config
-  (setq message-send-mail-function 'message-send-mail-with-sendmail
-	sendmail-program "/opt/homebrew/bin/msmtp"
-        message-sendmail-f-is-evil t
-	message-sendmail-extra-arguments '("--read-envelope-from"))
   (setq notmuch-fcc-dirs nil)
-  (setq message-kill-buffer-on-exit t)
 
   (defface notmuch-link
     '((t :foreground "SeaGreen4" :underline t))
@@ -4133,6 +4128,12 @@ With C-u C-u: pull static/ from remote."
 
 (use-package message
   :ensure nil
+  :custom
+  (message-send-mail-function 'message-send-mail-with-sendmail)
+  (sendmail-program "/opt/homebrew/bin/msmtp")
+  (message-sendmail-f-is-evil t)
+  (message-sendmail-extra-arguments '("--read-envelope-from"))
+  (message-kill-buffer-on-exit t)
   :bind
   (:map message-mode-map
 	("<tab>" . js/message-field-forward)
@@ -5465,6 +5466,7 @@ When pressed twice, make the sub/superscript roman."
      (?+  ("\\cup" "\\oplus"))
      (?*  ("\\times" "\\otimes" "\\bullet"))
      (?T ("\\top" "\\bot" "\\Type"))
+     (?L  ("\\Lambda" "\\leadsto"))
      (?t ("\\tau" "\\tan" "\\arctan"))
      (?P ("\\Pi" "\\Prop"))
      (?V ("\\vdash" "\\dashv"))

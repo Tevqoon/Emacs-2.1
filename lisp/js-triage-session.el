@@ -84,6 +84,11 @@
       (recenter)
       (js/triage--show-status))))
 
+(defun js/triage-goto-current ()
+  "Jump to the current triage entry"
+  (interactive)
+  (js/triage--visit-current))
+
 (defun js/triage-goto-next ()
   "Cycle current entry to the back of the queue and show the next."
   (interactive)
