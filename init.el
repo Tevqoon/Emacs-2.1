@@ -1282,68 +1282,68 @@ Produces multiple regions so expreg can step through them."
 	 ("C-c n e n" . deadgrep-search-org-roam)
 	 :map deadgrep-mode-map
 	 ("q" . quit-window--and-kill)
-	 ("M-o" . ace-link-org)))
+	 ("M-o" . ace-link-org))
+  :config
+  (defun deadgrep-search-directory (dir)
+    "Search a specific directory using deadgrep."
+    (let ((deadgrep-project-root-function
+	   (lambda () dir)))
+      (call-interactively #'deadgrep)))
 
-(defun deadgrep-search-directory (dir)
-  "Search a specific directory using deadgrep."
-  (let ((deadgrep-project-root-function
-	 (lambda () dir)))
-    (call-interactively #'deadgrep)))
+  (defun deadgrep-search-org-roam ()
+    "Search all org-roam files."
+    (interactive)
+    (deadgrep-search-directory org-roam-directory))
 
-(defun deadgrep-search-org-roam ()
-  "Search all org-roam files."
-  (interactive)
-  (deadgrep-search-directory org-roam-directory))
+  (defun deadgrep-search-org-roam-dailies ()
+    "Search only org-roam daily journal entries."
+    (interactive)
+    (deadgrep-search-directory
+     (expand-file-name org-roam-dailies-directory org-roam-directory)))
 
-(defun deadgrep-search-org-roam-dailies ()
-  "Search only org-roam daily journal entries."
-  (interactive)
-  (deadgrep-search-directory
-   (expand-file-name org-roam-dailies-directory org-roam-directory)))
+  (defun my/deadgrep-activate-org-links ()
+    "Activate Org links in deadgrep results buffer."
+    (interactive)
+    (when (eq major-mode 'deadgrep-mode)
+      (let ((inhibit-read-only t))
+	;; Make sure org is loaded
+	(require 'org)
 
-(defun my/deadgrep-activate-org-links ()
-  "Activate Org links in deadgrep results buffer."
-  (interactive)
-  (when (eq major-mode 'deadgrep-mode)
-    (let ((inhibit-read-only t))
-      ;; Make sure org is loaded
-      (require 'org)
+	;; Find and process links
+	(save-excursion
+          (goto-char (point-min))
+          (while (re-search-forward org-link-bracket-re nil t)
+            (let* ((start (match-beginning 0))
+                   (end (match-end 0))
+                   (link-text (buffer-substring-no-properties start end))
+                   (path (match-string-no-properties 1))
+                   (desc (or (match-string-no-properties 2) path))
+                   (overlay (make-overlay start end)))
 
-      ;; Find and process links
-      (save-excursion
-        (goto-char (point-min))
-        (while (re-search-forward org-link-bracket-re nil t)
-          (let* ((start (match-beginning 0))
-                 (end (match-end 0))
-                 (link-text (buffer-substring-no-properties start end))
-                 (path (match-string-no-properties 1))
-                 (desc (or (match-string-no-properties 2) path))
-                 (overlay (make-overlay start end)))
+              ;; Apply the link face
+              (overlay-put overlay 'face 'org-link)
+              (overlay-put overlay 'mouse-face 'highlight)
 
-            ;; Apply the link face
-            (overlay-put overlay 'face 'org-link)
-            (overlay-put overlay 'mouse-face 'highlight)
+              ;; Make it clickable using org's machinery
+              (overlay-put overlay 'help-echo
+                           (concat "Link: " path "\nMouse-1: Open link"))
+              (overlay-put overlay 'keymap
+                           (let ((map (make-sparse-keymap)))
+                             (define-key map [mouse-1]
+					 (lambda ()
+					   (interactive)
+					   (save-excursion
+					     (org-link-open-from-string link-text))))
+                             (define-key map (kbd "RET")
+					 (lambda ()
+					   (interactive)
+					   (save-excursion
+					     (org-link-open-from-string link-text))))
+                             map))
 
-            ;; Make it clickable using org's machinery
-            (overlay-put overlay 'help-echo
-                         (concat "Link: " path "\nMouse-1: Open link"))
-            (overlay-put overlay 'keymap
-                         (let ((map (make-sparse-keymap)))
-                           (define-key map [mouse-1]
-				       (lambda ()
-					 (interactive)
-					 (save-excursion
-					   (org-link-open-from-string link-text))))
-                           (define-key map (kbd "RET")
-				       (lambda ()
-					 (interactive)
-					 (save-excursion
-					   (org-link-open-from-string link-text))))
-                           map))
-
-            ;; Only display the description if different from path
-            (when (and desc (not (string= desc path)))
-	      (overlay-put overlay 'display desc))))))))
+              ;; Only display the description if different from path
+              (when (and desc (not (string= desc path)))
+		(overlay-put overlay 'display desc)))))))))
 
 (use-package wgrep
   :defer t
@@ -3610,13 +3610,14 @@ See `js/anki-derive-fields' for full hierarchy details."
 		    (org-agenda-overriding-header "* Lower-priority:")))
 	     (todo "COURSE" ((org-agenda-overriding-header "* Active courses: ")))
 	     (todo "EXAM" ((org-agenda-overriding-header "* Looming exams: ")
-			   (org-agenda-sorting-strategy '(deadline-up))))
+			   (org-agenda-sorting-strategy '(deadline-up))
+			   (org-agenda-prefix-format " %i %-12:c%(js/agenda-exam-deadline-str) ")))
 
 	     (todo "PROJECT" ((org-agenda-overriding-header "* Projects: ")))
 	     (agenda "" ((org-agenda-span 'week)
 			 (org-agenda-skip-function
 			  '(or (org-agenda-skip-entry-if 'todo 'done)
-			       (org-agenda-skip-entry-if 'todo '("PROCESS" "EXPLORE"))))))
+			       (org-agenda-skip-entry-if 'todo '("PROCESS" "EXPLORE" "EXAM" "HOLD"))))))
 	     (todo "FINISH" ((org-agenda-overriding-header "* Items to finish up:  ")
 			     (org-agenda-sorting-strategy '(scheduled-up category-up alpha-up))))
 	     (todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")
@@ -3628,6 +3629,7 @@ See `js/anki-derive-fields' for full hierarchy details."
 				(air-org-skip-subtree-if-priority ?A)
 				(air-org-skip-subtree-if-priority ?B)
 				(air-org-skip-if-blocked)
+				(js/org-skip-if-future)
 				(org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISH" "PACT"))
 				(js/org-skip-if-ancestor-blocked '("ACTIVE" "PROJECT"))
 				))
@@ -3644,6 +3646,16 @@ See `js/anki-derive-fields' for full hierarchy details."
 
   (add-to-list 'warning-suppress-types '(org-element))
 
+  (defun js/agenda-exam-deadline-str ()
+    (let ((dl (org-entry-get (point) "DEADLINE")))
+      (if dl
+          (let* ((time (org-time-string-to-time dl))
+		 (days (- (time-to-days time)
+                          (time-to-days (current-time)))))
+            (format "%8s %s"
+                    (format "In %dd: " days)
+                    (format-time-string "%e. %b" time)))
+	"                ")))
 
   (defun roam-agenda-files-update (&rest _)
     (interactive)
