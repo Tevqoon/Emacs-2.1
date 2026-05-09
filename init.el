@@ -3669,7 +3669,6 @@ See `js/anki-derive-fields' for full hierarchy details."
     (if arg
 	(call-interactively 'org-agenda)
       (org-agenda nil "d")))
-
   )
 
 (defun air-org-skip-subtree-if-priority (priority)
@@ -4227,6 +4226,7 @@ signature, in that order."
 	:description description)))))
 
 ;;; * Elfeed
+
 ;;; ** Basic configuration
 (use-package elfeed
   :defer t
@@ -5664,6 +5664,9 @@ When pressed twice, make the sub/superscript roman."
 
 (use-package eglot
   :defer t
+  :bind (:map eglot-mode-map
+	 ("C-c e a" . eglot-code-actions)
+	 )
   :ensure nil
   :hook ((python-mode-hook . eglot-ensure)
          (c-mode-hook . eglot-ensure)
@@ -5695,6 +5698,19 @@ When pressed twice, make the sub/superscript roman."
          ("<f1> ," . eldoc-box-help-at-point))
   :custom
   (eldoc-box-clear-with-C-g t))
+
+;;; ** Harper
+;; Seems more annoying than not
+;; (when (and (equal system-type 'darwin)
+;; 	   (locate-file "harper-ls" exec-path))
+;;   (with-eval-after-load 'eglot
+;;     (add-to-list 'eglot-server-programs
+;; 		 '((org-mode :language-id "org") . ("harper-ls" "--stdio"))))
+
+;;   ;; (setq-default eglot-workspace-configuration
+;;   ;; 		'(:harper-ls (:dialect "Australian")))
+
+;;   (add-hook 'org-mode-hook 'eglot-ensure))
 
 ;;; ** Lisp
 

@@ -6,11 +6,27 @@
 (defvar elfeed-summary-response-overlay nil
   "Overlay for displaying GPTel streaming responses dynamically.")
 
-(defcustom elfeed-summary-prompts '(("One sentence summary" . "Summarize this article in one clear and factual sentence, capturing the core message without repeating the title.")
-                                     ("General summary" . "Summarize the key points of this article in a clear and concise manner, highlighting the main arguments, findings, and conclusions.")
-                                     ("Bullet list summary" . "Provide a bullet-point summary of the main takeaways from this article. Answer only in bullets!")
-                                     ("Objective vs. Opinion analysis" . "Summarize this article by separating objective facts from the author's opinions, clearly distinguishing the two.")
-                                     ("Simplified summary" . "Summarize this article in simple, easy-to-understand language as if explaining to a non-expert."))
+(defcustom elfeed-summary-prompts '(("Decide to read" . "Assess this article:
+- **Category:** News/Analysis/Opinion/Tutorial/Technical/Other
+- **Information value:** High (novel insights, deep expertise, strong evidence) | Medium | Low (common knowledge, surface-level, promotional)
+- **Worth reading:** Yes/No and why
+- **Key points:** 3-5 specific takeaways
+
+Be direct about whether this deserves your attention.")
+                                    ("Short summary" . "Summarize in under 150 words:
+- Main argument or finding
+- Supporting evidence or data
+- Practical implications or actionability
+
+Be specific, avoid vague phrasing. Then assess: substantive for your information diet, or noise?")
+                                    ("Comprehensive summary" . "Provide detailed coverage:
+- **Main argument:** Core claim and context
+- **Evidence & findings:** Key data or research backing it
+- **Practical implications:** What can be applied or acted upon
+- **Limitations & gaps:** Unsupported claims or missing context
+- **Source quality:** Author credibility and evidence rigor
+
+Then assess: Does this merit deep engagement for your information diet?"))
   "Prompts for entry summaries."
   :type 'alist
   :group 'elfeed)
