@@ -121,22 +121,17 @@ text after the block type on the #+begin_ line:
 
 (defun js/anki-derive-fields (heading body explicit-front explicit-hint explicit-back)
   "Derive Anki (Front Hint Back) fields from an org entry.
-
 Arguments:
   HEADING        raw heading string (no tags/todo/priority)
   BODY           raw org string between the heading and its first subheading
   EXPLICIT-FRONT content of a '** Front' subheading, or nil
   EXPLICIT-HINT  content of a '** Hint' subheading, or nil
   EXPLICIT-BACK  content of a '** Back' subheading, or nil
-
 Returns a plist (:front STRING :hint STRING :back STRING).
-
 Examples:
-
-  ;; Block-based note, title from #+attr_latex
+  ;; Block-based note, heading becomes Front
   ;;
   ;;   ** Nondeterministic TM accepts L
-  ;;   #+attr_latex: :options [Acceptance Condition]
   ;;   #+begin_theorem
   ;;   A NTM accepts L if all branches ...
   ;;   #+end_theorem
@@ -144,11 +139,10 @@ Examples:
   ;;   By induction on ...
   ;;   #+end_proof
   ;;
-  ;; -> Front: \"Acceptance Condition\"
+  ;; -> Front: \"Nondeterministic TM accepts L\"
   ;;    Hint:  \"A NTM accepts L if all branches ...\"
   ;;    Back:  \"By induction on ...\"
-
-  ;; Definition note, no attr_latex, heading becomes Front
+  ;; Definition note, heading becomes Front
   ;;
   ;;   ** Definition: NTM
   ;;   #+begin_definition
@@ -158,41 +152,33 @@ Examples:
   ;; -> Front: \"Definition: NTM\"
   ;;    Hint:  \"A NTM has transition function ...\"
   ;;    Back:  \"\" (no proof, no residual)
-
   ;; Explicit subheadings always win regardless of blocks
   ;;
   ;;   ** Some heading
   ;;   #+begin_theorem ... #+end_theorem
+  ;;   ** Front
+  ;;   Override front text.
   ;;   ** Hint
   ;;   Override hint text.
   ;;
-  ;; -> Hint: \"Override hint text.\""
+  ;; -> Front: \"Override front text.\"
+  ;;    Hint:  \"Override hint text.\""
   (let* ((parsed   (js/anki-parse-body body))
          (blocks   (plist-get parsed :blocks))
          (residual (plist-get parsed :residual))
          (has-blocks (not (null blocks)))
-
          ;; Locate blocks by role
          (hint-block    (js/anki--find-block blocks js/anki-hint-block-types))
          (hint-fb-block (js/anki--find-block blocks js/anki-hint-fallback-block-types))
          (back-blocks   (js/anki--blocks-of-types blocks js/anki-back-block-types))
-
-         ;; Primary block = first hint-type or hint-fallback block.
-         ;; Its :options is the preferred Front title.
-         (primary-block (or hint-block hint-fb-block))
-         (block-title   (and primary-block (plist-get primary-block :options)))
-
          ;; --- Front ---
          (front (or explicit-front
-                    block-title
                     heading))
-
          ;; --- Hint ---
          (hint (or explicit-hint
                    (and hint-block    (plist-get hint-block    :content))
                    (and hint-fb-block (plist-get hint-fb-block :content))
                    ""))
-
          ;; --- Back ---
          (back
           (or explicit-back
@@ -203,7 +189,6 @@ Examples:
                                  (list residual)))
                 ;; No special blocks at all: use raw body
                 body))))
-
     (list :front front
           :hint  hint
           :back  (if (string-empty-p (string-trim back)) "" back))))

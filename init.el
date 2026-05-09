@@ -5005,7 +5005,13 @@ If none of the selected entries are downloaded, a message is shown."
     (setq elfeed-search-print-entry-function #'elfeed-score-print-entry)
     (elfeed-score-enable)
     (define-key elfeed-search-mode-map "=" elfeed-score-map)))
+;;; ** Elfeed summaries
 
+(use-package elfeed-summary
+  :after elfeed
+  :load-path "~/.emacs.d/lisp"
+  :bind (:map elfeed-show-mode-map
+	      ("?" . elfeed-summary)))
 ;;; * Annotation importer
 
 (use-package org-roam-annotation-import
