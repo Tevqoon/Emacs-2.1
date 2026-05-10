@@ -186,10 +186,10 @@ are defining or executing a macro."
   (auto-save-visited-mode 1)
   (setq auto-save-visited-interval 30))	; Save every 30 seconds
 
-;; (use-package gcmh
-;;   :ensure t
-;;   :init
-;;   (gcmh-mode 1))
+(use-package gcmh
+  :ensure t
+  :init
+  (gcmh-mode 1))
 
 (use-package emacs-everywhere
   :bind
@@ -1282,68 +1282,68 @@ Produces multiple regions so expreg can step through them."
 	 ("C-c n e n" . deadgrep-search-org-roam)
 	 :map deadgrep-mode-map
 	 ("q" . quit-window--and-kill)
-	 ("M-o" . ace-link-org)))
+	 ("M-o" . ace-link-org))
+  :config
+  (defun deadgrep-search-directory (dir)
+    "Search a specific directory using deadgrep."
+    (let ((deadgrep-project-root-function
+	   (lambda () dir)))
+      (call-interactively #'deadgrep)))
 
-(defun deadgrep-search-directory (dir)
-  "Search a specific directory using deadgrep."
-  (let ((deadgrep-project-root-function
-	 (lambda () dir)))
-    (call-interactively #'deadgrep)))
+  (defun deadgrep-search-org-roam ()
+    "Search all org-roam files."
+    (interactive)
+    (deadgrep-search-directory org-roam-directory))
 
-(defun deadgrep-search-org-roam ()
-  "Search all org-roam files."
-  (interactive)
-  (deadgrep-search-directory org-roam-directory))
+  (defun deadgrep-search-org-roam-dailies ()
+    "Search only org-roam daily journal entries."
+    (interactive)
+    (deadgrep-search-directory
+     (expand-file-name org-roam-dailies-directory org-roam-directory)))
 
-(defun deadgrep-search-org-roam-dailies ()
-  "Search only org-roam daily journal entries."
-  (interactive)
-  (deadgrep-search-directory
-   (expand-file-name org-roam-dailies-directory org-roam-directory)))
+  (defun my/deadgrep-activate-org-links ()
+    "Activate Org links in deadgrep results buffer."
+    (interactive)
+    (when (eq major-mode 'deadgrep-mode)
+      (let ((inhibit-read-only t))
+	;; Make sure org is loaded
+	(require 'org)
 
-(defun my/deadgrep-activate-org-links ()
-  "Activate Org links in deadgrep results buffer."
-  (interactive)
-  (when (eq major-mode 'deadgrep-mode)
-    (let ((inhibit-read-only t))
-      ;; Make sure org is loaded
-      (require 'org)
+	;; Find and process links
+	(save-excursion
+          (goto-char (point-min))
+          (while (re-search-forward org-link-bracket-re nil t)
+            (let* ((start (match-beginning 0))
+                   (end (match-end 0))
+                   (link-text (buffer-substring-no-properties start end))
+                   (path (match-string-no-properties 1))
+                   (desc (or (match-string-no-properties 2) path))
+                   (overlay (make-overlay start end)))
 
-      ;; Find and process links
-      (save-excursion
-        (goto-char (point-min))
-        (while (re-search-forward org-link-bracket-re nil t)
-          (let* ((start (match-beginning 0))
-                 (end (match-end 0))
-                 (link-text (buffer-substring-no-properties start end))
-                 (path (match-string-no-properties 1))
-                 (desc (or (match-string-no-properties 2) path))
-                 (overlay (make-overlay start end)))
+              ;; Apply the link face
+              (overlay-put overlay 'face 'org-link)
+              (overlay-put overlay 'mouse-face 'highlight)
 
-            ;; Apply the link face
-            (overlay-put overlay 'face 'org-link)
-            (overlay-put overlay 'mouse-face 'highlight)
+              ;; Make it clickable using org's machinery
+              (overlay-put overlay 'help-echo
+                           (concat "Link: " path "\nMouse-1: Open link"))
+              (overlay-put overlay 'keymap
+                           (let ((map (make-sparse-keymap)))
+                             (define-key map [mouse-1]
+					 (lambda ()
+					   (interactive)
+					   (save-excursion
+					     (org-link-open-from-string link-text))))
+                             (define-key map (kbd "RET")
+					 (lambda ()
+					   (interactive)
+					   (save-excursion
+					     (org-link-open-from-string link-text))))
+                             map))
 
-            ;; Make it clickable using org's machinery
-            (overlay-put overlay 'help-echo
-                         (concat "Link: " path "\nMouse-1: Open link"))
-            (overlay-put overlay 'keymap
-                         (let ((map (make-sparse-keymap)))
-                           (define-key map [mouse-1]
-				       (lambda ()
-					 (interactive)
-					 (save-excursion
-					   (org-link-open-from-string link-text))))
-                           (define-key map (kbd "RET")
-				       (lambda ()
-					 (interactive)
-					 (save-excursion
-					   (org-link-open-from-string link-text))))
-                           map))
-
-            ;; Only display the description if different from path
-            (when (and desc (not (string= desc path)))
-	      (overlay-put overlay 'display desc))))))))
+              ;; Only display the description if different from path
+              (when (and desc (not (string= desc path)))
+		(overlay-put overlay 'display desc)))))))))
 
 (use-package wgrep
   :defer t
@@ -1647,6 +1647,8 @@ Produces multiple regions so expreg can step through them."
 	      :map wdired-mode-map
 	      ("C-a" . js/dired-smart-bol)
               ("C-e" . js/dired-smart-eol))
+  :custom
+  (wdired-use-dired-vertical-movement 'sometimes)
   :config
   (require 'wdired)
   (when (eq system-type 'darwin)
@@ -2022,12 +2024,10 @@ Handles both |*abc*| and *|abc|* cases. Otherwise behave like self-insert."
 ;;; ** exporting
 ;;; TODO: Move the ox configs with heading splicing to a module
 (use-package js-ox-strip-heading	; Spliced exports
-  :defer t
   :load-path "~/.emacs.d/lisp/"
   :after ox)
 
 (use-package ox
-  :defer t
   :after org
   :ensure nil
   :custom
@@ -2051,109 +2051,109 @@ Handles both |*abc*| and *|abc|* cases. Otherwise behave like self-insert."
   (defcustom js/ox-html-blocks-open-by-default nil
     "If non-nil, collapsible theorem blocks start in the open state."
     :type 'boolean
-    :group 'js-ox))
+    :group 'js-ox)
 
-(defun js/ox-html-headline (headline contents info)
-  "Transcode HEADLINE to HTML, optionally wrapping in <details>."
-  (unless (org-element-property :footnote-section-p headline)
-    (let* ((numberedp  (org-export-numbered-headline-p headline info))
-           (numbers    (org-export-get-headline-number headline info))
-           (level      (+ (org-export-get-relative-level headline info)
-                          (1- (plist-get info :html-toplevel-hlevel))))
-           (todo       (and (plist-get info :with-todo-keywords)
-                            (let ((todo (org-element-property :todo-keyword headline)))
-                              (and todo (org-export-data todo info)))))
-           (todo-type  (and todo (org-element-property :todo-type headline)))
-           (priority   (and (plist-get info :with-priority)
-                            (org-element-property :priority headline)))
-           (text       (org-export-data (org-element-property :title headline) info))
-           (tags       (and (plist-get info :with-tags)
-                            (org-export-get-tags headline info)))
-           (full-text  (funcall (plist-get info :html-format-headline-function)
-                                todo todo-type priority text tags info))
-           (contents   (or contents ""))
-           (id         (org-html--reference headline info))
-           (formatted-text
-            (if (plist-get info :html-self-link-headlines)
-                (format "<a href=\"#%s\">%s</a>" id full-text)
-              full-text)))
-      (if (org-export-low-level-p headline info)
-          ;; Deep subtree: delegate to default list-item rendering
-          (org-html-headline headline contents info)
-        ;; Standard headline
-        (let* ((extra-class   (org-element-property :HTML_CONTAINER_CLASS headline))
-               (headline-class (org-element-property :HTML_HEADLINE_CLASS headline))
-               (first-content (car (org-element-contents headline)))
-               (section-contents
-                (if (org-element-type-p first-content 'section)
-                    contents
-                  (concat (org-html-section first-content "" info) contents)))
-               (open-attr (if js/ox-html-headlines-open-by-default " open" "")))
-          (if js/ox-html-collapsible-headlines
-              (format "<%s id=\"%s\" class=\"%s\">\n<details%s>\n<summary>\n<h%d id=\"%s\"%s>%s</h%d>\n</summary>\n%s\n</details>\n</%s>\n"
-                      (org-html--container headline info)
-                      (format "outline-container-%s" id)
-                      (concat (format "outline-%d" level)
-                              (and extra-class " ")
-                              extra-class)
-                      open-attr
-                      level
-                      id
-                      (if headline-class (format " class=\"%s\"" headline-class) "")
-                      (concat
-                       (and numberedp
-                            (format "<span class=\"section-number-%d\">%s</span> "
-                                    level
-                                    (concat (mapconcat #'number-to-string numbers ".") ".")))
-                       formatted-text)
-                      level
-                      section-contents
-                      (org-html--container headline info))
-            ;; Collapsible disabled: fall through to default
-            (org-html-headline headline contents info)))))))
+  (defun js/ox-html-headline (headline contents info)
+    "Transcode HEADLINE to HTML, optionally wrapping in <details>."
+    (unless (org-element-property :footnote-section-p headline)
+      (let* ((numberedp  (org-export-numbered-headline-p headline info))
+             (numbers    (org-export-get-headline-number headline info))
+             (level      (+ (org-export-get-relative-level headline info)
+                            (1- (plist-get info :html-toplevel-hlevel))))
+             (todo       (and (plist-get info :with-todo-keywords)
+                              (let ((todo (org-element-property :todo-keyword headline)))
+				(and todo (org-export-data todo info)))))
+             (todo-type  (and todo (org-element-property :todo-type headline)))
+             (priority   (and (plist-get info :with-priority)
+                              (org-element-property :priority headline)))
+             (text       (org-export-data (org-element-property :title headline) info))
+             (tags       (and (plist-get info :with-tags)
+                              (org-export-get-tags headline info)))
+             (full-text  (funcall (plist-get info :html-format-headline-function)
+                                  todo todo-type priority text tags info))
+             (contents   (or contents ""))
+             (id         (org-html--reference headline info))
+             (formatted-text
+              (if (plist-get info :html-self-link-headlines)
+                  (format "<a href=\"#%s\">%s</a>" id full-text)
+		full-text)))
+	(if (org-export-low-level-p headline info)
+            ;; Deep subtree: delegate to default list-item rendering
+            (org-html-headline headline contents info)
+          ;; Standard headline
+          (let* ((extra-class   (org-element-property :HTML_CONTAINER_CLASS headline))
+		 (headline-class (org-element-property :HTML_HEADLINE_CLASS headline))
+		 (first-content (car (org-element-contents headline)))
+		 (section-contents
+                  (if (org-element-type-p first-content 'section)
+                      contents
+                    (concat (org-html-section first-content "" info) contents)))
+		 (open-attr (if js/ox-html-headlines-open-by-default " open" "")))
+            (if js/ox-html-collapsible-headlines
+		(format "<%s id=\"%s\" class=\"%s\">\n<details%s>\n<summary>\n<h%d id=\"%s\"%s>%s</h%d>\n</summary>\n%s\n</details>\n</%s>\n"
+			(org-html--container headline info)
+			(format "outline-container-%s" id)
+			(concat (format "outline-%d" level)
+				(and extra-class " ")
+				extra-class)
+			open-attr
+			level
+			id
+			(if headline-class (format " class=\"%s\"" headline-class) "")
+			(concat
+			 (and numberedp
+                              (format "<span class=\"section-number-%d\">%s</span> "
+                                      level
+                                      (concat (mapconcat #'number-to-string numbers ".") ".")))
+			 formatted-text)
+			level
+			section-contents
+			(org-html--container headline info))
+              ;; Collapsible disabled: fall through to default
+              (org-html-headline headline contents info)))))))
 
-(defun js/ox-html-special-block (special-block contents info)
-  "Transcode SPECIAL-BLOCK to HTML, injecting a title from :parameters if present."
-  (let* ((type  (downcase (org-element-property :type special-block)))
-         (title (org-element-property :parameters special-block))
-         (id    (org-export-get-reference special-block info))
-         (inner (or contents "")))
-    (format "<div class=\"%s\" id=\"%s\">\n%s%s</div>"
-            type id
-            (if title (format "<span class=\"block-title\">%s</span>\n" title) "")
-            inner)))
+  (defun js/ox-html-special-block (special-block contents info)
+    "Transcode SPECIAL-BLOCK to HTML, injecting a title from :parameters if present."
+    (let* ((type  (downcase (org-element-property :type special-block)))
+           (title (org-element-property :parameters special-block))
+           (id    (org-export-get-reference special-block info))
+           (inner (or contents "")))
+      (format "<div class=\"%s\" id=\"%s\">\n%s%s</div>"
+              type id
+              (if title (format "<span class=\"block-title\">%s</span>\n" title) "")
+              inner)))
 
-(defun js/ox-latex-special-block (special-block contents info)
-  "Transcode SPECIAL-BLOCK to LaTeX, using :parameters for the optional title.
+  (defun js/ox-latex-special-block (special-block contents info)
+    "Transcode SPECIAL-BLOCK to LaTeX, using :parameters for the optional title.
 Falls back to #+attr_latex :options for backwards compatibility."
-  (let* ((type  (org-element-property :type special-block))
-         (params (org-element-property :parameters special-block))
-         (opt   (or (and params (format "[%s]" params))
-                    (org-export-read-attribute :attr_latex special-block :options)
-                    ""))
-         (caption (org-latex--caption/label-string special-block info))
-         (caption-above-p (org-latex--caption-above-p special-block info)))
-    (concat (format "\\begin{%s}%s\n" type opt)
-            (and caption-above-p caption)
-            contents
-            (and (not caption-above-p) caption)
-            (format "\\end{%s}" type))))
+    (let* ((type  (org-element-property :type special-block))
+           (params (org-element-property :parameters special-block))
+           (opt   (or (and params (format "[%s]" params))
+                      (org-export-read-attribute :attr_latex special-block :options)
+                      ""))
+           (caption (org-latex--caption/label-string special-block info))
+           (caption-above-p (org-latex--caption-above-p special-block info)))
+      (concat (format "\\begin{%s}%s\n" type opt)
+              (and caption-above-p caption)
+              contents
+              (and (not caption-above-p) caption)
+              (format "\\end{%s}" type))))
 
-(with-eval-after-load 'ox-html
-  (setf (alist-get 'special-block
-                   (org-export-backend-transcoders
-                    (org-export-get-backend 'html)))
-        #'js/ox-html-special-block)
-  (setf (alist-get 'headline
-                   (org-export-backend-transcoders
-                    (org-export-get-backend 'html)))
-        #'js/ox-html-headline))
+  (with-eval-after-load 'ox-html
+    (setf (alist-get 'special-block
+                     (org-export-backend-transcoders
+                      (org-export-get-backend 'html)))
+          #'js/ox-html-special-block)
+    (setf (alist-get 'headline
+                     (org-export-backend-transcoders
+                      (org-export-get-backend 'html)))
+          #'js/ox-html-headline))
 
-(with-eval-after-load 'ox-latex
-  (setf (alist-get 'special-block
-                   (org-export-backend-transcoders
-                    (org-export-get-backend 'latex)))
-        #'js/ox-latex-special-block))
+  (with-eval-after-load 'ox-latex
+    (setf (alist-get 'special-block
+                     (org-export-backend-transcoders
+                      (org-export-get-backend 'latex)))
+          #'js/ox-latex-special-block)))
 
 ;;; ** Org-download
 
@@ -2954,7 +2954,6 @@ you can catch it with `condition-case'."
 ;;; ** Org-transclusion
 
 (use-package org-transclusion
-  :ensure t
   :after org
   :bind
   (("<f12>" . org-transclusion-add)
@@ -3342,7 +3341,7 @@ Each function is called with two arguments: the tag and the buffer.")
 (use-package anki-editor
   :after org
   :if (not (eq system-type 'android))
-  :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all anki-editor-push-notes
+  :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all anki-editor-push-notes anki/my/after-snippet-tag-handler
   :bind
   (:map org-mode-map
         ("C-c n p" . my/anki-flashcard-push-current-buffer)
@@ -3535,8 +3534,8 @@ See `js/anki-derive-fields' for full hierarchy details."
 (use-package org-agenda
   :commands open-org-agenda
   :ensure nil
-  :bind (("C-c a" . open-org-agenda)
-	 :map org-agenda-mode-map
+  :bind* ("C-c a" . open-org-agenda)
+  :bind (:map org-agenda-mode-map
 	 ("o" . my/ace-link-agenda-current-line)
 	 ("M-o" . my/ace-link-org-agenda-urls)
 	 ;; This one doesn't change the view
@@ -3611,13 +3610,14 @@ See `js/anki-derive-fields' for full hierarchy details."
 		    (org-agenda-overriding-header "* Lower-priority:")))
 	     (todo "COURSE" ((org-agenda-overriding-header "* Active courses: ")))
 	     (todo "EXAM" ((org-agenda-overriding-header "* Looming exams: ")
-			   (org-agenda-sorting-strategy '(deadline-up))))
+			   (org-agenda-sorting-strategy '(deadline-up))
+			   (org-agenda-prefix-format " %i %-12:c%(js/agenda-exam-deadline-str) ")))
 
 	     (todo "PROJECT" ((org-agenda-overriding-header "* Projects: ")))
 	     (agenda "" ((org-agenda-span 'week)
 			 (org-agenda-skip-function
 			  '(or (org-agenda-skip-entry-if 'todo 'done)
-			       (org-agenda-skip-entry-if 'todo '("PROCESS" "EXPLORE"))))))
+			       (org-agenda-skip-entry-if 'todo '("PROCESS" "EXPLORE" "EXAM" "HOLD"))))))
 	     (todo "FINISH" ((org-agenda-overriding-header "* Items to finish up:  ")
 			     (org-agenda-sorting-strategy '(scheduled-up category-up alpha-up))))
 	     (todo "PROCESS" ((org-agenda-overriding-header "* To process:  ")
@@ -3629,6 +3629,7 @@ See `js/anki-derive-fields' for full hierarchy details."
 				(air-org-skip-subtree-if-priority ?A)
 				(air-org-skip-subtree-if-priority ?B)
 				(air-org-skip-if-blocked)
+				(js/org-skip-if-future)
 				(org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISH" "PACT"))
 				(js/org-skip-if-ancestor-blocked '("ACTIVE" "PROJECT"))
 				))
@@ -3645,6 +3646,16 @@ See `js/anki-derive-fields' for full hierarchy details."
 
   (add-to-list 'warning-suppress-types '(org-element))
 
+  (defun js/agenda-exam-deadline-str ()
+    (let ((dl (org-entry-get (point) "DEADLINE")))
+      (if dl
+          (let* ((time (org-time-string-to-time dl))
+		 (days (- (time-to-days time)
+                          (time-to-days (current-time)))))
+            (format "%8s %s"
+                    (format "In %dd: " days)
+                    (format-time-string "%e. %b" time)))
+	"                ")))
 
   (defun roam-agenda-files-update (&rest _)
     (interactive)
@@ -3658,7 +3669,6 @@ See `js/anki-derive-fields' for full hierarchy details."
     (if arg
 	(call-interactively 'org-agenda)
       (org-agenda nil "d")))
-
   )
 
 (defun air-org-skip-subtree-if-priority (priority)
@@ -3810,6 +3820,7 @@ _S_manual
     ("a" org-archive-subtree-default)
     ("s" js/triage-snooze-soon)
     ("l" js/triage-snooze-later)
+    ("<space>" js/triage-snooze-later)
     ("S" js/triage-manual)
     ("t" org-todo)
     ("r" org-node-refile)
@@ -3817,9 +3828,6 @@ _S_manual
     ("R" js/roamify-url-at-point :exit t)
     ("o" open-urls-at-point-or-region)
     ("q" js/triage-quit :color blue)))
-
-
-
 
 ;;; ** Babel
 
@@ -4029,79 +4037,75 @@ _S_manual
   ;; Hook into the render function
   (advice-add 'org-static-blog-render-post-content :before #'my/setup-blog-backend)
 
-  )
+  (defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page" "draft")
+    "Tags used for file management that shouldn't appear on the blog.")
 
-(defvar orb-ignored-tags '("blog" "note" "project" "flashcards" "blog-static-page" "draft")
-  "Tags used for file management that shouldn't appear on the blog.")
+  (defvar blog-tags '("blog")
+    "Org-roam tags that mark nodes as published blog posts.")
 
-(defvar blog-tags '("blog")
-  "Org-roam tags that mark nodes as published blog posts.")
+  (defvar static-tags '("blog-static-page" "draft" "lecture-notes")
+    "Org-roam tags that mark nodes as static pages, drafts, or lecture notes.")
 
-(defvar static-tags '("blog-static-page" "draft" "lecture-notes")
-  "Org-roam tags that mark nodes as static pages, drafts, or lecture notes.")
-
-(defun js/tags->or-clause (tags)
-  "Build an emacsql :where clause matching tags:tag against any tag in TAGS.
+  (defun js/tags->or-clause (tags)
+    "Build an emacsql :where clause matching tags:tag against any tag in TAGS.
 Returns e.g. (or (= tags:tag \"blog\") (= tags:tag \"note\"))."
-  (cons 'or (mapcar (lambda (tag) `(= tags:tag ,tag)) tags)))
+    (cons 'or (mapcar (lambda (tag) `(= tags:tag ,tag)) tags)))
 
-(defun my/org-static-blog-link (link desc info)
-  "Transcode ID links to proper blog post URLs.
+  (defun my/org-static-blog-link (link desc info)
+    "Transcode ID links to proper blog post URLs.
 Falls back to standard org-html-link for other link types."
-  (if (not (string= (org-element-property :type link) "id"))
-      (org-html-link link desc info)
-    (let* ((id (org-element-property :path link))
-           (node (org-roam-node-from-id id))
-           (tags (and node (org-roam-node-tags node)))
-           (published-p (and tags (seq-intersection tags (append blog-tags static-tags))))
-           (fallback-desc (if node (org-roam-node-title node) id)))
-      (if published-p
-          (format "<a href=\"/%s\">%s</a>"
-                  (org-static-blog-get-post-public-path (org-roam-node-file node))
-                  (or desc (org-roam-node-title node)))
-        (format "<a href=\"broken-link.html\" class=\"broken-link\">%s</a>"
-                (or desc fallback-desc))))))
+    (if (not (string= (org-element-property :type link) "id"))
+	(org-html-link link desc info)
+      (let* ((id (org-element-property :path link))
+             (node (org-roam-node-from-id id))
+             (tags (and node (org-roam-node-tags node)))
+             (published-p (and tags (seq-intersection tags (append blog-tags static-tags))))
+             (fallback-desc (if node (org-roam-node-title node) id)))
+	(if published-p
+            (format "<a href=\"/%s\">%s</a>"
+                    (org-static-blog-get-post-public-path (org-roam-node-file node))
+                    (or desc (org-roam-node-title node)))
+          (format "<a href=\"broken-link.html\" class=\"broken-link\">%s</a>"
+                  (or desc fallback-desc))))))
 
-;; Redefine the backend every time before rendering
-(defun my/setup-blog-backend (&rest _args)
-  "Ensure our custom link and tikzcd handlers are in the backend."
-  (org-export-define-derived-backend 'org-static-blog-post-bare 'html
-    :translate-alist '((template . (lambda (contents info) contents))
-                       (link . my/org-static-blog-link))))
+  ;; Redefine the backend every time before rendering
+  (defun my/setup-blog-backend (&rest _args)
+    "Ensure our custom link and tikzcd handlers are in the backend."
+    (org-export-define-derived-backend 'org-static-blog-post-bare 'html
+      :translate-alist '((template . (lambda (contents info) contents))
+			 (link . my/org-static-blog-link))))
 
-(defun js/sync-blog (arg)
-  "Sync blog to muffalo server via Makefile targets.
+  (defun js/sync-blog (arg)
+    "Sync blog to muffalo server via Makefile targets.
 
 No prefix: sync without static/.
 With C-u: sync including static/ (push).
 With C-u C-u: pull static/ from remote."
-  (interactive "P")
-  (let* ((default-directory (expand-file-name "~/Documents/blog/"))
-         (target (cond
-                  ((null arg) "sync")
-                  ((= (prefix-numeric-value arg) 16) "pull-static")
-                  (t "sync-static"))))
-    (compile (format "make %s" target))))
+    (interactive "P")
+    (let* ((default-directory (expand-file-name "~/Documents/blog/"))
+           (target (cond
+                    ((null arg) "sync")
+                    ((= (prefix-numeric-value arg) 16) "pull-static")
+                    (t "sync-static"))))
+      (compile (format "make %s" target))))
 
-(defun js/makovec-rss ()
-  "Scrape makovec and add to blog"
-  (interactive)
-  (let* ((default-directory (expand-file-name "~/Documents/blog/")))
-    (compile "make makovec")))
+  (defun js/makovec-rss ()
+    "Scrape makovec and add to blog"
+    (interactive)
+    (let* ((default-directory (expand-file-name "~/Documents/blog/")))
+      (compile "make makovec")))
 
-(defun js/blog-open-in-browser ()
-  "Open the current org-roam file as its published blog URL."
-  (interactive)
-  (let* ((file (buffer-file-name))
-         (public-path (org-static-blog-get-post-public-path file))
-         (url (concat org-static-blog-publish-url public-path)))
-    (browse-url url)))
-
+  (defun js/blog-open-in-browser ()
+    "Open the current org-roam file as its published blog URL."
+    (interactive)
+    (let* ((file (buffer-file-name))
+           (public-path (org-static-blog-get-post-public-path file))
+           (url (concat org-static-blog-publish-url public-path)))
+      (browse-url url))))
 
 ;;; * Notmuch - email
 
 (use-package notmuch
-  :defer t
   :commands notmuch
   :bind
   ("C-x m" . notmuch)
@@ -4112,12 +4116,7 @@ With C-u C-u: pull static/ from remote."
 	("G" . refresh-email))
   :if (eq system-type 'darwin)
   :config
-  (setq message-send-mail-function 'message-send-mail-with-sendmail
-	sendmail-program "/opt/homebrew/bin/msmtp"
-        message-sendmail-f-is-evil t
-	message-sendmail-extra-arguments '("--read-envelope-from"))
   (setq notmuch-fcc-dirs nil)
-  (setq message-kill-buffer-on-exit t)
 
   (defface notmuch-link
     '((t :foreground "SeaGreen4" :underline t))
@@ -4140,6 +4139,12 @@ With C-u C-u: pull static/ from remote."
 
 (use-package message
   :ensure nil
+  :custom
+  (message-send-mail-function 'message-send-mail-with-sendmail)
+  (sendmail-program "/opt/homebrew/bin/msmtp")
+  (message-sendmail-f-is-evil t)
+  (message-sendmail-extra-arguments '("--read-envelope-from"))
+  (message-kill-buffer-on-exit t)
   :bind
   (:map message-mode-map
 	("<tab>" . js/message-field-forward)
@@ -4221,12 +4226,13 @@ signature, in that order."
 	:description description)))))
 
 ;;; * Elfeed
+
 ;;; ** Basic configuration
 (use-package elfeed
   :defer t
   :commands elfeed
-  :bind (("C-x w" . elfeed)
-	 :map elfeed-search-mode-map
+  :bind* ("C-x w" . elfeed)
+  :bind (:map elfeed-search-mode-map
          ("SPC" . elfeed-search-show-entry)
 	 ("t" . elfeed-search-trash)
          ("T" . elfeed-filter-trash)
@@ -4999,7 +5005,13 @@ If none of the selected entries are downloaded, a message is shown."
     (setq elfeed-search-print-entry-function #'elfeed-score-print-entry)
     (elfeed-score-enable)
     (define-key elfeed-search-mode-map "=" elfeed-score-map)))
+;;; ** Elfeed summaries
 
+(use-package elfeed-summary
+  :after elfeed
+  :load-path "~/.emacs.d/lisp"
+  :bind (:map elfeed-show-mode-map
+	      ("?" . elfeed-summary)))
 ;;; * Annotation importer
 
 (use-package org-roam-annotation-import
@@ -5463,6 +5475,7 @@ When pressed twice, make the sub/superscript roman."
      (?o "\\mathring" nil t nil nil)
      ( ?C    "\\Class"           nil        t   nil nil )
      ( ?B    "\\mathbb"            nil t   nil nil )
+     ( ?d   "\\llbracket ? \\rrbracket"  nil        nil nil nil )
      ))
 
   (cdlatex-math-symbol-alist
@@ -5471,6 +5484,7 @@ When pressed twice, make the sub/superscript roman."
      (?+  ("\\cup" "\\oplus"))
      (?*  ("\\times" "\\otimes" "\\bullet"))
      (?T ("\\top" "\\bot" "\\Type"))
+     (?L  ("\\Lambda" "\\leadsto"))
      (?t ("\\tau" "\\tan" "\\arctan"))
      (?P ("\\Pi" "\\Prop"))
      (?V ("\\vdash" "\\dashv"))
@@ -5479,6 +5493,7 @@ When pressed twice, make the sub/superscript roman."
      (?I ("\\mid" "\\Im"))
      (?_ ("\\downarrow" "\\Downarrow"))
      (?. ("\\cdot" ".\\,"))
+     (?, ("\\,"))
      ))
 
   :hook
@@ -5649,6 +5664,9 @@ When pressed twice, make the sub/superscript roman."
 
 (use-package eglot
   :defer t
+  :bind (:map eglot-mode-map
+	 ("C-c e a" . eglot-code-actions)
+	 )
   :ensure nil
   :hook ((python-mode-hook . eglot-ensure)
          (c-mode-hook . eglot-ensure)
@@ -5661,6 +5679,14 @@ When pressed twice, make the sub/superscript roman."
   (eglot-autoshutdown t)
   (eglot-sync-connect nil))
 
+(use-package eglot-booster
+  :vc (:url "https://github.com/jdtsmith/eglot-booster")
+  :after eglot
+  :custom
+  (eglot-booster-io-only t) 		; Emacs 30+ has better JSON parsing
+  :config
+  (eglot-booster-mode))
+
 (use-package eldoc
   :init
   (global-eldoc-mode +1))
@@ -5672,6 +5698,19 @@ When pressed twice, make the sub/superscript roman."
          ("<f1> ," . eldoc-box-help-at-point))
   :custom
   (eldoc-box-clear-with-C-g t))
+
+;;; ** Harper
+;; Seems more annoying than not
+;; (when (and (equal system-type 'darwin)
+;; 	   (locate-file "harper-ls" exec-path))
+;;   (with-eval-after-load 'eglot
+;;     (add-to-list 'eglot-server-programs
+;; 		 '((org-mode :language-id "org") . ("harper-ls" "--stdio"))))
+
+;;   ;; (setq-default eglot-workspace-configuration
+;;   ;; 		'(:harper-ls (:dialect "Australian")))
+
+;;   (add-hook 'org-mode-hook 'eglot-ensure))
 
 ;;; ** Lisp
 
