@@ -1529,6 +1529,7 @@ Produces multiple regions so expreg can step through them."
    ("C-c g s" . gptel-send)
    ("C-c g /" . gptel-menu)
    ("C-c g g" . gptel)
+   ("C-c g w" . org/save-gptel-chat-as-node)
    ("C-c g M" . mcp-hub)
    (:map gptel-mode-map
 	 ("C-c g t o" . gptel-org-set-topic)))
@@ -1551,7 +1552,53 @@ Produces multiple regions so expreg can step through them."
 	      openai/gpt-4o
 	      openai/o4-mini-deep-research
 	      anthropic/claude-sonnet-4.6))
-  (require 'gptel-integrations))
+  (require 'gptel-integrations)
+  (require 'gptel-org)
+
+
+  (defvar org-roam-chatlogs-directory "chatlogs/"
+    "The directory to save gptel chatlogs in.")
+
+  (defun org/enable-gptel-for-chatlog-buffer ()
+    "Enable gptel-mode if the current buffer has the `chatlog' tag."
+    (when (and (buffer-file-name)
+	       (member "chatlog" (vulpea-buffer-tags-get)))
+      (gptel-mode 1)))
+
+  (defun org/save-gptel-chat-as-node ()
+    "Save the current gptel chat buffer as an org-roam node and link it in today's journal."
+    (interactive)
+    (let* ((existing-id (org-id-get))
+           (title (read-string "Title for chat node: " (format-time-string "Chat %Y-%m-%d %H:%M")))
+           (chatlog-dir (expand-file-name org-roam-chatlogs-directory org-roam-directory))
+           (file-name (format-time-string "Chat-%Y-%m-%d_%H-%M.org"))
+           (full-path (expand-file-name file-name chatlog-dir)))
+
+      (if existing-id
+          (save-buffer)
+
+	(unless (file-directory-p chatlog-dir)
+          (make-directory chatlog-dir t))
+
+	(write-file full-path)
+
+	(goto-char (point-min))
+	(org-id-get-create)
+	(unless (save-excursion (re-search-forward "^#\\+title:" nil t))
+          (goto-char (point-min))
+          (when (re-search-forward "^:END:$" nil t)
+            (forward-line 1)
+            (insert (format "#+title: %s\n" title))))
+
+	(save-buffer)
+	(org-roam-db-sync)
+
+	(let* ((node-id (org-id-get))
+	       (link (org-roam-link-make-string node-id title)))
+          (org-roam-dailies-autocapture-today "c" link)
+          (message "Chat saved as '%s' and linked in today's journal." title)))))
+
+  )
 
 ;;; ** Emacs MCP
 
@@ -3554,7 +3601,7 @@ See `js/anki-derive-fields' for full hierarchy details."
   :custom
   (org-todo-keywords
    '((sequence "NEXT(n)" "ACTIVE(a)" "COURSE(C)" "EXAM(E)" "PROJECT(P)"
-	       "TODO(t)" "FINISH(f)" "PROCESS(p)" "EXPLORE(e)" "IDEA(I)" "HOLD(h)" "PACT(A)"
+	       "TODO(t)" "FINISH(f)" "PROCESS(p)" "EXPLORE(e)" "INGEST(i)" "IDEA(I)" "HOLD(h)" "PACT(A)"
 	       "|"
 	       "DONE(d)" "CANCELLED(c)" "FAILED(F)" "NAREDU(N)")))
 
@@ -3632,7 +3679,7 @@ See `js/anki-derive-fields' for full hierarchy details."
 				(air-org-skip-subtree-if-priority ?B)
 				(air-org-skip-if-blocked)
 				(js/org-skip-if-future)
-				(org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISH" "PACT"))
+				(org-agenda-skip-entry-if 'todo '("NEXT" "ACTIVE" "HOLD" "PROCESS" "EXPLORE" "PROJECT" "COURSE" "EXAM" "IDEA" "FINISH" "PACT" "INGEST"))
 				(js/org-skip-if-ancestor-blocked '("ACTIVE" "PROJECT"))
 				))
 			  (org-agenda-overriding-header "* All normal priority tasks:")))
@@ -3670,8 +3717,7 @@ See `js/anki-derive-fields' for full hierarchy details."
     (interactive "P")
     (if arg
 	(call-interactively 'org-agenda)
-      (org-agenda nil "d")))
-  )
+      (org-agenda nil "d"))))
 
 (defun air-org-skip-subtree-if-priority (priority)
   "Skip an agenda subtree if it has a priority of PRIORITY.
