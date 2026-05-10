@@ -3111,6 +3111,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
   )
 
 ;;; * Vulpea
+
 ;;; ** Basic config
 
 (use-package vulpea
@@ -3132,6 +3133,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
 
   :custom
   (vulpea-buffer-alias-property "ROAM_ALIASES")
+  (vulpea-db-sync-scan-on-enable t)	; Detect changes while emacs was closed
 
   :hook
   (org-mode-hook . tags/enable-tag-updating)
