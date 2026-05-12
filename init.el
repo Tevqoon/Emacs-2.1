@@ -3940,7 +3940,6 @@ _S_manual
   (org-html-htmlize-output-type 'css))
 
 (use-package org-static-blog
-  :defer t
   :after org-roam
   :bind
   ("C-c n b b" . org-static-blog-publish)
@@ -5859,10 +5858,53 @@ When pressed twice, make the sub/superscript roman."
 
 ;;; ** Agda
 
-(when (eq system-type 'darwin)
-  (load-file
-   (let ((coding-system-for-read 'utf-8))
-     (shell-command-to-string "agda --emacs-mode locate"))))
+(add-to-list 'load-path
+             (when (eq system-type 'darwin)
+               (let ((coding-system-for-read 'utf-8))
+                 (file-name-directory
+                  (shell-command-to-string "agda --emacs-mode locate")))))
+
+(use-package agda2-mode
+  :if (eq system-type 'darwin)
+  :ensure nil
+  :mode ("\\.l?agda\\'" . agda2-mode)
+
+  :functions (agda2-goal-at agda2-next-goal agda2-previous-goal)
+
+  :preface
+  (defun js/fix-agda-highlight-face (&rest _)
+    (let* ((dark (eq (frame-parameter nil 'background-mode) 'dark))
+           (bg (if dark "#073642" "#eee8d5"))
+           (fg (if dark "#93a1a1" "#586e75")))
+      (set-face-attribute 'highlight nil
+                          :background bg
+                          :foreground 'unspecified
+                          :box nil)))
+
+  (defun js/agda-tab ()
+    "Next goal if in a hole, else eri-indent."
+    (interactive)
+    (if (agda2-goal-at (point))
+        (agda2-next-goal)
+      (eri-indent)))
+
+  (defun js/agda-backtab ()
+    "Previous goal if in a hole, else eri-indent-reverse."
+    (interactive)
+    (if (agda2-goal-at (point))
+        (agda2-previous-goal)
+      (eri-indent-reverse)))
+  :config
+  (advice-add 'agda2-next-goal     :before #'push-mark)
+  (advice-add 'agda2-previous-goal :before #'push-mark)
+
+
+  :bind (:map agda2-mode-map
+              ("<tab>"       . js/agda-tab)
+              ("S-<tab>" . js/agda-backtab))
+
+  :hook (load-theme . js/fix-agda-highlight-face))
+
 ;;; ** Lean
 
 (use-package nael
