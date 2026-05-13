@@ -2495,9 +2495,10 @@ only processes keywords listed in `js/org-keywords-with-links'."
   '(("r" "reference" plain "%?"
      :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
      :unnarrowed t)
-    ("p" "process" entry
-     "* PROCESS %(eval (or org-roam-capture-content \"\"))"
-     :target (node "DC4125FE-CC54-4515-9ACC-7FCF288142F1")
+    ("p" "process" plain
+     ""
+     :target (file+olp "20260509100451-process.org"
+                       ("PROCESS %(eval org-roam-capture-content)"))
      :immediate-finish t))
   "A list of templates to use for automatic capture.")
 
@@ -2516,7 +2517,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
      :immediate-finish t))
   "A list of templates to use for automatic daily capture.")
 
-(defun js/org-roam-autocapture-today (keys &optional contents body)
+(defun js/org-roam-autocapture (keys &optional contents body)
   "Automatically capture content into a given roam node."
   (let ((org-roam-capture-content (or contents org-roam-capture-content))
         (org-roam-capture-body    (or body org-roam-capture-body)))
@@ -2582,10 +2583,13 @@ Using the org-mac-link, this comes pre-formatted with the url title."
 
 ;;; *** Org logging
 
-(defun  js/process-at-point ()
+(defun js/process-at-point ()
   (interactive)
-  (let ((url (org-store-link nil nil)))
-    (js/url-target-process url)))
+  (let ((link (if-let* ((node (org-roam-node-at-point))
+                        (id (org-roam-node-id node)))
+                  (js/format-link (concat "id:" id))
+                (org-store-link nil nil))))
+    (js/url-target-process link)))
 
 (defvar js/url-targets
   '((Log . js/url-target-log)
@@ -2604,7 +2608,7 @@ Using the org-mac-link, this comes pre-formatted with the url title."
 (defun js/url-target-process (url-source)
   "Log URL-SOURCE as a top-level entry in the @Process node."
   (let ((org-roam-capture-content url-source))
-    (js/org-roam-autocapture-today "p"))
+    (js/org-roam-autocapture "p"))
   "processed")
 
 (defun js/url-target-wallabag (url-source)
@@ -2727,7 +2731,11 @@ Without NODE, prompts with completion filtered to nodes tagged 'trail'."
 (defun js/trail-add-at-point ()
   (interactive)
   (unless js/active-trail (user-error "No active trail"))
-  (js/url-target-trail (org-store-link nil nil)))
+  (let ((link (if-let* ((node (org-roam-node-at-point))
+                        (id (org-roam-node-id node)))
+                  (js/format-link (concat "id:" id))
+                (org-store-link nil nil))))
+    (js/url-target-trail link)))
 
 ;;; *** Roamify
 
