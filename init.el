@@ -2286,16 +2286,15 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ("C-c n r" . js/roamify-url-at-point)
 	 ("C-c n t" . org-roam-tag-add)
 	 ("C-c n n s" . org-roam-db-sync)
-
+	 ;; Trails
+	 ("C-c n y ." . js/trail-activate-at-point)
+	 ("C-c n y a" . js/trail-activate)
+	 ("C-c n y d" . js/trail-deactivate)
+	 ("C-c n y y" . js/trail-add-at-point)
+	 ("C-c n u" . js/process-at-point)
 
          :map org-mode-map
          ("C-M-i" . completion-at-point)
-
-
-	 ;; Narrowing and movement
-	 ;; ("C-c n ." . my/org-narrow-to-heading-content) ;; current position
-	 ;; ("C-c n >" . my/org-next-heading-narrow)       ;; move forward
-	 ;; ("C-c n <" . my/org-previous-heading-narrow)   ;; move backward
 
 	 ("C-c n >" . js/org-goto-last-sibling)
 	 ("C-c n <" . js/org-goto-first-sibling)
@@ -2485,12 +2484,6 @@ only processes keywords listed in `js/org-keywords-with-links'."
          :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+startup: show2levels")
          :unnarrowed t)))
 
-(defvar org-roam-autocapture-templates
-  '(("r" "reference" plain "%?"
-     :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
-     :unnarrowed t))
-  "A list of templates to use for automatic capture.")
-
 (setq org-roam-dailies-capture-templates
       `(("d" "default" plain "* %?"
 	 :target (file+head "%<%Y-%m-%d>.org"
@@ -2510,6 +2503,12 @@ only processes keywords listed in `js/org-keywords-with-links'."
 
 (defvar org-roam-capture-body nil
   "Variable to pass body content to capture templates.")
+
+(defvar org-roam-autocapture-templates
+  '(("r" "reference" plain "%?"
+     :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
+     :unnarrowed t))
+  "A list of templates to use for automatic capture.")
 
 (defvar org-roam-dailies-autocapture-templates
   '(("w" "url capture" plain "%(eval (or org-roam-capture-body \"\"))"
@@ -2537,6 +2536,15 @@ only processes keywords listed in `js/org-keywords-with-links'."
 			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Processed today" "%(eval (concat \"DONE \" org-roam-capture-content))"))
      :immediate-finish t))
   "A list of templates to use for automatic daily capture.")
+
+(defun js/org-roam-autocapture-today (keys &optional contents body)
+  "Automatically capture content into a given roam node."
+  (let ((org-roam-capture-content (or contents org-roam-capture-content))
+        (org-roam-capture-body    (or body org-roam-capture-body)))
+    (org-roam-capture- :keys keys
+                       :node (org-roam-node-create)
+                       :templates org-roam-autocapture-templates
+                       :props (list :override-default-time (current-time)))))
 
 (defun org-roam-dailies-autocapture-today (keys &optional contents body)
   "A function to automatically capture content into a daily template."
@@ -2603,7 +2611,8 @@ Using the org-mac-link, this comes pre-formatted with the url title."
 (defvar js/url-targets
   '((Log . js/url-target-log)
     (Process . js/url-target-process)
-    (Wallabag . js/url-target-wallabag))
+    (Wallabag . js/url-target-wallabag)
+    (Trail . js/url-target-trail))
   "Alist of available URL handling targets and their handler functions.")
 
 ;; Handler functions for each target
@@ -2678,6 +2687,68 @@ For emacsclient:
 
       ;; Return the URL source for potential chaining
       url-source)))
+
+;;; *** Vannevar Trails
+
+(defvar js/active-trail nil
+  "ID of the currently active research trail node, or nil if none.")
+
+(defun js/trail--set-mode-line ()
+  (if js/active-trail
+      (add-to-list 'global-mode-string " T")
+    (setq global-mode-string (delete " T" global-mode-string)))
+  (force-mode-line-update t))
+
+(defun js/trail-activate (&optional node)
+  "Set a trail node as active.
+Without NODE, prompts with completion filtered to nodes tagged 'trail'."
+  (interactive)
+  (let* ((node (or node
+                   (org-roam-node-read
+                    nil
+                    (lambda (n) (member "trail" (org-roam-node-tags n))))))
+         (id (org-roam-node-id node)))
+    (setq js/active-trail id)
+    (js/trail--set-mode-line)
+    (message "Trail active: %s" (org-roam-node-title node))))
+
+(defun js/trail-activate-at-point ()
+  "Set the node at point as the active trail, adding 'trail' tag if absent."
+  (interactive)
+  (let ((node (org-roam-node-at-point 'assert)))
+    (unless (member "trail" (org-roam-node-tags node))
+      (org-roam-tag-add '("trail")))
+    (js/trail-activate node)))
+
+(defun js/trail-deactivate ()
+  "Clear the active trail."
+  (interactive)
+  (setq js/active-trail nil)
+  (js/trail--set-mode-line)
+  (message "Trail deactivated."))
+
+(defun js/trail-jump ()
+  "Jump to the active trail node."
+  (interactive)
+  (unless js/active-trail (user-error "No active trail"))
+  (org-id-goto js/active-trail))
+
+(defun js/url-target-trail (url-source)
+  "Capture URL-SOURCE as an entry into the active trail node."
+  (unless js/active-trail (user-error "No active trail"))
+  (let ((org-roam-capture-content url-source))
+    (org-roam-capture- :keys "t"
+                       :node (org-roam-node-create)
+                       :templates `(("t" "trail entry" entry
+                                     "* %(or org-roam-capture-content \"\")"
+                                     :target (node ,js/active-trail)
+                                     :immediate-finish t))))
+  "added to trail")
+
+(defun js/trail-add-at-point ()
+  (interactive)
+  (unless js/active-trail (user-error "No active trail"))
+  (js/url-target-trail (org-store-link nil nil)))
 
 ;;; *** Roamify
 
