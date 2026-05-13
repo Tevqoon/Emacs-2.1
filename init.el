@@ -339,8 +339,7 @@ are defining or executing a macro."
          ("p" . helpful-at-point)
 	 :map helpful-mode-map
 	 ("q" . quit-window--and-kill)
-	 :map Info-mode-map
-	 ("U" . js/process-at-point))
+	 )
   :custom
   (helpful-switch-buffer-function #'switch-to-buffer)
   (help-window-select t))
@@ -494,9 +493,9 @@ are defining or executing a macro."
      "Main directory for downloading videos using yt-dlp.")
    ;; Macos Registers ;;
    (set-register ?r '(file . "~/.emacs.d/init.el"))
-   (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
-   (set-register ?j `(file . ,(concat org-directory "/journal/Journelly.org")))
-   (set-register ?p `(file . ,(concat org-directory "/20250823160311-software.org")))
+   (set-register ?t `(file . ,(file-name-concat org-directory "tasks.org")))
+   (set-register ?j `(file . ,(file-name-concat org-directory "journal/Journelly.org")))
+   (set-register ?p `(file . ,(file-name-concat org-directory "20260509100451-process.org")))
 
 ;;; https://www.reddit.com/r/emacs/comments/1qlnde7/comment/o1fq5lj/
    (defun start-process@use-pipe (fn &rest args)
@@ -2239,25 +2238,10 @@ Falls back to #+attr_latex :options for backwards compatibility."
   (org-after-todo-state-change . mm/org-insert-trigger)
   (org-after-todo-statistics . org-summary-todo))
 
-(defun js/org-log-processed-today ()
-  "Log a DONE link to the current node under today's 'Processed today'."
-  (interactive)
-  (save-excursion
-    (org-back-to-heading t)
-    ;; If there's no id or content, don't capture
-    (if-let* ((title (js/org--derive-title))
-	      (id    (js/org-current-node-id))
-	      (link (org-roam-link-make-string id title)))
-	(org-roam-dailies-autocapture-today "x" link))))
-
 (defun mm/org-insert-trigger ()
   "An org-edna handler which adds TRIGGER properties."
   (cond ((equal org-state "NEXT")
-         (org-set-property "TRIGGER" "next-sibling(todo-only) todo!(NEXT) chain!(\"TRIGGER\") self delete-property!(\"TRIGGER\")"))
-
-	;; Changing from PROCESS logs the file to today
-	((equal org-last-state "PROCESS")
-	 (js/org-log-processed-today))))
+         (org-set-property "TRIGGER" "next-sibling(todo-only) todo!(NEXT) chain!(\"TRIGGER\") self delete-property!(\"TRIGGER\")"))))
 
 ;; Automatically complete the parent with a statistics cookie when all children are complete
 (defun org-summary-todo (_n-done n-not-done)
@@ -2293,13 +2277,16 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ("C-c n y y" . js/trail-add-at-point)
 	 ("C-c n u" . js/process-at-point)
 
+	 :map special-mode-map		; For quickly adding references
+	 ("Y" . js/trail-add-at-point)
+	 ("U" . js/process-at-point)
+
          :map org-mode-map
          ("C-M-i" . completion-at-point)
 
 	 ("C-c n >" . js/org-goto-last-sibling)
 	 ("C-c n <" . js/org-goto-first-sibling)
-	 ("C-c n s d" . js/org-sort-siblings-by-todo)
-         )
+	 ("C-c n s d" . js/org-sort-siblings-by-todo))
   :hook (org-roam-mode-hook . visual-line-mode)
 
   :custom
@@ -2507,7 +2494,11 @@ only processes keywords listed in `js/org-keywords-with-links'."
 (defvar org-roam-autocapture-templates
   '(("r" "reference" plain "%?"
      :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
-     :unnarrowed t))
+     :unnarrowed t)
+    ("p" "process" entry
+     "* PROCESS %(eval (or org-roam-capture-content \"\"))"
+     :target (node "DC4125FE-CC54-4515-9ACC-7FCF288142F1")
+     :immediate-finish t))
   "A list of templates to use for automatic capture.")
 
 (defvar org-roam-dailies-autocapture-templates
@@ -2515,25 +2506,13 @@ only processes keywords listed in `js/org-keywords-with-links'."
      :target (file+head+olp "%<%Y-%m-%d>.org"
 			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Web" "%(eval (concat org-roam-capture-content))"))
      :immediate-finish t)
-    ("r" "url reading capture" plain "%(eval (or org-roam-capture-body \"\"))"
-     :target (file+head+olp "%<%Y-%m-%d>.org"
-			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Processing" "%(eval (concat \"PROCESS \" org-roam-capture-content))"))
-     :immediate-finish t)
     ("e" "elfeed link capture" plain "%(eval (or org-roam-capture-body \"\"))"
      :target (file+head+olp "%<%Y-%m-%d>.org"
 			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Elfeed" "%(eval (concat org-roam-capture-content))"))
      :immediate-finish t)
-    ("p" "process capture" plain "%(eval (or org-roam-capture-body \"\"))"
-     :target (file+head+olp "%<%Y-%m-%d>.org"
-			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Processing" "%(eval (concat \"PROCESS \" org-roam-capture-content))"))
-     :immediate-finish t)
     ("c" "chatlog capture" plain "%(eval (or org-roam-capture-body \"\"))"
      :target (file+head+olp "%<%Y-%m-%d>.org"
 			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Chats" "%(eval (concat org-roam-capture-content))"))
-     :immediate-finish t)
-    ("x" "processed log" plain "%(eval (or org-roam-capture-body \"\"))"
-     :target (file+head+olp "%<%Y-%m-%d>.org"
-			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Processed today" "%(eval (concat \"DONE \" org-roam-capture-content))"))
      :immediate-finish t))
   "A list of templates to use for automatic daily capture.")
 
@@ -2623,9 +2602,9 @@ Using the org-mac-link, this comes pre-formatted with the url title."
   "logged")
 
 (defun js/url-target-process (url-source)
-  "Log URL-SOURCE to the processing section."
+  "Log URL-SOURCE as a top-level entry in the @Process node."
   (let ((org-roam-capture-content url-source))
-    (org-roam-dailies-autocapture-today "r"))
+    (js/org-roam-autocapture-today "p"))
   "processed")
 
 (defun js/url-target-wallabag (url-source)
@@ -4904,7 +4883,13 @@ If a key is provided, use it instead of the default capture template."
 
   (defun js/log-elfeed-process ()
     (interactive)
-    (js/log-elfeed-entries 1 nil "p"))
+    (let ((entries (cond
+                    ((derived-mode-p 'elfeed-show-mode) (list elfeed-show-entry))
+                    ((derived-mode-p 'elfeed-search-mode) (elfeed-search-selected))
+                    (t (user-error "Not in an Elfeed buffer")))))
+      (dolist (entry entries)
+	(js/url-target-process (js/make-elfeed-entry-link entry)))
+      (elfeed-db-save)))
   ) ;;
 
 
