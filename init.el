@@ -802,7 +802,8 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 	 ("M-s s" . swiper-isearch)
 	 ("M-s a" . swiper-all)
 	 :map ivy-minibuffer-map
-         ("TAB" . ivy-alt-done))
+         ("TAB" . ivy-alt-done)
+	 ("S-SPC" . (lambda () (interactive) (insert " "))))
   :config
   (ivy-mode 1)
   (counsel-mode)
