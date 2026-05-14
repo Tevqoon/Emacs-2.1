@@ -69,20 +69,6 @@
 
 (use-package bug-hunter)
 
-;;; ** Shannonmax
-
-(use-package shannon-max
-  :vc (:url "https://github.com/sstraust/shannonmax")
-  :if (not (eq system-type 'android))
-  :custom
-  (shannon-max-jar-file (expand-file-name "elpa/shannon-max/target/emacskeys-0.1.1-SNAPSHOT-standalone.jar"))
-  :init
-  (require 'shannon-max)
-  (shannon-max-start-logger)
-  ;; Use with M-x shannon-max-analyze
-  )
-
-
 ;;; ** Basic setup
 (use-package emacs
   :init
