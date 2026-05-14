@@ -2276,6 +2276,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ("C-c n y a" . js/trail-activate)
 	 ("C-c n y d" . js/trail-deactivate)
 	 ("C-c n y y" . js/trail-add-at-point)
+	 ("C-c n y j" . js/trail-jump)
 	 ("C-c n u" . js/process-at-point)
 
 	 :map special-mode-map		; For quickly adding references
@@ -3231,7 +3232,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
   (setq tags/updating-tags (mapcar #'car tag-checkers))
 
   :init
-  (dolist (tag (cons "interesting" (cons "summary" tags/updating-tags))) ;TODO: Remove double cons
+  (dolist (tag (cons "trail" (cons "interesting" (cons "summary" tags/updating-tags)))) ;TODO: Remove double cons
     (add-to-list 'org-tags-exclude-from-inheritance tag))
 
   (with-eval-after-load 'org
