@@ -43,3 +43,4 @@ anki-flashcard-queue.el
 /history
 /vulpea.db
 /org-persist/
+/neocaml-repl-history

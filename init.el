@@ -3195,6 +3195,25 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
   (org-node-roam-accelerator-mode -1)
   )
 
+;;; ** Org-roam links via org-protocol
+
+(with-eval-after-load 'org-roam
+  (require 'org-protocol)
+
+ ;; Handler: org-protocol://roam-id?id=<UUID> → visit that node
+ (defun js/org-protocol-open-roam-id (data)
+   "Open org-roam node by ID received via org-protocol."
+   (when-let* ((id (plist-get data :id))
+               (node (org-roam-node-from-id id)))
+     (org-roam-node-visit node nil 'force))
+   nil)			; return nil: don't kill the emacsclient frame
+
+ (add-to-list 'org-protocol-protocol-alist
+              '("roam-id"
+		:protocol "roam-id"
+		:function js/org-protocol-open-roam-id
+		:kill-client nil)))
+
 ;;; * Vulpea
 
 ;;; ** Basic config
@@ -3218,7 +3237,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
 
   :custom
   (vulpea-buffer-alias-property "ROAM_ALIASES")
-  (vulpea-db-sync-scan-on-enable t)	; Detect changes while emacs was closed
+  (vulpea-db-sync-scan-on-enable t) ; Detect changes while emacs was closed
 
   :hook
   (org-mode-hook . tags/enable-tag-updating)
@@ -3430,10 +3449,9 @@ Each function is called with two arguments: the tag and the buffer.")
   :if (not (eq system-type 'android))
   :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all anki-editor-push-notes anki/my/after-snippet-tag-handler
   :bind
-  (:map org-mode-map
-        ("C-c n p b" . my/anki-flashcard-push-current-buffer)
-        ("C-c n p p" . my/anki-flashcard-push-all)
-	("C-c n p a" . my/anki-annotation-push-all))
+  (("C-c n p b" . my/anki-flashcard-push-current-buffer)
+   ("C-c n p p" . my/anki-flashcard-push-all)
+   ("C-c n p a" . my/anki-annotation-push-all))
   :vc (:url "https://github.com/anki-editor/anki-editor" :rev :newest)
   :custom
   (anki-editor-latex-style 'mathjax)
@@ -3574,47 +3592,47 @@ See `js/anki-derive-fields' for full hierarchy details."
                       (buffer-file-name) anki-flashcard-error-buffer))))
       (message "Buffer is not visiting a file")))
 
-  (defun my/anki-flashcard-push-all ()
-    "Push all flashcard files (via org-roam tag index) to Anki."
-    (interactive)
-    (anki-flashcard-clear-error-buffer)
-    (let* ((files (org-flashcards-files))
-           (total (length files))
-           (success 0))
-      (dolist (file files)
-	(condition-case err
-            (with-current-buffer (find-file-noselect file)
-	      (org-transclusion-mode +1)
-              (save-excursion (anki-editor-push-notes 'file))
-              (cl-incf success))
-          (error (anki-flashcard-report-error file (error-message-string err)))))
-      (if (< success total)
-          (progn
-            (message "Pushed %d/%d, %d errors — see %s"
-                     success total (- total success) anki-flashcard-error-buffer)
-            (display-buffer anki-flashcard-error-buffer))
-	(message "Pushed all %d flashcard files" total))))
+  (defun js/anki-editor--inject-source-field (note-plist)
+    "Inject Source field with org-protocol link into already-exported NOTE-PLIST."
+    (when-let* ((node (org-roam-node-at-point))
+		(id (org-roam-node-id node))
+		(url (format "org-protocol://roam-id?id=%s" id))
+		(link (format "<a href=\"%s\">Open in Emacs</a>" url))
+		(fields (plist-get note-plist :fields)))
+      (unless (assoc "Source" fields)
+	(plist-put note-plist :fields
+                   (cons (cons "Source" link) fields))))
+    note-plist)
 
-  (defun my/anki-flashcard-push-all ()
-    "Push all flashcard files (via org-roam tag index) to Anki."
-    (interactive)
+  (advice-add 'anki-editor-api--note :filter-return
+              #'js/anki-editor--inject-source-field)
+
+  ;; C-u prefix on push-all → force-repush everything
+  (defun my/anki-flashcard-push-all (&optional force)
+    "Push all flashcard files to Anki.
+With prefix C-u, force-repush all notes (ignores hash/unchanged check)."
+    (interactive "P")
     (anki-flashcard-clear-error-buffer)
     (let* ((files (org-flashcards-files))
            (total (length files))
-           (success 0))
+           (success 0)
+           (anki-editor-force-update (when force t)))
       (dolist (file files)
 	(condition-case err
-            (with-current-buffer (find-file-noselect file)
-	      (org-transclusion-mode +1)
+            (save-current-buffer
+              (set-buffer (find-file-noselect file))
+              (org-transclusion-mode 1)
               (save-excursion (anki-editor-push-notes 'file))
               (cl-incf success))
-          (error (anki-flashcard-report-error file (error-message-string err)))))
+          (error
+           (anki-flashcard-report-error file (error-message-string err)))))
       (if (< success total)
           (progn
             (message "Pushed %d/%d, %d errors — see %s"
                      success total (- total success) anki-flashcard-error-buffer)
             (display-buffer anki-flashcard-error-buffer))
-	(message "Pushed all %d flashcard files" total))))
+	(message "Pushed all %d flashcard files%s"
+		 total (if force " (forced)" "")))))
 
   (defun my/anki-annotations-files ()
     "Return list of org-roam files tagged :annotations:."
