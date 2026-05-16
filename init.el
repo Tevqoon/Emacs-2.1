@@ -2664,12 +2664,6 @@ For emacsclient:
 (defvar js/active-trail nil
   "ID of the currently active research trail node, or nil if none.")
 
-(defun js/trail--set-mode-line ()
-  (if js/active-trail
-      (add-to-list 'global-mode-string " T")
-    (setq global-mode-string (delete " T" global-mode-string)))
-  (force-mode-line-update t))
-
 (defun js/trail-activate (&optional node)
   "Set a trail node as active.
 Without NODE, prompts with completion filtered to nodes tagged 'trail'."
@@ -2680,7 +2674,6 @@ Without NODE, prompts with completion filtered to nodes tagged 'trail'."
                     (lambda (n) (member "trail" (org-roam-node-tags n))))))
          (id (org-roam-node-id node)))
     (setq js/active-trail id)
-    (js/trail--set-mode-line)
     (message "Trail active: %s" (org-roam-node-title node))))
 
 (defun js/trail-activate-at-point ()
@@ -2695,7 +2688,6 @@ Without NODE, prompts with completion filtered to nodes tagged 'trail'."
   "Clear the active trail."
   (interactive)
   (setq js/active-trail nil)
-  (js/trail--set-mode-line)
   (message "Trail deactivated."))
 
 (defun js/trail-jump ()
@@ -3439,8 +3431,9 @@ Each function is called with two arguments: the tag and the buffer.")
   :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all anki-editor-push-notes anki/my/after-snippet-tag-handler
   :bind
   (:map org-mode-map
-        ("C-c n p" . my/anki-flashcard-push-current-buffer)
-        ("C-c n n p" . my/anki-flashcard-push-all))
+        ("C-c n p b" . my/anki-flashcard-push-current-buffer)
+        ("C-c n p p" . my/anki-flashcard-push-all)
+	("C-c n p a" . my/anki-annotation-push-all))
   :vc (:url "https://github.com/anki-editor/anki-editor" :rev :newest)
   :custom
   (anki-editor-latex-style 'mathjax)
@@ -3622,6 +3615,34 @@ See `js/anki-derive-fields' for full hierarchy details."
                      success total (- total success) anki-flashcard-error-buffer)
             (display-buffer anki-flashcard-error-buffer))
 	(message "Pushed all %d flashcard files" total))))
+
+  (defun my/anki-annotations-files ()
+    "Return list of org-roam files tagged :annotations:."
+    (delete-dups
+     (mapcar #'org-roam-node-file
+             (seq-filter
+              (lambda (n) (member "annotations" (org-roam-node-tags n)))
+              (org-roam-node-list)))))
+
+  (defun my/anki-annotation-push-all ()
+    "Push all annotation files (via org-roam tag index) to Anki."
+    (interactive)
+    (anki-flashcard-clear-error-buffer)
+    (let* ((files (my/anki-annotations-files))
+           (total (length files))
+           (success 0))
+      (dolist (file files)
+	(condition-case err
+            (with-current-buffer (find-file-noselect file)
+              (save-excursion (anki-editor-push-notes 'file))
+              (cl-incf success))
+          (error (anki-flashcard-report-error file (error-message-string err)))))
+      (if (< success total)
+          (progn
+            (message "Pushed %d/%d, %d errors — see %s"
+                     success total (- total success) anki-flashcard-error-buffer)
+            (display-buffer anki-flashcard-error-buffer))
+	(message "Pushed all %d annotation files" total))))
   )
 
 ;;; ** Agenda
@@ -4362,6 +4383,8 @@ signature, in that order."
   (elfeed-show-mode-hook . visual-line-mode)
   (elfeed-show-mode-hook-hook . efs/org-mode-visual-fill)
   (elfeed-search-mode-hook . my/setup-elfeed-scroll)
+  :custom
+  (elfeed-confirm-browse-url nil)
   :config
   (advice-add 'elfeed-search-clear-filter
 	      :after (lambda () (message "Clearing filter."))))
@@ -5593,6 +5616,7 @@ When pressed twice, make the sub/superscript roman."
      (?_ ("\\downarrow" "\\Downarrow"))
      (?. ("\\cdot" ".\\,"))
      (?, ("\\,"))
+     (?b ("\\beta" "\\bind"))
      ))
 
   :hook

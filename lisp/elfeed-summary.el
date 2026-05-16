@@ -6,27 +6,55 @@
 (defvar elfeed-summary-response-overlay nil
   "Overlay for displaying GPTel streaming responses dynamically.")
 
-(defcustom elfeed-summary-prompts '(("Decide to read" . "Assess this article:
-- **Category:** News/Analysis/Opinion/Tutorial/Technical/Other
-- **Information value:** High (novel insights, deep expertise, strong evidence) | Medium | Low (common knowledge, surface-level, promotional)
-- **Worth reading:** Yes/No and why
-- **Key points:** 3-5 specific takeaways
+(defcustom elfeed-summary-prompts
+  '(("Decide to read" . "Triage this RSS item. Be direct, no hedging.
 
-Be direct about whether this deserves your attention.")
-                                    ("Short summary" . "Summarize in under 150 words:
-- Main argument or finding
-- Supporting evidence or data
-- Practical implications or actionability
+**Step 1 — Flag the format:**
+- Is this primarily informational or reactive/entertainment?
+- Does the long-form medium (video, long article) add value, or is it stretching a small core?
+- Is the title engineering urgency (ALL CAPS, crisis framing, vague hooks)?
 
-Be specific, avoid vague phrasing. Then assess: substantive for your information diet, or noise?")
-                                    ("Comprehensive summary" . "Provide detailed coverage:
-- **Main argument:** Core claim and context
-- **Evidence & findings:** Key data or research backing it
-- **Practical implications:** What can be applied or acted upon
-- **Limitations & gaps:** Unsupported claims or missing context
-- **Source quality:** Author credibility and evidence rigor
+**Step 2 — Output:**
 
-Then assess: Does this merit deep engagement for your information diet?"))
+- **Category:** News commentary / Analysis / Entertainment / Tutorial / Technical / Other
+- **Verdict:** Watch/Read · Summary only · Skip
+  - *Watch/Read:* format adds genuine value over a summary
+  - *Summary only:* real content exists, but the medium adds more drag than signal
+  - *Skip:* nothing worth extracting (filler, reaction, pure entertainment)
+- **Reasoning:** One sentence on why this verdict.
+- **If \"Summary only\":** 2–3 sentences. Just what happened or what's argued, stripped of affect and framing.
+
+Do not pad. Do not soften.")
+
+    ("Short summary" . "Summarize this item in under 150 words.
+
+**Cover:**
+- What's argued or what happened (the core, not the framing)
+- Key evidence or specifics (numbers, names, sources)
+- What's actually actionable, if anything
+
+**Rules:**
+- No affect, no dramatization, no rhetorical flourishes
+- Skip throat-clearing intros and conclusions
+- If the item is mostly filler, say so in one sentence and stop
+
+**Then assess:** substantive for an information diet, or noise? One sentence.")
+
+    ("Comprehensive summary" . "Provide detailed coverage of this item.
+
+**Structure:**
+- **Argument:** Core claim and the context it's responding to
+- **Evidence:** Specific data, sources, or examples backing the claim
+- **Implications:** What's actionable or what changes downstream
+- **Gaps:** Unsupported claims, missing context, weak links in the reasoning
+- **Source quality:** Author credibility, evidence rigor, primary vs derivative
+
+**Rules:**
+- Be specific. \"The author argues X\" not \"the author discusses important themes\"
+- Name names, cite numbers
+- Flag speculation as speculation
+
+**Then assess:** Does this merit deep engagement, or is the comprehensive summary the whole value?"))
   "Prompts for entry summaries."
   :type 'alist
   :group 'elfeed)
