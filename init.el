@@ -3643,13 +3643,21 @@ With prefix C-u, force-repush all notes (ignores hash/unchanged check)."
               (lambda (n) (member "annotations" (org-roam-node-tags n)))
               (org-roam-node-list)))))
 
-  (defun my/anki-annotation-push-all ()
-    "Push all annotation files (via org-roam tag index) to Anki."
-    (interactive)
+  (defun my/anki-annotation-push-all (&optional all)
+    "Push annotation files to Anki.
+By default, pushes only files modified by the last sync
+\(stored in `annotation--recently-modified-files').
+With prefix argument ALL, push all files tagged :annotations:."
+    (interactive "P")
     (anki-flashcard-clear-error-buffer)
-    (let* ((files (my/anki-annotations-files))
+    (let* ((files (if (or all (null annotation--recently-modified-files))
+                      (my/anki-annotations-files)
+                    annotation--recently-modified-files))
+           (scope (if (or all (null annotation--recently-modified-files))
+                      "all" "recently modified"))
            (total (length files))
            (success 0))
+      (message "Pushing %d %s annotation file(s) to Anki..." total scope)
       (dolist (file files)
 	(condition-case err
             (with-current-buffer (find-file-noselect file)
@@ -3658,10 +3666,10 @@ With prefix C-u, force-repush all notes (ignores hash/unchanged check)."
           (error (anki-flashcard-report-error file (error-message-string err)))))
       (if (< success total)
           (progn
-            (message "Pushed %d/%d, %d errors — see %s"
-                     success total (- total success) anki-flashcard-error-buffer)
+            (message "Pushed %d/%d %s, %d errors — see %s"
+                     success total scope (- total success) anki-flashcard-error-buffer)
             (display-buffer anki-flashcard-error-buffer))
-	(message "Pushed all %d annotation files" total))))
+	(message "Pushed all %d %s annotation files" total scope))))
   )
 
 ;;; ** Agenda
