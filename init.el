@@ -2263,7 +2263,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
 	 ("C-c n y d" . js/trail-deactivate)
 	 ("C-c n y y" . js/trail-add-at-point)
 	 ("C-c n y j" . js/trail-jump)
-	 ("C-c n u" . js/process-at-point)
+	 ("C-c n y u" . js/process-at-point)
 
 	 :map special-mode-map		; For quickly adding references
 	 ("Y" . js/trail-add-at-point)
@@ -5182,7 +5182,9 @@ If none of the selected entries are downloaded, a message is shown."
   :defer t
   :after request emacsql
   :commands wallabag
-  :bind (("C-x W" . wallabag)
+  :bind* (("C-x W" . wallabag)
+	  ("C-c n y w" . js/add-wallabag-at-point))
+  :bind (
          :map wallabag-search-mode-map
          ;; Basic navigation and viewing
          ("SPC" . wallabag-view)
@@ -5402,6 +5404,28 @@ If none of the selected entries are downloaded, a message is shown."
                       (message "Add Entry: %s" id)
                       (if wallabag-show-entry-after-creation
                           (wallabag-show-entry (car (wallabag-db-select :id id))) ))))))))
+
+(defun js/add-wallabag-at-point ()
+  "Send the URL at point to wallabag.
+
+Works on any org link (plain URL, bracket link, etc.).
+Skips id: links since those aren't web URLs."
+  (interactive)
+  (let* ((context (org-element-context))
+         (type (org-element-type context))
+         (link-type (org-element-property :type context))
+         (url (org-element-property :raw-link context)))
+    (pcase (list type link-type)
+      (`(link "id")
+       (message "Link is an org-roam id link, not a web URL."))
+      (`(link ,_)
+       (if (wallabag-db-select :url url)
+           (message "Already in wallabag: %s" url)
+         (wallabag-request-token)
+         (js/wallabag-add-entry url "")
+         (message "Sending to wallabag: %s" url)))
+      (_
+       (message "No link found at point.")))))
 
 (defun my/escape-html (s)
   "Minimal HTML-escape for S."
