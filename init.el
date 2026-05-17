@@ -3205,6 +3205,7 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
    "Open org-roam node by ID received via org-protocol."
    (when-let* ((id (plist-get data :id))
                (node (org-roam-node-from-id id)))
+     (tab-new)
      (org-roam-node-visit node nil 'force))
    nil)			; return nil: don't kill the emacsclient frame
 
