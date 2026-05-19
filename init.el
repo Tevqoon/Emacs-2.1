@@ -3650,26 +3650,27 @@ By default, pushes only files modified by the last sync
 With prefix argument ALL, push all files tagged :annotations:."
     (interactive "P")
     (anki-flashcard-clear-error-buffer)
-    (let* ((files (if (or all (null annotation--recently-modified-files))
+    (let* ((files (if all
                       (my/anki-annotations-files)
                     annotation--recently-modified-files))
-           (scope (if (or all (null annotation--recently-modified-files))
-                      "all" "recently modified"))
+           (scope (if all "all" "recently modified"))
            (total (length files))
            (success 0))
-      (message "Pushing %d %s annotation file(s) to Anki..." total scope)
-      (dolist (file files)
-	(condition-case err
-            (with-current-buffer (find-file-noselect file)
-              (save-excursion (anki-editor-push-notes 'file))
-              (cl-incf success))
-          (error (anki-flashcard-report-error file (error-message-string err)))))
-      (if (< success total)
-          (progn
-            (message "Pushed %d/%d %s, %d errors — see %s"
-                     success total scope (- total success) anki-flashcard-error-buffer)
-            (display-buffer anki-flashcard-error-buffer))
-	(message "Pushed all %d %s annotation files" total scope))))
+      (if (null files)
+          (message "No annotation files to push.")
+	(message "Pushing %d %s annotation file(s) to Anki..." total scope)
+	(dolist (file files)
+          (condition-case err
+              (with-current-buffer (find-file-noselect file)
+		(save-excursion (anki-editor-push-notes 'file))
+		(cl-incf success))
+            (error (anki-flashcard-report-error file (error-message-string err)))))
+	(if (< success total)
+            (progn
+              (message "Pushed %d/%d %s, %d errors — see %s"
+                       success total scope (- total success) anki-flashcard-error-buffer)
+              (display-buffer anki-flashcard-error-buffer))
+          (message "Pushed all %d %s annotation files" total scope)))))
   )
 
 ;;; ** Agenda
