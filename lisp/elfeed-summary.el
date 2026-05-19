@@ -9,50 +9,91 @@
 (defcustom elfeed-summary-prompts
   '(("Decide to read" . "Triage this RSS item. Be direct, no hedging.
 
-**Step 1 — Flag the format:**
-- Is this primarily informational or reactive/entertainment?
-- Does the long-form medium (video, long article) add value, or is it stretching a small core?
-- Is the title engineering urgency (ALL CAPS, crisis framing, vague hooks)?
+**Step 1 — Classify the content kind:**
+Identify which of these best fits:
+- *Hard news* — factual event or development, primary source
+- *Analysis* — interprets or contextualizes events, requires prior knowledge to evaluate
+- *Opinion/commentary* — argues a position, author's credibility matters
+- *Tutorial/technical* — teaches a skill or explains a system
+- *Entertainment/reaction* — primarily performance, personality, or affect
+- *Research* — original data, methodology, findings
 
-**Step 2 — Output:**
+**Step 2 — Assess the medium:**
+Does the long-form format (video runtime, article length) add signal the content kind actually needs?
+- Hard news: rarely. A summary is almost always sufficient.
+- Analysis/research: maybe. Nuance can require length.
+- Opinion: only if the argument is dense or evolves. Most opinion pieces have one point repeated.
+- Tutorial/technical: often yes. Steps, code, demos need the medium.
+- Entertainment: no. The medium IS the content; if you're not watching for the experience, skip entirely.
 
-- **Category:** News commentary / Analysis / Entertainment / Tutorial / Technical / Other
+**Step 3 — Output:**
+
+- **Kind:** [one of the above]
 - **Verdict:** Watch/Read · Summary only · Skip
   - *Watch/Read:* format adds genuine value over a summary
   - *Summary only:* real content exists, but the medium adds more drag than signal
-  - *Skip:* nothing worth extracting (filler, reaction, pure entertainment)
-- **Reasoning:** One sentence on why this verdict.
-- **If \"Summary only\":** 2–3 sentences. Just what happened or what's argued, stripped of affect and framing.
+  - *Skip:* nothing worth extracting beyond a one-liner
+- **Core claim (always, even for Skip):** One sentence — what is actually being said or what happened, stripped of framing and affect.
+- **Reasoning:** One sentence on why this verdict given the content kind and medium.
+- **If \"Summary only\":** 2–3 sentences. What's argued or what happened, key specifics (names, numbers, sources), what's actionable if anything. No rhetorical flourishes.
 
 Do not pad. Do not soften.")
 
     ("Short summary" . "Summarize this item in under 150 words.
 
-**Cover:**
-- What's argued or what happened (the core, not the framing)
-- Key evidence or specifics (numbers, names, sources)
-- What's actually actionable, if anything
+First, identify the content kind: hard news / analysis / opinion / tutorial / research / entertainment.
+Then summarize accordingly:
+
+- *Hard news:* What happened, who, when, what changes downstream.
+- *Analysis/opinion:* Core claim in one sentence. Key evidence or reasoning. What it implies if correct.
+- *Tutorial/technical:* What problem it solves. The approach. What you'd need to act on it.
+- *Research:* Question, method, finding, caveat.
+- *Entertainment:* Don't summarize — state the one extractable claim or observation if any exists, then say it's entertainment.
 
 **Rules:**
-- No affect, no dramatization, no rhetorical flourishes
-- Skip throat-clearing intros and conclusions
+- No affect, no dramatization
+- Skip intros and conclusions
+- Be specific: names, numbers, sources over vague characterizations
 - If the item is mostly filler, say so in one sentence and stop
 
-**Then assess:** substantive for an information diet, or noise? One sentence.")
+**Then assess in one sentence:** substantive for an information diet, or noise?")
 
     ("Comprehensive summary" . "Provide detailed coverage of this item.
 
-**Structure:**
-- **Argument:** Core claim and the context it's responding to
-- **Evidence:** Specific data, sources, or examples backing the claim
-- **Implications:** What's actionable or what changes downstream
-- **Gaps:** Unsupported claims, missing context, weak links in the reasoning
-- **Source quality:** Author credibility, evidence rigor, primary vs derivative
+First, identify the content kind: hard news / analysis / opinion / tutorial / research / entertainment.
+Structure your summary for that kind:
+
+**For analysis or opinion:**
+- *Claim:* The core argument and what it's responding to
+- *Reasoning:* How the author gets from premises to conclusion
+- *Evidence:* Specific data, examples, or sources cited
+- *Gaps:* Unsupported assertions, missing context, weak links
+- *Source:* Author's relevant expertise or track record
+
+**For hard news:**
+- *What happened:* Event, actors, timeline
+- *Why it matters:* Immediate and downstream consequences
+- *What's uncertain:* What's confirmed vs. reported vs. speculated
+- *Source quality:* Primary, secondary, or derivative?
+
+**For tutorial/technical:**
+- *Problem:* What it solves
+- *Approach:* Core method or insight
+- *Prerequisites:* What you need to use it
+- *Limitations:* Where it breaks down
+- *Actionability:* Can you apply this directly?
+
+**For research:**
+- *Question:* What was investigated
+- *Method:* How (briefly)
+- *Finding:* The actual result, with effect sizes or specifics if available
+- *Caveats:* Sample, scope, replication status
+- *Implication:* What changes if this holds
 
 **Rules:**
 - Be specific. \"The author argues X\" not \"the author discusses important themes\"
-- Name names, cite numbers
-- Flag speculation as speculation
+- Name names, cite numbers, flag speculation as speculation
+- Entertainment gets one extractable claim if any, then stop
 
 **Then assess:** Does this merit deep engagement, or is the comprehensive summary the whole value?"))
   "Prompts for entry summaries."

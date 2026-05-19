@@ -5615,7 +5615,8 @@ When pressed twice, make the sub/superscript roman."
      ("ssned" "Inserts supersetneq dots" "\\supsetneq \\cdots \\supsetneq " nil nil nil t)
      ("leqd" "Inserts leq dots" "\\leq \\cdots \\leq " nil nil nil t)
      ("geqd" "Inserts geq dots" "\\geq \\cdots \\geq " nil nil nil t)
-
+     ("ceq" "Insert the pretty assignment coloneqq" "\\coloneqq" nil nil nil t)
+     ("Ceq" "Insert the pretty assignment Coloneqq" "\\Coloneqq" nil nil nil t)
 
      ("osuml"       "Insert \\bigoplus\\limits_{}^{}"
       "\\bigoplus\\limits_{?}^{}"  cdlatex-position-cursor nil nil t)
@@ -5638,6 +5639,7 @@ When pressed twice, make the sub/superscript roman."
       "\\binom{?}{}"  cdlatex-position-cursor nil nil t)
      ("oper"       "Insert \\operatorname{}"
       "\\operatorname{?}"  cdlatex-position-cursor nil nil t)
+
      ))
 
   (cdlatex-math-modify-alist
@@ -5650,6 +5652,7 @@ When pressed twice, make the sub/superscript roman."
      ( ?C    "\\Class"           nil        t   nil nil )
      ( ?B    "\\mathbb"            nil t   nil nil )
      ( ?d   "\\llbracket ? \\rrbracket"  nil        nil nil nil )
+     ( ?p   "\\llparenthesis ? \\rrparenthesis"  nil        nil nil nil )
      ))
 
   (cdlatex-math-symbol-alist

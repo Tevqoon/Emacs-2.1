@@ -61,6 +61,7 @@
 	isearch-repeat-forward
 	ivy-occur-delete-candidate
 	js/agenda-refile
+	js/yas-cdlatex-tab
 	kill-region
 	kill-visual-line
 	kmacro-end-or-call-macro
