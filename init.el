@@ -5185,8 +5185,7 @@ If none of the selected entries are downloaded, a message is shown."
   :commands wallabag
   :bind* (("C-x W" . wallabag)
 	  ("C-c n y w" . js/add-wallabag-at-point))
-  :bind (
-         :map wallabag-search-mode-map
+  :bind (:map wallabag-search-mode-map
          ;; Basic navigation and viewing
          ("SPC" . wallabag-view)
          ("b" . wallabag-browse-url)
@@ -5252,6 +5251,24 @@ If none of the selected entries are downloaded, a message is shown."
   (wallabag-after-render-hook . my/wallabag-initialize-view)
 
   :config
+
+  (defun js/wallabag-org-link-store ()
+    "Store a wallabag org link from an entry buffer, for use with `org-store-link'."
+    (when (derived-mode-p 'wallabag-entry-mode)
+      (let* ((entry (get-text-property (point-min) 'wallabag-entry))
+             (id    (alist-get 'id entry))
+             (title (or (alist-get 'title entry) "No title")))
+	(org-link-store-props
+	 :type        "wallabag"
+	 :link        (format "wallabag:%s" id)
+	 :description title))))
+
+  (org-link-set-parameters
+   "wallabag"
+   :follow #'wallabag-org-link-view
+   :store  #'js/wallabag-org-link-store
+   :face   'wallabag-org-link)
+
   (setq wallabag-show-entry-switch #'switch-to-buffer)
 
   ;; Set up our custom parsers
