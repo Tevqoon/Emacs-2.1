@@ -1,7 +1,7 @@
 ;;; vulpea-dblocks.el --- Org dynamic blocks powered by vulpea -*- lexical-binding: t -*-
 
 ;; Author: Jure Smolar
-;; Version: 0.1.0
+;; Version: 0.2.0
 ;; Package-Requires: ((emacs "28.1") (vulpea "0.3") (org "9.6"))
 ;; Keywords: org, roam, vulpea, dynamic-blocks
 ;; URL: https://github.com/yourname/vulpea-dblocks
@@ -19,6 +19,7 @@
 ;;   :title-match  regex on title
 ;;   :exclude-tags list of tags to exclude
 ;;   :meta-filter  (KEY OP VALUE) e.g. ("rating" >= 8)
+;;   :limit        max number of results (applied after sort)
 ;;
 ;; roam-links additional params:
 ;;   :level        explicit heading depth (auto-detected from context otherwise)
@@ -27,13 +28,15 @@
 ;;   :columns      list of column specs (see below)
 ;;   :sort         column name to sort by
 ;;   :sort-dir     asc (default) or desc
+;;   :group-by     metadata key or symbol to group results by
 ;;
 ;; Column specs for roam-table:
-;;   title         note title (default, always available)
+;;   title         note title (always a link)
 ;;   tags          note tags as comma-separated string
 ;;   todo          todo state
 ;;   scheduled     scheduled timestamp
 ;;   deadline      deadline timestamp
+;;   backlinks     number of notes linking to this note
 ;;   "key"         a string treated as a vulpea metadata key
 ;;
 ;; Auto-update:
@@ -59,9 +62,13 @@
           (concat "^" (regexp-quote todo) "\\s-+") "" title))
       title)))
 
+(defun vulpea-dblocks--note-backlinks (note)
+  "Return the number of notes linking to NOTE."
+  (length (vulpea-db-query-links-to (vulpea-note-id note))))
+
 (defun vulpea-dblocks--note-column-value (note col)
   "Return the value of column COL for NOTE as a string.
-COL is either a symbol (title, tags, todo, scheduled, deadline)
+COL is a symbol (title, tags, todo, scheduled, deadline, backlinks)
 or a string treated as a vulpea metadata key."
   (pcase col
     ('title     (vulpea-dblocks--note-title note))
@@ -69,6 +76,7 @@ or a string treated as a vulpea metadata key."
     ('todo      (or (vulpea-note-todo note) ""))
     ('scheduled (or (vulpea-note-scheduled note) ""))
     ('deadline  (or (vulpea-note-deadline note) ""))
+    ('backlinks (number-to-string (vulpea-dblocks--note-backlinks note)))
     ((pred stringp)
      (or (vulpea-note-meta-get note col) ""))))
 
@@ -84,7 +92,6 @@ Applies :tags, :tags-every, :title-match, :exclude-tags, :meta-filter."
          (title-match  (plist-get params :title-match))
          (exclude-tags (plist-get params :exclude-tags))
          (meta-filter  (plist-get params :meta-filter))
-         ;; Start with the most selective indexed query
          (notes
           (cond
            (tags-every (vulpea-db-query-by-tags-every
@@ -92,7 +99,6 @@ Applies :tags, :tags-every, :title-match, :exclude-tags, :meta-filter."
            (tags       (vulpea-db-query-by-tags-some
                         (if (listp tags) tags (list tags))))
            (t          (vulpea-db-query))))
-         ;; AND in :tags on top of :tags-every if both given
          (notes
           (if (and tags tags-every)
               (let ((tags-list (if (listp tags) tags (list tags))))
@@ -102,7 +108,6 @@ Applies :tags, :tags-every, :title-match, :exclude-tags, :meta-filter."
                                 tags-list))
                  notes))
             notes))
-         ;; Title regex
          (notes
           (if title-match
               (seq-filter (lambda (n)
@@ -110,7 +115,6 @@ Applies :tags, :tags-every, :title-match, :exclude-tags, :meta-filter."
                                             (or (vulpea-note-title n) "")))
                           notes)
             notes))
-         ;; Exclude tags
          (notes
           (if exclude-tags
               (let ((ex (if (listp exclude-tags) exclude-tags (list exclude-tags))))
@@ -119,12 +123,11 @@ Applies :tags, :tags-every, :title-match, :exclude-tags, :meta-filter."
                    (not (seq-some (lambda (tag) (member tag (vulpea-note-tags n))) ex)))
                  notes))
             notes))
-         ;; Meta filter: (KEY OP VALUE) e.g. ("rating" >= 8)
          (notes
           (if meta-filter
-              (let* ((key (nth 0 meta-filter))
-                     (op  (nth 1 meta-filter))
-                     (val (nth 2 meta-filter))
+              (let* ((key   (nth 0 meta-filter))
+                     (op    (nth 1 meta-filter))
+                     (val   (nth 2 meta-filter))
                      (op-fn (pcase op
                               ('=  #'equal)
                               ('<  (lambda (a b) (< (string-to-number a) b)))
@@ -138,6 +141,36 @@ Applies :tags, :tags-every, :title-match, :exclude-tags, :meta-filter."
                      (funcall op-fn v val)))
                  notes))
             notes)))
+    notes))
+
+;;; ============================================================
+;;; Sorting and limiting
+;;; ============================================================
+
+(defun vulpea-dblocks--sort-notes (notes sort-col sort-dir)
+  "Sort NOTES by SORT-COL in SORT-DIR (asc or desc)."
+  (let* ((col      (if (stringp sort-col) sort-col
+                     (and sort-col (symbol-name sort-col))))
+         (is-meta  (and col (not (member col '("title" "tags" "todo"
+                                               "scheduled" "deadline")))))
+         (key-fn   (lambda (n)
+                     (vulpea-dblocks--note-column-value
+                      n (if is-meta col (intern (or col "title"))))))
+         (cmp-fn   (if is-meta
+                       (lambda (a b)
+                         (let ((na (string-to-number a))
+                               (nb (string-to-number b)))
+                           (if (and (not (zerop na)) (not (zerop nb)))
+                               (< na nb)
+                             (string< a b))))
+                     #'string<))
+         (sorted   (seq-sort-by key-fn cmp-fn notes)))
+    (if (eq sort-dir 'desc) (nreverse sorted) sorted)))
+
+(defun vulpea-dblocks--apply-limit (notes limit)
+  "Return at most LIMIT notes from NOTES, or all if LIMIT is nil."
+  (if (and limit (> limit 0))
+      (seq-take notes limit)
     notes))
 
 ;;; ============================================================
@@ -190,7 +223,6 @@ Nodes no longer matching the query but with content become CANCELLED."
   (let* ((prefix   (make-string level ?*))
          (live-ids (mapcar #'vulpea-note-id notes))
          (sorted   (seq-sort-by #'vulpea-dblocks--note-title #'string< notes)))
-    ;; Live nodes
     (dolist (note sorted)
       (let* ((id    (vulpea-note-id note))
              (title (vulpea-dblocks--note-title note))
@@ -199,7 +231,6 @@ Nodes no longer matching the query but with content become CANCELLED."
         (insert (format "%s [[id:%s][%s]]\n" prefix id title))
         (when (and body (not (string-empty-p body)))
           (insert body "\n"))))
-    ;; Dead nodes with content
     (dolist (entry existing)
       (let ((id    (nth 0 entry))
             (title (nth 1 entry))
@@ -218,6 +249,7 @@ Query params (shared with roam-table):
   :title-match  regex matched against note title
   :exclude-tags list of tags to exclude
   :meta-filter  (KEY OP VALUE) e.g. (\"rating\" >= 8)
+  :limit        max number of results
 
 Display params:
   :level        explicit heading depth (auto-detected from context if omitted)
@@ -229,7 +261,9 @@ Entries removed from the query but with annotations become CANCELLED."
                        1))
          (content  (or (plist-get params :content) ""))
          (existing (vulpea-dblocks--parse-existing-links content level))
-         (notes    (vulpea-dblocks--query params)))
+         (notes    (vulpea-dblocks--query params))
+         (notes    (vulpea-dblocks--sort-notes notes 'title 'asc))
+         (notes    (vulpea-dblocks--apply-limit notes (plist-get params :limit))))
     (vulpea-dblocks--insert-links notes level existing)))
 
 ;;; ============================================================
@@ -238,60 +272,68 @@ Entries removed from the query but with annotations become CANCELLED."
 
 (defun vulpea-dblocks--parse-column-spec (col)
   "Normalise a column spec COL to (HEADER . KEY).
-Symbols: title, tags, todo, scheduled, deadline → header is capitalised name.
-Strings: treated as metadata keys, header is the key itself.
-Conses: (HEADER . KEY) passed through as-is."
+Symbols → capitalised name as header.
+Strings → used as both header and metadata key.
+Conses  → passed through as-is."
   (cond
    ((consp col)   col)
    ((symbolp col) (cons (capitalize (symbol-name col)) col))
    ((stringp col) (cons col col))
    (t (error "Invalid column spec: %S" col))))
 
-(defun vulpea-dblocks--sort-notes (notes sort-col sort-dir)
-  "Sort NOTES by SORT-COL in SORT-DIR (asc or desc)."
-  (let* ((col    (if (stringp sort-col) sort-col
-                   (and sort-col (symbol-name sort-col))))
-         (is-meta (and col (not (member col '("title" "tags" "todo"
-                                              "scheduled" "deadline")))))
-         (key-fn (lambda (n)
-                   (vulpea-dblocks--note-column-value
-                    n (if is-meta col (intern (or col "title"))))))
-         (cmp-fn (if is-meta
-                     ;; Try numeric comparison, fall back to string
-                     (lambda (a b)
-                       (let ((na (string-to-number a))
-                             (nb (string-to-number b)))
-                         (if (and (not (zerop na)) (not (zerop nb)))
-                             (< na nb)
-                           (string< a b))))
-                   #'string<))
-         (sorted (seq-sort-by key-fn cmp-fn notes)))
-    (if (eq sort-dir 'desc) (nreverse sorted) sorted)))
+(defun vulpea-dblocks--group-notes (notes group-col)
+  "Group NOTES by GROUP-COL, returning an alist of (GROUP-VALUE . NOTES)."
+  (let ((groups '()))
+    (dolist (note notes)
+      (let* ((val (vulpea-dblocks--note-column-value note group-col))
+             (val (if (string-empty-p val) "—" val))
+             (existing (assoc val groups)))
+        (if existing
+            (setcdr existing (append (cdr existing) (list note)))
+          (push (cons val (list note)) groups))))
+    (sort groups (lambda (a b) (string< (car a) (car b))))))
 
-(defun vulpea-dblocks--insert-table (notes columns sort-col sort-dir)
+(defun vulpea-dblocks--insert-table-rows (notes specs row-fn)
+  "Insert table rows for NOTES using SPECS and ROW-FN."
+  (dolist (note notes)
+    (insert "| " (string-join (funcall row-fn note specs) " | ") " |\n")))
+
+(defun vulpea-dblocks--table-row-fn (note specs)
+  "Return list of cell values for NOTE given column SPECS."
+  (mapcar
+   (lambda (spec)
+     (let ((key (cdr spec)))
+       (if (eq key 'title)
+           (format "[[id:%s][%s]]"
+                   (vulpea-note-id note)
+                   (vulpea-dblocks--note-title note))
+         (vulpea-dblocks--note-column-value note key))))
+   specs))
+
+(defun vulpea-dblocks--insert-table (notes columns sort-col sort-dir group-col limit)
   "Insert an org table for NOTES with COLUMNS.
-SORT-COL is a column name or nil; SORT-DIR is asc or desc."
+SORT-COL and SORT-DIR control ordering; GROUP-COL groups into sections;
+LIMIT caps results per group (or total if no grouping)."
   (let* ((specs   (mapcar #'vulpea-dblocks--parse-column-spec columns))
+         (headers (mapcar #'car specs))
          (sorted  (vulpea-dblocks--sort-notes notes sort-col sort-dir))
-         ;; Always prefix title column with the org link
-         (row-fn
-          (lambda (note)
-            (mapcar
-             (lambda (spec)
-               (let ((key (cdr spec)))
-                 (if (eq key 'title)
-                     (format "[[id:%s][%s]]"
-                             (vulpea-note-id note)
-                             (vulpea-dblocks--note-title note))
-                   (vulpea-dblocks--note-column-value note key))))
-             specs))))
-    ;; Header row
-    (insert "| " (string-join (mapcar #'car specs) " | ") " |\n")
-    (insert "|-\n")
-    ;; Data rows
-    (dolist (note sorted)
-      (insert "| " (string-join (funcall row-fn note) " | ") " |\n"))
-    ;; Align the table
+         (row-fn  #'vulpea-dblocks--table-row-fn))
+    (if group-col
+        ;; Grouped: one table section per group value
+        (let ((groups (vulpea-dblocks--group-notes sorted group-col)))
+          (dolist (group groups)
+            (let* ((group-val   (car group))
+                   (group-notes (vulpea-dblocks--apply-limit (cdr group) limit)))
+              (insert (format "| *%s* |\n" group-val))
+              (insert "| " (string-join headers " | ") " |\n")
+              (insert "|-\n")
+              (vulpea-dblocks--insert-table-rows group-notes specs row-fn)
+              (insert "|-\n"))))
+      ;; Flat table
+      (let ((limited (vulpea-dblocks--apply-limit sorted limit)))
+        (insert "| " (string-join headers " | ") " |\n")
+        (insert "|-\n")
+        (vulpea-dblocks--insert-table-rows limited specs row-fn)))
     (org-table-align)))
 
 (defun org-dblock-write:roam-table (params)
@@ -303,23 +345,33 @@ Query params (shared with roam-links):
   :title-match  regex matched against note title
   :exclude-tags list of tags to exclude
   :meta-filter  (KEY OP VALUE) e.g. (\"rating\" >= 8)
+  :limit        max results (per group if :group-by is set)
 
 Display params:
   :columns      list of column specs, default (title)
-                symbols: title tags todo scheduled deadline
+                symbols: title tags todo scheduled deadline backlinks
                 strings: vulpea metadata keys, e.g. \"rating\" \"author\"
-                conses:  (\"Header\" . key) for custom headers
-  :sort         column name/symbol to sort by, e.g. \"rating\" or title
+                conses:  (\"Header\" . key) for custom header names
+  :sort         column to sort by, e.g. \"rating\" or title
   :sort-dir     asc (default) or desc
+  :group-by     metadata key or symbol to group results into sections
 
-Example:
+Examples:
   #+BEGIN: roam-table :tags (\"book\") :columns (title \"rating\" \"author\") :sort \"rating\" :sort-dir desc
+  #+END:
+
+  #+BEGIN: roam-table :tags (\"book\") :columns (title \"rating\") :group-by \"genre\" :sort \"rating\" :sort-dir desc
+  #+END:
+
+  #+BEGIN: roam-table :tags (\"book\") :columns (title backlinks) :sort backlinks :sort-dir desc :limit 5
   #+END:"
   (let* ((columns  (or (plist-get params :columns) '(title)))
          (sort-col (plist-get params :sort))
          (sort-dir (or (plist-get params :sort-dir) 'asc))
+         (group-by (plist-get params :group-by))
+         (limit    (plist-get params :limit))
          (notes    (vulpea-dblocks--query params)))
-    (vulpea-dblocks--insert-table notes columns sort-col sort-dir)))
+    (vulpea-dblocks--insert-table notes columns sort-col sort-dir group-by limit)))
 
 ;;; ============================================================
 ;;; Auto-update
