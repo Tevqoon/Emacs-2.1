@@ -3086,6 +3086,8 @@ you can catch it with `condition-case'."
   (org-node-alter-candidates t) ; OLP support
   (org-node-stay-in-source-buffer t)
 
+  (org-node-affixation-fn #'js/org-node-affix-olp-hashtags-aligned)  ; Add tag search support
+
   ;; Performance tuning
   (org-node-perf-keep-file-name-handlers nil)  ; Max speed
 
@@ -3123,6 +3125,29 @@ With C-u prefix, insert a transclusion instead."
     (if arg
 	(org-node-insert-transclusion)
       (org-node-insert-link*)))
+
+  (defun js/org-node-affix-olp-hashtags-aligned (node title)
+    "OLP prefix, right-aligned #hashtags suffix."
+    (let (olp)
+      (list title
+            (when (org-mem-entry-subtree-p node)
+              (let ((ancestors (org-mem-olpath-with-file-title node)))
+		(setq olp (concat (mapconcat (lambda (anc)
+                                               (propertize anc 'face 'org-node-parent))
+                                             ancestors " > ")
+                                  " > "))))
+            (let ((tags (org-mem-entry-tags node)))
+              (when tags
+		(let* ((tag-str (propertize
+                                 (mapconcat (lambda (tag) (concat "#" tag)) tags " ")
+                                 'face 'org-node-tag))
+                       (padding (max 2 (- (frame-width)
+                                          (string-width title)
+                                          (string-width (or olp ""))
+                                          (string-width tag-str)
+                                          (fringe-columns 'right)
+                                          (fringe-columns 'left)))))
+                  (concat (make-string padding ?\s) tag-str)))))))
 
   ;; Modified to work outside of org-mode buffers, so i can use it in the minibuffer
   (defun org-node-insert-link (&optional region-as-initial-input novisit)
