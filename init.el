@@ -3972,6 +3972,76 @@ _S_manual
     ("o" open-urls-at-point-or-region)
     ("q" js/triage-quit :color blue)))
 
+;;; ** Dynamic queries
+(use-package vulpea
+  :defer t
+  :config
+
+  (defun js/roam-links--collect (notes level)
+    "Insert sorted heading links for NOTES at heading depth LEVEL."
+    (let ((prefix (make-string level ?*)))
+      (dolist (note (seq-sort-by #'vulpea-note-title #'string< notes))
+        (let ((id    (vulpea-note-id note))
+              (title (vulpea-note-title note)))
+          (when (and id title)
+            (insert (format "%s [[id:%s][%s]]\n" prefix id title)))))))
+
+  (defun org-dblock-write:roam-links (params)
+    "Dynamic block: insert org-roam node links matching a query.
+
+Params:
+  :tags         - list of tags; returns notes with ANY of them, e.g. (\"trail\")
+  :tags-every   - list of tags; returns notes with ALL of them
+  :title-match  - regex matched against note title, e.g. \"@\"
+  :exclude-tags - list of tags to exclude from results
+  :level        - heading star count, default 1
+
+All specified filters are ANDed together."
+    (let* ((tags         (plist-get params :tags))
+           (tags-every   (plist-get params :tags-every))
+           (title-match  (plist-get params :title-match))
+           (exclude-tags (plist-get params :exclude-tags))
+           (level        (or (plist-get params :level) 1))
+           (notes
+            (cond
+             (tags-every (vulpea-db-query-by-tags-every
+                          (if (listp tags-every) tags-every (list tags-every))))
+             (tags       (vulpea-db-query-by-tags-some
+                          (if (listp tags) tags (list tags))))
+             (t          (vulpea-db-query))))
+           (notes
+            (if (and tags tags-every)
+                (seq-filter (lambda (n)
+                              (seq-every-p (lambda (tag) (member tag (vulpea-note-tags n)))
+                                           (if (listp tags) tags (list tags))))
+                            notes)
+              notes))
+           (notes
+            (if title-match
+                (seq-filter (lambda (n)
+                              (string-match-p title-match (or (vulpea-note-title n) "")))
+                            notes)
+              notes))
+           (notes
+            (if exclude-tags
+                (seq-filter (lambda (n)
+                              (not (seq-some (lambda (tag) (member tag (vulpea-note-tags n)))
+                                             (if (listp exclude-tags)
+                                                 exclude-tags
+                                               (list exclude-tags)))))
+                            notes)
+              notes)))
+      (js/roam-links--collect notes level)))
+
+  (defun js/roam-links-maybe-autoupdate ()
+    "Update all roam-links dblocks if file has #+ROAM_LINKS_AUTOUPDATE: t."
+    (when (and (derived-mode-p 'org-mode)
+               (string= "t" (cadr (car (org-collect-keywords
+                                        '("ROAM_LINKS_AUTOUPDATE"))))))
+      (org-update-all-dblocks)))
+
+  (add-hook 'org-mode-hook   #'js/roam-links-maybe-autoupdate)
+  (add-hook 'before-save-hook #'js/roam-links-maybe-autoupdate))
 ;;; ** Babel
 
 (use-package org ;;babel
