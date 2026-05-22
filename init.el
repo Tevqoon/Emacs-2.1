@@ -3973,9 +3973,23 @@ _S_manual
     ("q" js/triage-quit :color blue)))
 
 ;;; ** Dynamic queries
+
 (use-package vulpea
   :defer t
   :config
+
+  (advice-add 'org-prepare-dblock :around #'js/org-prepare-dblock-inject-level)
+
+  (defun js/org-prepare-dblock-inject-level (orig-fn)
+    "Inject :auto-level into dblock params before block is prepared."
+    (let ((level (save-excursion
+                   (condition-case nil
+                       (progn
+			 (outline-back-to-heading t)
+			 (1+ (org-current-level)))
+                     (error 1)))))  ; no heading above = top level, use 1
+      (let ((result (funcall orig-fn)))
+	(plist-put result :auto-level level))))
 
   (defun js/roam-links--collect (notes level)
     "Insert sorted heading links for NOTES at heading depth LEVEL."
@@ -3994,14 +4008,17 @@ Params:
   :tags-every   - list of tags; returns notes with ALL of them
   :title-match  - regex matched against note title, e.g. \"@\"
   :exclude-tags - list of tags to exclude from results
-  :level        - heading star count, default 1
+  :level        - explicit heading star count, overrides auto-detection
 
-All specified filters are ANDed together."
+All specified filters are ANDed together.
+Heading level is auto-detected from context if :level is not given."
     (let* ((tags         (plist-get params :tags))
            (tags-every   (plist-get params :tags-every))
            (title-match  (plist-get params :title-match))
            (exclude-tags (plist-get params :exclude-tags))
-           (level        (or (plist-get params :level) 1))
+           (level        (or (plist-get params :level)
+                             (plist-get params :auto-level)
+                             1))
            (notes
             (cond
              (tags-every (vulpea-db-query-by-tags-every
@@ -4035,13 +4052,16 @@ All specified filters are ANDed together."
 
   (defun js/roam-links-maybe-autoupdate ()
     "Update all roam-links dblocks if file has #+ROAM_LINKS_AUTOUPDATE: t."
-    (when (and (derived-mode-p 'org-mode)
-               (string= "t" (cadr (car (org-collect-keywords
-                                        '("ROAM_LINKS_AUTOUPDATE"))))))
+    (when (string= "t" (cadr (car (org-collect-keywords
+                                   '("ROAM_LINKS_AUTOUPDATE")))))
       (org-update-all-dblocks)))
 
-  (add-hook 'org-mode-hook   #'js/roam-links-maybe-autoupdate)
-  (add-hook 'before-save-hook #'js/roam-links-maybe-autoupdate))
+  (add-hook 'org-mode-hook
+            (lambda ()
+              (add-hook 'before-save-hook
+                        #'js/roam-links-maybe-autoupdate
+                        nil t))))
+
 ;;; ** Babel
 
 (use-package org ;;babel
