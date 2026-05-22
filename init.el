@@ -232,8 +232,8 @@ are defining or executing a macro."
   (project-kill-buffers-display-buffer-list t)
   :config (project-forget-zombie-projects)
   :hook (find-file-hook . (lambda ()
-		       (when-let ((pr (project-current)))
-			 (project-remember-project pr)))))
+			    (when-let ((pr (project-current)))
+			      (project-remember-project pr)))))
 
 ;;; * Look and feel
 ;;; ** Theme & Symbols
@@ -1805,23 +1805,23 @@ Produces multiple regions so expreg can step through them."
   (setf (alist-get 'file org-link-frame-setup) #'find-file)
 
   (setq org-latex-classes
-      '(("article" "\\documentclass[11pt,a4paper]{article}"
-	 ("\\section{%s}" . "\\section*{%s}")
-	 ("\\subsection{%s}" . "\\subsection*{%s}")
-	 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
-	 ("\\paragraph{%s}" . "\\paragraph*{%s}")
-	 ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))
-	("report" "\\documentclass[11pt,a4paper]{report}"
-	 ("\\part{%s}" . "\\part*{%s}") ("\\chapter{%s}" . "\\chapter*{%s}")
-	 ("\\section{%s}" . "\\section*{%s}")
-	 ("\\subsection{%s}" . "\\subsection*{%s}")
-	 ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))
-	("book" "\\documentclass[11pt,a4paper]{book}"
-	 ("\\part{%s}" . "\\part*{%s}")
-	 ("\\chapter{%s}" . "\\chapter*{%s}")
-	 ("\\section{%s}" . "\\section*{%s}")
-	 ("\\subsection{%s}" . "\\subsection*{%s}")
-	 ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
+	'(("article" "\\documentclass[11pt,a4paper]{article}"
+	   ("\\section{%s}" . "\\section*{%s}")
+	   ("\\subsection{%s}" . "\\subsection*{%s}")
+	   ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+	   ("\\paragraph{%s}" . "\\paragraph*{%s}")
+	   ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))
+	  ("report" "\\documentclass[11pt,a4paper]{report}"
+	   ("\\part{%s}" . "\\part*{%s}") ("\\chapter{%s}" . "\\chapter*{%s}")
+	   ("\\section{%s}" . "\\section*{%s}")
+	   ("\\subsection{%s}" . "\\subsection*{%s}")
+	   ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))
+	  ("book" "\\documentclass[11pt,a4paper]{book}"
+	   ("\\part{%s}" . "\\part*{%s}")
+	   ("\\chapter{%s}" . "\\chapter*{%s}")
+	   ("\\section{%s}" . "\\section*{%s}")
+	   ("\\subsection{%s}" . "\\subsection*{%s}")
+	   ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
   (setq org-export-with-section-numbers nil)
 
   )
@@ -3128,7 +3128,10 @@ With C-u prefix, insert a transclusion instead."
 
   (defun js/org-node-affix-olp-hashtags-aligned (node title)
     "OLP prefix, right-aligned #hashtags suffix."
-    (let (olp)
+    (let* ((width  (- (frame-width)
+                      (fringe-columns 'right)
+                      (fringe-columns 'left)))
+           (olp    nil))
       (list title
             (when (org-mem-entry-subtree-p node)
               (let ((ancestors (org-mem-olpath-with-file-title node)))
@@ -3139,14 +3142,12 @@ With C-u prefix, insert a transclusion instead."
             (let ((tags (org-mem-entry-tags node)))
               (when tags
 		(let* ((tag-str (propertize
-                                 (mapconcat (lambda (tag) (concat "#" tag)) tags " ")
-                                 'face 'org-node-tag))
-                       (padding (max 2 (- (frame-width)
+				 (mapconcat (lambda (tag) (concat "#" tag)) tags " ")
+				 'face 'org-node-tag))
+                       (padding (max 2 (- width
                                           (string-width title)
                                           (string-width (or olp ""))
-                                          (string-width tag-str)
-                                          (fringe-columns 'right)
-                                          (fringe-columns 'left)))))
+                                          (string-width tag-str)))))
                   (concat (make-string padding ?\s) tag-str)))))))
 
   ;; Modified to work outside of org-mode buffers, so i can use it in the minibuffer
@@ -3225,20 +3226,20 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
 (with-eval-after-load 'org-roam
   (require 'org-protocol)
 
- ;; Handler: org-protocol://roam-id?id=<UUID> → visit that node
- (defun js/org-protocol-open-roam-id (data)
-   "Open org-roam node by ID received via org-protocol."
-   (when-let* ((id (plist-get data :id))
-               (node (org-roam-node-from-id id)))
-     (tab-new)
-     (org-roam-node-visit node nil 'force))
-   nil)			; return nil: don't kill the emacsclient frame
+  ;; Handler: org-protocol://roam-id?id=<UUID> → visit that node
+  (defun js/org-protocol-open-roam-id (data)
+    "Open org-roam node by ID received via org-protocol."
+    (when-let* ((id (plist-get data :id))
+		(node (org-roam-node-from-id id)))
+      (tab-new)
+      (org-roam-node-visit node nil 'force))
+    nil)			; return nil: don't kill the emacsclient frame
 
- (add-to-list 'org-protocol-protocol-alist
-              '("roam-id"
-		:protocol "roam-id"
-		:function js/org-protocol-open-roam-id
-		:kill-client nil)))
+  (add-to-list 'org-protocol-protocol-alist
+               '("roam-id"
+		 :protocol "roam-id"
+		 :function js/org-protocol-open-roam-id
+		 :kill-client nil)))
 
 ;;; * Vulpea
 
@@ -3450,11 +3451,11 @@ Each function is called with two arguments: the tag and the buffer.")
   :config
   (defvar js/vulpea-monthly-template
     '(:file-name "journal/monthlies/%Y-%m-monthly.org"
-			 :title "%Y-%m"
-			 :tags ("journal")
-			 :entry-level 1
-			 :entry-title "%Y-%m-%d %A"
-			 :head "#+created: %<[%Y-%m-%d]>\n#+startup: show2levels"))
+		 :title "%Y-%m"
+		 :tags ("journal")
+		 :entry-level 1
+		 :entry-title "%Y-%m-%d %A"
+		 :head "#+created: %<[%Y-%m-%d]>\n#+startup: show2levels"))
 
   (vulpea-journal-setup)
 
@@ -3705,18 +3706,18 @@ With prefix argument ALL, push all files tagged :annotations:."
   :ensure nil
   :bind* ("C-c a" . open-org-agenda)
   :bind (:map org-agenda-mode-map
-	 ("o" . my/ace-link-agenda-current-line)
-	 ("M-o" . my/ace-link-org-agenda-urls)
-	 ;; This one doesn't change the view
-	 ("g" . org-agenda-redo)
-	 ("r" . roam-agenda-files-update)
-	 ("<tab>" . outline-toggle-children)
-	 ("<backtab>" . outline-cycle-buffer)
-	 ("<return>" . org-agenda-goto)
-	 ("S-<return>" . org-agenda-switch-to)
-	 ("R" . js/agenda-refile)
-	 ("O" . js/agenda-roamify)
-	 )
+	      ("o" . my/ace-link-agenda-current-line)
+	      ("M-o" . my/ace-link-org-agenda-urls)
+	      ;; This one doesn't change the view
+	      ("g" . org-agenda-redo)
+	      ("r" . roam-agenda-files-update)
+	      ("<tab>" . outline-toggle-children)
+	      ("<backtab>" . outline-cycle-buffer)
+	      ("<return>" . org-agenda-goto)
+	      ("S-<return>" . org-agenda-switch-to)
+	      ("R" . js/agenda-refile)
+	      ("O" . js/agenda-roamify)
+	      )
 
   :custom
   (org-todo-keywords
@@ -4410,37 +4411,37 @@ signature, in that order."
   :commands elfeed
   :bind* ("C-x w" . elfeed)
   :bind (:map elfeed-search-mode-map
-         ("SPC" . elfeed-search-show-entry)
-	 ("t" . elfeed-search-trash)
-         ("T" . elfeed-filter-trash)
-	 ("A" . elfeed-filter-asmr)
-	 ("P" . elfeed-filter-papers)
-         ("i" . open-downloaded-youtube-in-iina)
-         ("I" . download-selected-youtube-videos)
-         ("D" . elfeed-filter-downloaded)
-	 ("s" . my/elfeed-show-default)
-	 ("U" . js/log-elfeed-process)
-	 ("B" . elfeed-browse-with-secondary-browser)
-	 ("W" . js/elfeed-entries-to-wallabag)
-	 ("O" . js/elfeed-dispatch-entries)
-	 ("<wheel-up>" . previous-line)
-	 ("<wheel-down>" . next-line)
-	 ("y" . elfeed-search-yank)
-	 ("V" . elpapers-ingest-full)
-	 ("K" . elpapers-semantic-search)
-         :map elfeed-show-mode-map
-         ("SPC" . elfeed-scroll-up-command)
-         ("S-SPC" . elfeed-scroll-down-command)
-	 ("U" . js/log-elfeed-process)
-         ;; If called with C-u then bring up the capture buffer
-	 ("t" . elfeed-show-trash)
-         ("i" . open-downloaded-youtube-in-iina)
-	 ("M-o" . ace-link-safari)
-	 ("B" . elfeed-browse-with-secondary-browser)
-	 ("W" . js/elfeed-entries-to-wallabag)
-	 ("O" . js/elfeed-dispatch-entries)
-	 ("V" . elpapers-ingest-full)
-	 ("y" . elfeed-show-yank))
+              ("SPC" . elfeed-search-show-entry)
+	      ("t" . elfeed-search-trash)
+              ("T" . elfeed-filter-trash)
+	      ("A" . elfeed-filter-asmr)
+	      ("P" . elfeed-filter-papers)
+              ("i" . open-downloaded-youtube-in-iina)
+              ("I" . download-selected-youtube-videos)
+              ("D" . elfeed-filter-downloaded)
+	      ("s" . my/elfeed-show-default)
+	      ("U" . js/log-elfeed-process)
+	      ("B" . elfeed-browse-with-secondary-browser)
+	      ("W" . js/elfeed-entries-to-wallabag)
+	      ("O" . js/elfeed-dispatch-entries)
+	      ("<wheel-up>" . previous-line)
+	      ("<wheel-down>" . next-line)
+	      ("y" . elfeed-search-yank)
+	      ("V" . elpapers-ingest-full)
+	      ("K" . elpapers-semantic-search)
+              :map elfeed-show-mode-map
+              ("SPC" . elfeed-scroll-up-command)
+              ("S-SPC" . elfeed-scroll-down-command)
+	      ("U" . js/log-elfeed-process)
+              ;; If called with C-u then bring up the capture buffer
+	      ("t" . elfeed-show-trash)
+              ("i" . open-downloaded-youtube-in-iina)
+	      ("M-o" . ace-link-safari)
+	      ("B" . elfeed-browse-with-secondary-browser)
+	      ("W" . js/elfeed-entries-to-wallabag)
+	      ("O" . js/elfeed-dispatch-entries)
+	      ("V" . elpapers-ingest-full)
+	      ("y" . elfeed-show-yank))
   :hook
   (elfeed-show-mode-hook . mixed-pitch-mode)
   (elfeed-show-mode-hook . visual-line-mode)
@@ -5221,55 +5222,55 @@ If none of the selected entries are downloaded, a message is shown."
   :bind* (("C-x W" . wallabag)
 	  ("C-c n y w" . js/add-wallabag-at-point))
   :bind (:map wallabag-search-mode-map
-         ;; Basic navigation and viewing
-         ("SPC" . wallabag-view)
-         ("b" . wallabag-browse-url)
-         ("B" . wallabag-browse-url-firefox)
-         ("n" . wallabag-next-entry)
-         ("p" . wallabag-previous-entry)
-         ("q" . wallabag-search-quit)
+              ;; Basic navigation and viewing
+              ("SPC" . wallabag-view)
+              ("b" . wallabag-browse-url)
+              ("B" . wallabag-browse-url-firefox)
+              ("n" . wallabag-next-entry)
+              ("p" . wallabag-previous-entry)
+              ("q" . wallabag-search-quit)
 
-         ;; Filtering and display options
-         ("c" . my/wallabag-show-unarchived) ; Mirror elfeed's clear filter - show default view
-         ("s" . my/wallabag-show-all) ; Show all entries including archived
-         ("S" . wallabag-search-live-filter) ; Search functionality
+              ;; Filtering and display options
+              ("c" . my/wallabag-show-unarchived) ; Mirror elfeed's clear filter - show default view
+              ("s" . my/wallabag-show-all) ; Show all entries including archived
+              ("S" . wallabag-search-live-filter) ; Search functionality
 
-         ;; Tag and status management
-         ("+" . wallabag-add-tags)
-         ("-" . wallabag-remove-tag)
-         ("t" . wallabag-delete-entry)
-         ("f" . wallabag-update-entry-starred)
+              ;; Tag and status management
+              ("+" . wallabag-add-tags)
+              ("-" . wallabag-remove-tag)
+              ("t" . wallabag-delete-entry)
+              ("f" . wallabag-update-entry-starred)
 
-         ;; Other functions
-         ("y" . wallabag-org-link-copy)
-         ("i" . wallabag-add-entry)
-         ("g" . wallabag-search-refresh-and-clear-filter)
-         ("G" . wallabag-search-update-and-clear-filter)
-	 ("R" . wallabag-search-synchronize-and-clear-filter)
-	 ("Y" . wallabag-full-update)
-         ("r" . wallabag-update-entry-archive)
-	 ("R" . js/wallabag-roamify-entry)
+              ;; Other functions
+              ("y" . wallabag-org-link-copy)
+              ("i" . wallabag-add-entry)
+              ("g" . wallabag-search-refresh-and-clear-filter)
+              ("G" . wallabag-search-update-and-clear-filter)
+	      ("R" . wallabag-search-synchronize-and-clear-filter)
+	      ("Y" . wallabag-full-update)
+              ("r" . wallabag-update-entry-archive)
+	      ("R" . js/wallabag-roamify-entry)
 
-         :map wallabag-entry-mode-map
-         ;; Entry mode keys (same as before)
-         ("SPC" . scroll-up-command)
-         ("S-SPC" . scroll-down-command)
-         ("M-o" . ace-link-safari)
-         ("b" . wallabag-browse-url)
-         ("+" . wallabag-add-tags)
-         ("-" . wallabag-remove-tag)
-         ("q" . wallabag-entry-quit)
-         ("n" . wallabag-next-entry)
-         ("p" . wallabag-previous-entry)
-         ("g" . wallabag-view)
-         ("t" . wallabag-delete-entry)
-         ("<" . beginning-of-buffer)
-         (">" . end-of-buffer)
-         ("y" . wallabag-org-link-copy)
-         ("f" . wallabag-update-entry-starred)
-         ("x" . wallabag-update-entry-archive)
-	 ("r" . wallabag-update-entry-archive)
-	 ("R" . js/wallabag-roamify-entry))
+              :map wallabag-entry-mode-map
+              ;; Entry mode keys (same as before)
+              ("SPC" . scroll-up-command)
+              ("S-SPC" . scroll-down-command)
+              ("M-o" . ace-link-safari)
+              ("b" . wallabag-browse-url)
+              ("+" . wallabag-add-tags)
+              ("-" . wallabag-remove-tag)
+              ("q" . wallabag-entry-quit)
+              ("n" . wallabag-next-entry)
+              ("p" . wallabag-previous-entry)
+              ("g" . wallabag-view)
+              ("t" . wallabag-delete-entry)
+              ("<" . beginning-of-buffer)
+              (">" . end-of-buffer)
+              ("y" . wallabag-org-link-copy)
+              ("f" . wallabag-update-entry-starred)
+              ("x" . wallabag-update-entry-archive)
+	      ("r" . wallabag-update-entry-archive)
+	      ("R" . js/wallabag-roamify-entry))
   :init
   ;; contains the wallabag info
 
@@ -5895,8 +5896,8 @@ When pressed twice, make the sub/superscript roman."
 (use-package eglot
   :defer t
   :bind (:map eglot-mode-map
-	 ("C-c e a" . eglot-code-actions)
-	 )
+	      ("C-c e a" . eglot-code-actions)
+	      )
   :ensure nil
   :hook ((python-mode-hook . eglot-ensure)
          (c-mode-hook . eglot-ensure)
@@ -5925,7 +5926,7 @@ When pressed twice, make the sub/superscript roman."
   :defer t
   :after eglot
   :bind (:map eglot-mode-map
-         ("<f1> ," . eldoc-box-help-at-point))
+              ("<f1> ," . eldoc-box-help-at-point))
   :custom
   (eldoc-box-clear-with-C-g t))
 
