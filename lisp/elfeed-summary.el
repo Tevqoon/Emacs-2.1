@@ -7,37 +7,11 @@
   "Overlay for displaying GPTel streaming responses dynamically.")
 
 (defcustom elfeed-summary-prompts
-  '(("Decide to read" . "Triage this RSS item. Be direct, no hedging.
+  '(("Brief" . "Summarize this item in 3–4 sentences of dense prose. No labels, no structure, no evaluation.
 
-**Step 1 — Classify the content kind:**
-Identify which of these best fits:
-- *Hard news* — factual event or development, primary source
-- *Analysis* — interprets or contextualizes events, requires prior knowledge to evaluate
-- *Opinion/commentary* — argues a position, author's credibility matters
-- *Tutorial/technical* — teaches a skill or explains a system
-- *Entertainment/reaction* — primarily performance, personality, or affect
-- *Research* — original data, methodology, findings
+First sentence: what happened or what is argued — written as a sharp subheadline would be, not as a topic sentence. Remaining sentences: key specifics (names, numbers, sources, methods, findings). If the item is mostly filler, say so in one sentence and stop.
 
-**Step 2 — Assess the medium:**
-Does the long-form format (video runtime, article length) add signal the content kind actually needs?
-- Hard news: rarely. A summary is almost always sufficient.
-- Analysis/research: maybe. Nuance can require length.
-- Opinion: only if the argument is dense or evolves. Most opinion pieces have one point repeated.
-- Tutorial/technical: often yes. Steps, code, demos need the medium.
-- Entertainment: no. The medium IS the content; if you're not watching for the experience, skip entirely.
-
-**Step 3 — Output:**
-
-- **Kind:** [one of the above]
-- **Verdict:** Watch/Read · Summary only · Skip
-  - *Watch/Read:* format adds genuine value over a summary
-  - *Summary only:* real content exists, but the medium adds more drag than signal
-  - *Skip:* nothing worth extracting beyond a one-liner
-- **Core claim (always, even for Skip):** One sentence — what is actually being said or what happened, stripped of framing and affect.
-- **Reasoning:** One sentence on why this verdict given the content kind and medium.
-- **If \"Summary only\":** 2–3 sentences. What's argued or what happened, key specifics (names, numbers, sources), what's actionable if anything. No rhetorical flourishes.
-
-Do not pad. Do not soften.")
+No affect. No framing. No meta-commentary.")
 
     ("Short summary" . "Summarize this item in under 150 words.
 
@@ -48,15 +22,13 @@ Then summarize accordingly:
 - *Analysis/opinion:* Core claim in one sentence. Key evidence or reasoning. What it implies if correct.
 - *Tutorial/technical:* What problem it solves. The approach. What you'd need to act on it.
 - *Research:* Question, method, finding, caveat.
-- *Entertainment:* Don't summarize — state the one extractable claim or observation if any exists, then say it's entertainment.
+- *Entertainment:* State the one extractable claim or observation if any exists, then stop.
 
 **Rules:**
 - No affect, no dramatization
 - Skip intros and conclusions
 - Be specific: names, numbers, sources over vague characterizations
-- If the item is mostly filler, say so in one sentence and stop
-
-**Then assess in one sentence:** substantive for an information diet, or noise?")
+- If the item is mostly filler, say so in one sentence and stop")
 
     ("Comprehensive summary" . "Provide detailed coverage of this item.
 
@@ -93,9 +65,7 @@ Structure your summary for that kind:
 **Rules:**
 - Be specific. \"The author argues X\" not \"the author discusses important themes\"
 - Name names, cite numbers, flag speculation as speculation
-- Entertainment gets one extractable claim if any, then stop
-
-**Then assess:** Does this merit deep engagement, or is the comprehensive summary the whole value?"))
+- Entertainment gets one extractable claim if any, then stop"))
   "Prompts for entry summaries."
   :type 'alist
   :group 'elfeed)
