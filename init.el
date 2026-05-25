@@ -1634,6 +1634,8 @@ Produces multiple regions so expreg can step through them."
   :custom
   (agent-shell-preferred-agent-config 'opencode)
   (agent-shell-opencode-default-model-id "github-copilot/claude-haiku-4.5")
+  (agent-shell-anthropic-authentication
+   (agent-shell-anthropic-make-authentication :login t))
   (agent-shell-prefer-viewport-interaction t)
   (agent-shell-session-strategy 'new)
   (agent-shell-show-usage-at-turn-end t)
@@ -1925,6 +1927,18 @@ This function is expected to be hooked in org-mode."
           ((and clipboard-url (not point-in-link))
            (insert (js/format-link clipboard-url)))
           (t (call-interactively 'org-insert-link)))))
+
+(defun js/youtube-channel-rss (url)
+  "Extract the RSS feed URL from a YouTube channel URL."
+  (interactive "sYouTube channel URL: ")
+  (let* ((feed (shell-command-to-string
+                (format "curl -s %S | grep -o 'feeds/videos\\.xml?channel_id=[^\"]*' | head -1 | xargs -I{} echo 'https://www.youtube.com/{}'" url)))
+         (feed (string-trim feed)))
+    (if (string-empty-p feed)
+        (user-error "No RSS feed found for %s" url)
+      (progn
+        (kill-new feed)
+        (message "Copied: %s" feed)))))
 
 ;;; ** Browser integration
 
