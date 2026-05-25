@@ -6288,6 +6288,23 @@ This function is derived from org-export-visible."
 		(not (get-char-property s 'invisible))))
     s))
 
+(defun js/insert-words (letters &optional length)
+  "Insert words containing all LETTERS into current buffer.
+Optionally filter by LENGTH."
+  (interactive
+   (list (read-string "Letters (no spaces): ")
+         (let ((n (read-number "Length (0 for all): " 0)))
+           (unless (zerop n) n))))
+  (let* ((wordlist "/usr/share/dict/words")
+         (length-filter (if length
+                            (format "grep -Eiw '[a-z]{%d}' %s" length wordlist)
+                          (format "grep -Ei '^[a-z]+$' %s" wordlist)))
+         (filter (mapconcat (lambda (c)
+                              (format "grep -i '%c'" c))
+                            (string-to-list letters)
+                            " | "))
+         (cmd (format "%s | %s" length-filter filter)))
+    (shell-command cmd (current-buffer))))
 
 ;;;
 ;;; End of configuration file.
