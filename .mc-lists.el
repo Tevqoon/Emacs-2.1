@@ -7,6 +7,7 @@
 	LaTeX-insert-left-brace
 	TeX-insert-backslash
 	agda2-load
+	agda2-make-case
 	ar/org-insert-link-dwim
 	avy-goto-char-timer
 	beginning-of-visual-line
@@ -60,6 +61,7 @@
 	indent-for-tab-command
 	isearch-repeat-forward
 	ivy-occur-delete-candidate
+	js/agda-backtab
 	js/agenda-refile
 	js/yas-cdlatex-tab
 	kill-region

@@ -92,6 +92,7 @@
   (global-auto-revert-non-file-buffers t)
   (delete-by-moving-to-trash t)
   (sentence-end-double-space nil)
+  (indent-tabs-mode nil)
 
   (auto-hscroll-mode t)
   (mouse-wheel-scroll-amount '(1 ((meta))
@@ -858,6 +859,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   ;; (outline-stars-mode 1)
   :hook
   (prog-mode-hook . outline-stars-setup)
+  (agda2-mode-hook . outline-stars-setup)
   :bind
   (:map prog-mode-map
 	("<backtab>" . outline-stars-cycle-buffer)
@@ -6086,28 +6088,28 @@ When pressed twice, make the sub/superscript roman."
                           :box nil)))
 
   (defun js/agda-tab ()
-    "Next goal if in a hole, else eri-indent."
+    "Next goal if in a hole; cycle subtree if on a heading; else eri-indent."
     (interactive)
-    (if (agda2-goal-at (point))
-        (agda2-next-goal)
-      (eri-indent)))
+    (cond
+     ((agda2-goal-at (point))  (agda2-next-goal))
+     ((outline-on-heading-p t) (outline-cycle))
+     (t                        (eri-indent))))
 
   (defun js/agda-backtab ()
-    "Previous goal if in a hole, else eri-indent-reverse."
+    "Previous goal if in a hole, else cycle outline visibility."
     (interactive)
     (if (agda2-goal-at (point))
-        (agda2-previous-goal)
-      (eri-indent-reverse)))
+	(agda2-previous-goal)
+      (outline-stars-cycle-buffer)))
+
   :config
   (advice-add 'agda2-next-goal     :before #'push-mark)
   (advice-add 'agda2-previous-goal :before #'push-mark)
-
+  (advice-add 'enable-theme :after #'js/fix-agda-highlight-face)
 
   :bind (:map agda2-mode-map
               ("<tab>"       . js/agda-tab)
-              ("S-<tab>" . js/agda-backtab))
-
-  :hook (load-theme . js/fix-agda-highlight-face))
+              ("S-<tab>" . js/agda-backtab)))
 
 ;;; ** Lean
 
