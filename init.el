@@ -5223,10 +5223,25 @@ If none of the selected entries are downloaded, a message is shown."
 ;;; * Annotation importer
 
 (use-package org-roam-annotation-import
-  :after org
+  :after org anki-editor
   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
+  :bind* ("C-c n p r a" . my/anki-sync-and-push-annotations)
   :config
-  (require 'wallabag-backend))
+  (require 'wallabag-backend)
+
+  (defun my/anki-sync-and-push-annotations ()
+    "Synchronise Wallabag annotations, then push the modified files to Anki.
+The push runs inside the sync's async completion callback, so it waits
+for pagination to finish and reads the freshly-populated
+`annotation--recently-modified-files'."
+    (interactive)
+    (message "Wallabag: starting async sync (will push to Anki when done)...")
+    (wb--detect-capabilities)
+    (wb--fetch-entries-page-async
+     1 nil
+     (lambda (entries)
+       (annotation--update-entries entries)
+       (my/anki-annotation-push-all)))))
 
 ;;; * Wallabag
 
