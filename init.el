@@ -3257,6 +3257,81 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
 		 :function js/org-protocol-open-roam-id
 		 :kill-client nil)))
 
+;;; ** Citations
+
+(use-package oc
+  :ensure nil
+  :init
+  (setq org-cite-global-bibliography
+        (list (expand-file-name "library.bib" org-directory)))
+  :config
+  (setq org-cite-insert-processor   'citar
+        org-cite-follow-processor   'citar
+        org-cite-activate-processor 'citar))
+
+(use-package citar
+  :after oc
+  :custom
+  (citar-bibliography org-cite-global-bibliography)
+  (citar-open-entry-function #'citar-open-entry-in-zotero)
+  :config
+  (defvar citar-capture-template
+    '(("r" "reference" plain "%?"
+       :target (file+head "references/${citar-citekey}.org"
+                          "#+title: ${note-title}\n#+filetags: :literature:")
+       :unnarrowed t)))
+
+  (defun js/citar--citekey-at-node ()
+    "Return the first citekey for the current org-roam node, or nil."
+    (when-let* ((node (and (fboundp 'org-roam-node-at-point)
+                           (org-roam-node-at-point)))
+                (keys (citar-org-roam--node-cite-refs node)))
+      (car keys)))
+
+  (defun js/citar-open-pdf ()
+    "Open PDF for reference at point, current node, or prompt."
+    (interactive)
+    (citar-open-files
+     (if-let ((key (or (citar-key-at-point)
+                       (js/citar--citekey-at-node))))
+         (list key)
+       (citar-select-refs))))
+
+  (defun js/citar-open-in-zotero ()
+    "Open reference in Zotero.
+Uses cite key at point, then current node's ref, then prompts."
+    (interactive)
+    (citar-open-entry-in-zotero
+     (or (citar-key-at-point)
+         (js/citar--citekey-at-node)
+         (citar-select-ref))))
+
+  (defun js/citar-open-note ()
+    "Select a reference and open or create its org-roam note."
+    (interactive)
+    (let ((org-roam-capture-templates citar-capture-template))
+      (citar-open-notes (citar-select-refs))))
+
+  (defun js/citar-insert-citation ()
+    "Select a reference and insert a citation."
+    (interactive)
+    (citar-insert-citation (citar-select-refs)))
+
+  :bind
+  (("C-c n b z" . js/citar-open-in-zotero)
+   ("C-c n b f" . js/citar-open-note)
+   ("C-c n b i" . js/citar-insert-citation)
+   ("C-c n b d" . js/citar-open-pdf)))
+
+(use-package citar-org-roam
+  :after (citar org-roam)
+  :custom
+  (citar-org-roam-note-title-template "${author} (${year}) - ${title}")
+  (citar-org-roam-subdir "references")
+  (citar-org-roam-capture-template-key "r")
+  :config
+  (citar-org-roam-mode))
+
 ;;; * Vulpea
 
 ;;; ** Basic config
@@ -5225,23 +5300,9 @@ If none of the selected entries are downloaded, a message is shown."
 (use-package org-roam-annotation-import
   :after org anki-editor
   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
-  :bind* ("C-c n p r a" . my/anki-sync-and-push-annotations)
+  :bind* ("C-c n p r a" . wallabag-synchronise-annotations)
   :config
-  (require 'wallabag-backend)
-
-  (defun my/anki-sync-and-push-annotations ()
-    "Synchronise Wallabag annotations, then push the modified files to Anki.
-The push runs inside the sync's async completion callback, so it waits
-for pagination to finish and reads the freshly-populated
-`annotation--recently-modified-files'."
-    (interactive)
-    (message "Wallabag: starting async sync (will push to Anki when done)...")
-    (wb--detect-capabilities)
-    (wb--fetch-entries-page-async
-     1 nil
-     (lambda (entries)
-       (annotation--update-entries entries)
-       (my/anki-annotation-push-all)))))
+  (require 'wallabag-backend))
 
 ;;; * Wallabag
 
