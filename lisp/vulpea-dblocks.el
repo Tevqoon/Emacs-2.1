@@ -1,7 +1,7 @@
 ;;; vulpea-dblocks.el --- Org dynamic blocks powered by vulpea -*- lexical-binding: t -*-
 
 ;; Author: Jure Smolar
-;; Version: 0.5.0
+;; Version: 0.5.2
 ;; Package-Requires: ((emacs "28.1") (vulpea "0.3") (org "9.6"))
 ;; Keywords: org, roam, vulpea, dynamic-blocks
 
@@ -95,10 +95,10 @@
 ;;
 ;;   A tags column with :exclude hides the listed tags; they cannot be removed
 ;;   by editing (re-added on write-back if the note already had them) and are
-;;   never injected onto a note that lacked them.  Metadata cells are split on
-;;   commas into a value list, so a single metadata value that itself contains
-;;   a comma will be split into two on edit (untouched cells are unaffected,
-;;   as write-back is idempotent against the current DB value).
+;;   never injected onto a note that lacked them.  Multi-valued metadata cells
+;;   are joined and split on `vulpea-dblocks-meta-separator' (default " ;; "),
+;;   not a comma, so values containing commas (plain strings or link
+;;   descriptions) round-trip safely.
 ;;
 ;; Auto-update:
 ;;   Add #+ROAM_DBLOCKS_AUTOUPDATE: t to a file to refresh all blocks on save.
@@ -109,6 +109,31 @@
 (require 'cl-lib)
 (require 'org)
 (require 'vulpea)
+
+;;; ============================================================
+;;; Customization
+;;; ============================================================
+
+(defgroup vulpea-dblocks nil
+  "Org dynamic blocks powered by vulpea."
+  :group 'org
+  :prefix "vulpea-dblocks-")
+
+(defcustom vulpea-dblocks-meta-separator " ;; "
+  "Separator between values of a multi-valued metadata cell in roam-table.
+
+Used only for metadata columns: a property with several values
+\(e.g. multiple `author' lines) renders its values joined by this string,
+and an editable cell is split back on it.  A comma is deliberately NOT
+used so that values which themselves contain commas — plain strings like
+\"a, b\" or link descriptions like [[id:..][Word, Another word]] — survive
+the round-trip intact.
+
+The leading/trailing spaces are cosmetic; splitting trims surrounding
+whitespace, so \" ;; \" and \";;\" parse identically.  Tags columns are
+unaffected (tags cannot contain commas and stay comma-joined)."
+  :type 'string
+  :group 'vulpea-dblocks)
 
 ;;; ============================================================
 ;;; Per-render dynamic state
@@ -214,10 +239,21 @@ per-row exploded value is returned without memoisation."
                            (dest-ids (mapcar (lambda (l) (plist-get l :dest)) links)))
                       (when dest-ids (vulpea-db-query-by-ids dest-ids))))
                    (_
-                    (let ((type (cdr (assoc key vulpea-dblocks--current-meta-types))))
-                      (if type
-                          (vulpea-note-meta-get note key type)
-                        (vulpea-note-meta-get note key)))))))
+                    (let* ((type (cdr (assoc key vulpea-dblocks--current-meta-types)))
+                           (vals (if type
+                                     (vulpea-note-meta-get-list note key type)
+                                   (vulpea-note-meta-get-list note key))))
+                      ;; Preserve scalar semantics for 0/1 values (so typed
+                      ;; reads, sorting, and :where comparisons still see a
+                      ;; number/string, not a one-element list); return the
+                      ;; full list only when a property genuinely has 2+
+                      ;; values (e.g. multiple authors); the metadata render
+                      ;; path joins these on `vulpea-dblocks-meta-separator'
+                      ;; and write-back round-trips them correctly.
+                      (pcase vals
+                        ('()        nil)
+                        (`(,single) single)
+                        (_          vals)))))))
             (when memo (puthash mkey val memo))
             val))))))
 
@@ -610,14 +646,22 @@ Deprecated: used only by `org-dblock-write:roam-links'."
 ;;; Aggregate evaluation and group-level sort
 ;;; ============================================================
 
-(defun vulpea-dblocks--format-value (val)
+(defun vulpea-dblocks--format-value (val &optional sep)
   "Format VAL as a table cell display string.
-Numbers use %%g (drops trailing zeros); lists join with \", \"."
-  (cond
-   ((null val)    "")
-   ((listp val)   (string-join (mapcar (lambda (x) (format "%s" x)) val) ", "))
-   ((numberp val) (format "%g" val))
-   (t             (format "%s" val))))
+Numbers use %%g (drops trailing zeros); lists join with SEP (default \", \")."
+  (let ((sep (or sep ", ")))
+    (cond
+     ((null val)    "")
+     ((listp val)   (string-join (mapcar (lambda (x) (format "%s" x)) val) sep))
+     ((numberp val) (format "%g" val))
+     (t             (format "%s" val)))))
+
+(defun vulpea-dblocks--format-meta-value (val)
+  "Format a metadata VAL for a table cell.
+Multi-valued metadata joins on `vulpea-dblocks-meta-separator' rather than
+a comma, so values containing commas round-trip safely.  Scalars are
+formatted exactly as `vulpea-dblocks--format-value'."
+  (vulpea-dblocks--format-value val vulpea-dblocks-meta-separator))
 
 (defun vulpea-dblocks--eval-aggregate (agg-spec rows)
   "Evaluate AGG-SPEC over ROWS (list of `vulpea-dblocks-row'), returning a value.
@@ -881,7 +925,11 @@ ROW may be a `vulpea-dblocks-row' struct or a bare `vulpea-note'."
                   (tags (seq-difference (vulpea-note-tags note) excl)))
              (string-join tags ", ")))
           (t
-           (vulpea-dblocks--field-as-string row key)))))
+           ;; Metadata (and computed scalar) column: multi-valued metadata
+           ;; joins on the meta separator so comma-bearing values round-trip;
+           ;; scalars format identically to `--field-as-string'.
+           (vulpea-dblocks--format-meta-value
+            (vulpea-dblocks--field row key))))))
      specs)))
 
 (defun vulpea-dblocks--insert-flat-table (rows columns)
@@ -1134,18 +1182,24 @@ returned; header, separator and group rows are skipped."
 
 (defun vulpea-dblocks--parse-meta-cell (cell)
   "Parse a rendered meta CELL string into a list of value strings.
-Splits on commas, trims, and drops empty fragments.  An empty cell
-yields nil (meaning: remove the property)."
-  (let ((parts (mapcar #'string-trim (split-string (or cell "") "," t))))
+Splits on `vulpea-dblocks-meta-separator' (matched ignoring surrounding
+whitespace), trims, and drops empty fragments.  An empty cell yields nil
+\(meaning: remove the property).  A comma is not a separator, so values
+containing commas are preserved."
+  (let* ((sep   (regexp-quote (string-trim vulpea-dblocks-meta-separator)))
+         (parts (mapcar #'string-trim (split-string (or cell "") sep t))))
     (seq-remove #'string-empty-p parts)))
 
 (defun vulpea-dblocks--meta-cell-changed-p (note key cell)
   "Return non-nil if meta CELL differs from NOTE's current KEY value.
 Compares the parsed cell list against the freshly rendered current value
-so that identical content (after round-trip) is treated as unchanged."
+so that identical content (after round-trip) is treated as unchanged.
+Both sides use `vulpea-dblocks-meta-separator', keeping the comparison
+symmetric with how the cell was rendered."
   (let* ((current   (vulpea-note-meta-get-list note key))
-         (rendered  (vulpea-dblocks--format-value current))
-         (cell-norm (string-join (vulpea-dblocks--parse-meta-cell cell) ", ")))
+         (rendered  (vulpea-dblocks--format-meta-value current))
+         (cell-norm (string-join (vulpea-dblocks--parse-meta-cell cell)
+                                 vulpea-dblocks-meta-separator)))
     (not (string= rendered cell-norm))))
 
 (defun vulpea-dblocks--parse-tags-cell (cell)
