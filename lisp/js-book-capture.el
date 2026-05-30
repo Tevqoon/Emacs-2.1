@@ -30,12 +30,15 @@
 Returns the parsed Lisp object or nil on error."
   (condition-case err
       (with-current-buffer (url-retrieve-synchronously url t t 10)
+        (set-buffer-multibyte t)
         (goto-char (point-min))
         ;; Skip HTTP headers
         (re-search-forward "^\r?\n" nil t)
         (let ((json-object-type 'alist)
               (json-array-type  'list)
-              (json-key-type    'symbol))
+              (json-key-type    'symbol)
+              (coding-system-for-read 'utf-8))
+          (decode-coding-region (point) (point-max) 'utf-8)
           (json-read)))
     (error
      (message "js-book-capture: HTTP error for %s — %s" url (error-message-string err))
@@ -138,20 +141,23 @@ Returns a list of candidate alists with keys:
   (js-book--meta-safe (format "[[id:%s][%s]]" id title)))
 
 (defun js-book--find-or-offer-create (title tags)
-  "Return an id: link string for the node with TITLE.
-If an exact node exists, return a link to it.
-If not, ask whether to create one tagged TAGS.
-If user declines, return TITLE as a plain string."
-  (let ((node (org-roam-node-from-title-or-alias title)))
+  "Prompt to select or create a node, starting with TITLE as initial input.
+If an existing node is chosen, return an id: link to it.
+If a new name is typed, create a node tagged TAGS and link it.
+If the prompt is exited empty, return TITLE as plain text."
+  (let* ((note (vulpea-select
+                (format "Link %s: " title)
+                :initial-prompt title
+                :require-match nil)))
     (cond
-     ;; Existing node -> link
-     (node
-      (js-book--id-link (org-roam-node-id node) title))
-     ;; Offer to create
-     ((yes-or-no-p (format "No node for %S. Create one? " title))
-      (let ((new-note (vulpea-create title nil :tags tags)))
-        (js-book--id-link (vulpea-note-id new-note) title)))
-     ;; Plain text fallback
+     ;; Existing node selected
+     ((and note (vulpea-note-id note))
+      (js-book--id-link (vulpea-note-id note) (vulpea-note-title note)))
+     ;; New title typed — create it
+     ((and note (not (string-blank-p (vulpea-note-title note))))
+      (let ((new-note (vulpea-create (vulpea-note-title note) nil :tags tags)))
+        (js-book--id-link (vulpea-note-id new-note) (vulpea-note-title new-note))))
+     ;; Blank / aborted — plain text fallback
      (t (js-book--meta-safe title)))))
 
 ;;;; ──────────────────────────────────────────────────────────────
