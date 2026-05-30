@@ -140,38 +140,40 @@ Returns a list of candidate alists with keys:
   "Return an org id: link string, with % escaped for vulpea meta."
   (js-book--meta-safe (format "[[id:%s][%s]]" id title)))
 
-(defun js-book--find-or-offer-create (title tags)
+(defun js-book--find-or-offer-create (title tags &optional skippable)
   "Prompt to select or create a node, starting with TITLE as initial input.
 If an existing node is chosen, return an id: link to it.
 If a new name is typed, create a node tagged TAGS and link it.
-If the prompt is exited empty, return TITLE as plain text."
-  (let* ((note (vulpea-select
-                (format "Link %s: " title)
-                :initial-prompt title
-                :require-match nil)))
-    (cond
-     ;; Existing node selected
-     ((and note (vulpea-note-id note))
-      (js-book--id-link (vulpea-note-id note) (vulpea-note-title note)))
-     ;; New title typed — create it
-     ((and note (not (string-blank-p (vulpea-note-title note))))
-      (let ((new-note (vulpea-create (vulpea-note-title note) nil :tags tags)))
-        (js-book--id-link (vulpea-note-id new-note) (vulpea-note-title new-note))))
-     ;; Blank / aborted — plain text fallback
-     (t (js-book--meta-safe title)))))
+If SKIPPABLE is non-nil, blank RET or C-g return nil (omit field).
+Otherwise, C-g inserts TITLE as plain unlinked text."
+  (condition-case nil
+      (let* ((prompt (if skippable
+                         (format "Link %s (C-g to skip): " title)
+                       (format "Link %s (C-g for plain text): " title)))
+             (note (vulpea-select prompt
+                                  :initial-prompt title
+                                  :require-match nil)))
+        (cond
+         ;; Existing node selected
+         ((and note (vulpea-note-id note))
+          (js-book--id-link (vulpea-note-id note) (vulpea-note-title note)))
+         ;; New title typed — create it
+         ((and note (not (string-blank-p (vulpea-note-title note))))
+          (let ((new-note (vulpea-create (vulpea-note-title note) nil :tags tags)))
+            (js-book--id-link (vulpea-note-id new-note) (vulpea-note-title new-note))))
+         ;; Blank
+         (t (unless skippable (js-book--meta-safe title)))))
+    ;; C-g
+    (quit (unless skippable (js-book--meta-safe title)))))
 
 ;;;; ──────────────────────────────────────────────────────────────
 ;;;; Genre / subject pruning
 ;;;; ──────────────────────────────────────────────────────────────
 
-(defun js-book--pick-genre (subjects)
-  "Let the user choose one genre from SUBJECTS (or enter a custom one).
-Returns a string, or nil if left empty."
-  (when subjects
-    (let* ((choice (completing-read
-                    "Genre (leave blank to skip): "
-                    subjects nil nil)))
-      (unless (string-blank-p choice) choice))))
+(defun js-book--pick-genre-and-link (subjects tags)
+  "Prompt for a genre using the same flow as author linking.
+Pre-fills with the first API subject. Blank RET or C-g skips genre entirely."
+  (js-book--find-or-offer-create (or (car subjects) "") tags 'skippable))
 
 ;;;; ──────────────────────────────────────────────────────────────
 ;;;; Note creation
@@ -196,19 +198,47 @@ Returns a string, or nil if left empty."
     (nreverse meta)))
 
 ;;;; ──────────────────────────────────────────────────────────────
+;;;; Lift (update existing note into a book note)
+;;;; ──────────────────────────────────────────────────────────────
+
+(defun js-book--lift-note (note meta isbn)
+  "Lift an existing NOTE into a book note.
+Adds the book tag if missing, sets ROAM_REFS to ISBN if provided,
+and merges META into the note's description list — only keys that
+are not already set are written, so existing data is preserved."
+  (let* ((existing-keys (mapcar #'car (vulpea-note-meta note)))
+         (new-meta (seq-filter (lambda (kv)
+                                 (not (member (car kv) existing-keys)))
+                               meta)))
+    (vulpea-utils-with-note-sync note
+      ;; Add :book: tag if not already there
+      (unless (member "book" (vulpea-buffer-tags-get))
+        (vulpea-buffer-tags-add "book"))
+      ;; Set ROAM_REFS if we have an ISBN and it's not set
+      (when (and isbn
+                 (not (org-entry-get nil "ROAM_REFS")))
+        (org-set-property "ROAM_REFS" (format "[[isbn:%s]]" isbn)))
+      ;; Merge only missing meta keys
+      (when new-meta
+        (vulpea-buffer-meta-set-batch new-meta)))))
+
+;;;; ──────────────────────────────────────────────────────────────
 ;;;; Entry point
 ;;;; ──────────────────────────────────────────────────────────────
 
 ;;;###autoload
 (defun js-book-capture (&optional as-heading)
-  "Interactively create an org-roam book note.
+  "Interactively create or update an org-roam book note.
 
-Prompts for a search query (title, author, or ISBN).  Searches
-Open Library, lets you pick a result, resolves author/genre nodes,
-then creates a Vulpea note tagged :book:.
+First searches Open Library by title/author/ISBN, then prompts to
+select an existing note to link or lift, or create a new one.
 
 Without prefix arg: creates a standalone file-level note.
-With prefix arg (C-u): inserts as a heading under the node at point."
+With prefix arg (C-u): inserts as a heading under the node at point.
+
+If an existing note is selected at the title step, it is 'lifted'
+into a book note: the :book: tag and any missing metadata are added
+without disturbing existing content."
   (interactive "P")
   (let* (;; ── 1. Resolve parent (heading mode only) ────────────
          (parent (when as-heading
@@ -219,12 +249,11 @@ With prefix arg (C-u): inserts as a heading under the node at point."
                      vn)))
 
          ;; ── 2. Get search query ──────────────────────────────
-         (query (read-string "Search (title / author / ISBN): "))
+         (query (read-string "Search Open Library (title / author / ISBN): "))
 
          ;; ── 3. Fetch candidates ──────────────────────────────
          (candidates
           (or
-           ;; Pure ISBN? Try dedicated endpoint first for richer data.
            (and (string-match-p "\\`[0-9]\\{10,13\\}\\'" (string-trim query))
                 (when-let ((c (js-book--ol-isbn-lookup (string-trim query))))
                   (list c)))
@@ -235,57 +264,72 @@ With prefix arg (C-u): inserts as a heading under the node at point."
          (_ (unless candidates
               (user-error "No results found for %S" query)))
 
-         ;; ── 4. Pick a candidate ──────────────────────────────
+         ;; ── 4. Pick an Open Library candidate ────────────────
          (candidate (if (= (length candidates) 1)
                         (car candidates)
                       (js-book--select-candidate candidates)))
 
-         (title    (alist-get 'title   candidate))
-         (authors  (alist-get 'authors candidate))
-         (subjects (alist-get 'subjects candidate))
+         (api-title  (alist-get 'title   candidate))
+         (authors    (alist-get 'authors candidate))
+         (subjects   (alist-get 'subjects candidate))
 
-         ;; ── 5. Allow title edit ──────────────────────────────
-         (title (read-string "Book title: " title))
+         ;; ── 5. Select or name the target note ────────────────
+         ;; vulpea-select over ALL notes; api-title pre-filled.
+         ;; Existing note → lift. New title typed → create.
+         (target-note (vulpea-select
+                       "Book note (select existing or type new title): "
+                       :initial-prompt api-title
+                       :require-match nil))
+         (existing-note (and target-note
+                             (vulpea-note-id target-note)
+                             target-note))
+         (title (if existing-note
+                    (vulpea-note-title existing-note)
+                  (and target-note
+                       (vulpea-note-title target-note))))
+
+         (_ (unless (and title (not (string-blank-p title)))
+              (user-error "No title given, aborting")))
 
          ;; ── 6. Resolve author nodes ──────────────────────────
          (author-links
-          (mapcar (lambda (a)
-                    (js-book--find-or-offer-create a '("person" "author")))
-                  (or authors
-                      (list (read-string "Author name: ")))))
+          (delq nil
+                (mapcar (lambda (a)
+                          (js-book--find-or-offer-create a '("person" "author")))
+                        (or authors (list (read-string "Author name: "))))))
 
          ;; ── 7. Pick genre ────────────────────────────────────
-         (genre-raw  (js-book--pick-genre subjects))
-         (genre-link (when genre-raw
-                       (js-book--find-or-offer-create genre-raw '("genre"))))
+         (genre-link (js-book--pick-genre-and-link subjects '("genre")))
 
          ;; ── 8. Build metadata and properties ─────────────────
-         (meta       (js-book--build-meta candidate genre-link author-links))
-         (isbn       (or (alist-get 'isbn candidate)
-                         (let ((input (read-string "ISBN (leave blank to skip): ")))
-                           (unless (string-blank-p input) input))))
-         ;; org-roam requires bracket link syntax for ROAM_REFS
-         (properties (when isbn
-                       (list (cons "ROAM_REFS" (format "[[isbn:%s]]" isbn)))))
-         ;; For heading mode, serialize meta as a body description list since
-         ;; vulpea--create-heading does not support :meta
-         (meta-body  (when (and parent meta)
-                       (mapconcat (lambda (kv)
-                                    (format "- %s :: %s" (car kv) (cdr kv)))
-                                  meta "\n")))
+         (meta  (js-book--build-meta candidate genre-link author-links))
+         (isbn  (or (alist-get 'isbn candidate)
+                    (let ((input (read-string "ISBN (leave blank to skip): ")))
+                      (unless (string-blank-p input) input)))))
 
-         ;; ── 9. Create note ───────────────────────────────────
-         (note (vulpea-create title nil
-                              :tags '("book")
-                              :meta (unless parent meta)
-                              :body (when parent meta-body)
-                              :properties properties
-                              :parent parent)))
+    (if existing-note
+        ;; ── Lift path ────────────────────────────────────────
+        (progn
+          (js-book--lift-note existing-note meta isbn)
+          (find-file (vulpea-note-path existing-note)))
 
-    (message "Created book note: %s" (vulpea-note-path note))
-    (find-file (vulpea-note-path note))
-    (when parent
-      (goto-char (vulpea-note-pos note)))))
+      ;; ── Create path ──────────────────────────────────────
+      (let* ((properties (when isbn
+                           (list (cons "ROAM_REFS" (format "[[isbn:%s]]" isbn)))))
+             (meta-body  (when (and parent meta)
+                           (mapconcat (lambda (kv)
+                                        (format "- %s :: %s" (car kv) (cdr kv)))
+                                      meta "\n")))
+             (note (vulpea-create title nil
+                                  :tags '("book")
+                                  :meta (unless parent meta)
+                                  :body (when parent meta-body)
+                                  :properties properties
+                                  :parent parent)))
+        (message "Created book note: %s" (vulpea-note-path note))
+        (find-file (vulpea-note-path note))
+        (when parent
+          (goto-char (vulpea-note-pos note)))))))
 
 (provide 'js-book-capture)
 ;;; js-book-capture.el ends here
