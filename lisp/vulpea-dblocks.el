@@ -1,7 +1,7 @@
 ;;; vulpea-dblocks.el --- Org dynamic blocks powered by vulpea -*- lexical-binding: t -*-
 
 ;; Author: Jure Smolar
-;; Version: 0.4.1
+;; Version: 0.5.0
 ;; Package-Requires: ((emacs "28.1") (vulpea "0.3") (org "9.6"))
 ;; Keywords: org, roam, vulpea, dynamic-blocks
 
@@ -80,6 +80,25 @@
 ;;   ("Header" . key)          custom header name
 ;;   (AGG . "Header")          aggregate column, e.g. ((avg "rating") . "Avg")
 ;;   (group . "Header")        the group value column in a grouped table
+;;   (tags :exclude (a b))     tags column hiding tags a, b
+;;   ("Header" tags :exclude (a b)) same, with a custom header
+;;
+;; Editable tables (write-back):
+;;   With :editable t, editing the rendered `tags' and metadata cells and
+;;   running `org-update-dblock' (C-c C-c) writes the changes back into the
+;;   underlying notes (via vulpea-buffer-*), then re-renders.  Requires a
+;;   `title' column (its id: link anchors each row to a note).  Only tags and
+;;   metadata columns are writable; title/todo/scheduled/deadline/backlinks/
+;;   computed/aggregate cells are read-only and ignored.  Disabled when
+;;   :group-by or :flatten is set (rows are not 1:1 with notes there).
+;;   Editable blocks are excluded from save-triggered auto-rebuild.
+;;
+;;   A tags column with :exclude hides the listed tags; they cannot be removed
+;;   by editing (re-added on write-back if the note already had them) and are
+;;   never injected onto a note that lacked them.  Metadata cells are split on
+;;   commas into a value list, so a single metadata value that itself contains
+;;   a comma will be split into two on edit (untouched cells are unaffected,
+;;   as write-back is idempotent against the current DB value).
 ;;
 ;; Auto-update:
 ;;   Add #+ROAM_DBLOCKS_AUTOUPDATE: t to a file to refresh all blocks on save.
@@ -111,6 +130,13 @@ Distinguishes a cached nil from a cache miss (gethash default).")
   "Field name being exploded by :flatten during a render pass, or nil.
 When non-nil, `vulpea-dblocks--field' returns a row's :value slot instead of
 querying the DB for this field, so each exploded row shows its own value.")
+
+(defvar vulpea-dblocks--in-autoupdate nil
+  "Non-nil while `vulpea-dblocks-maybe-autoupdate' is running.
+Editable tables (`:editable t') skip both write-back and regeneration in
+this context, so a buffer save never clobbers in-progress edits.  Only an
+explicit `org-update-dblock'/`org-update-all-dblocks' (with this flag nil)
+processes an editable block.")
 
 ;;; ============================================================
 ;;; Row struct
@@ -790,8 +816,17 @@ Entries removed from the query but with annotations become CANCELLED."
 Symbols → (\"Symbol\" . symbol).
 Strings → (string . string).
 (HEADER . KEY) cons where HEADER is a string → passed through.
-(AGG-EXPR . HEADER) or (group . HEADER) → swapped to (HEADER . AGG-EXPR)."
+(AGG-EXPR . HEADER) or (group . HEADER) → swapped to (HEADER . AGG-EXPR).
+Tags with options:
+  (tags :exclude (a b))          → (\"Tags\" . (tags :exclude (a b)))
+  (\"Header\" tags :exclude (a b)) → (\"Header\" . (tags :exclude (a b)))"
   (cond
+   ;; Tags column carrying options, no custom header: (tags :exclude (...))
+   ((and (consp col) (eq (car col) 'tags))
+    (cons "Tags" col))
+   ;; Tags column with a custom header: ("Header" tags :exclude (...))
+   ((and (consp col) (stringp (car col)) (eq (cadr col) 'tags))
+    (cons (car col) (cons 'tags (cddr col))))
    ;; Aggregate or group marker: car is a list or the symbol `group'.
    ;; Convention (AGG-EXPR . HEADER) → normalise to (HEADER . AGG-EXPR).
    ((and (consp col)
@@ -803,8 +838,10 @@ Strings → (string . string).
    (t (error "Invalid column spec: %S" col))))
 
 (defun vulpea-dblocks--aggregate-spec-p (key)
-  "Return non-nil when KEY is an aggregate column spec (a list such as (avg FIELD))."
-  (listp key))
+  "Return non-nil when KEY is an aggregate column spec (a list such as (avg FIELD)).
+A tags-with-options key (tags :exclude (...)) is NOT an aggregate."
+  (and (listp key)
+       (not (eq (car-safe key) 'tags))))
 
 (defun vulpea-dblocks--group-rows (rows group-col)
   "Group ROWS by GROUP-COL, returning a sorted alist of (GROUP-VALUE . ROWS)."
@@ -832,11 +869,19 @@ ROW may be a `vulpea-dblocks-row' struct or a bare `vulpea-note'."
     (mapcar
      (lambda (spec)
        (let ((key (cdr spec)))
-         (if (eq key 'title)
-             (format "[[id:%s][%s]]"
-                     (vulpea-note-id note)
-                     (vulpea-dblocks--note-title note))
-           (vulpea-dblocks--field-as-string row key))))
+         (cond
+          ((eq key 'title)
+           (format "[[id:%s][%s]]"
+                   (vulpea-note-id note)
+                   (vulpea-dblocks--note-title note)))
+          ;; Tags column (bare `tags' or (tags :exclude (...))): render the
+          ;; visible tags, dropping any excluded ones.
+          ((vulpea-dblocks--spec-tags-p spec)
+           (let* ((excl (vulpea-dblocks--spec-tags-excludes spec))
+                  (tags (seq-difference (vulpea-note-tags note) excl)))
+             (string-join tags ", ")))
+          (t
+           (vulpea-dblocks--field-as-string row key)))))
      specs)))
 
 (defun vulpea-dblocks--insert-flat-table (rows columns)
@@ -913,6 +958,10 @@ Display params:
   :sort-dir     asc (default) or desc
   :group-by     metadata key or symbol to group results into sections
   :flatten      metadata key to explode into one row per value
+  :editable     when t, edits to tags/metadata cells are written back to the
+                underlying notes on `org-update-dblock'.  Requires a `title'
+                column.  Disabled with :group-by or :flatten.  Editable blocks
+                are excluded from save-triggered auto-rebuild.
   :meta-types   alist of (KEY . TYPE) for typed metadata reads
                 e.g. ((\"rating\" . number) (\"author\" . note))
 
@@ -923,39 +972,274 @@ Examples:
   #+BEGIN: roam-table :from (tag (\"book\")) :meta-filter (\"status\" = \"to-read\") :columns (title \"author\" \"status\")
   #+END:
 
+  #+BEGIN: roam-table :editable t :from (tag \"book\") :columns (title \"status\" \"rating\" (\"Tags\" tags :exclude (book)))
+  #+END:
+
   #+BEGIN: roam-table :tags (\"book\") :columns (title \"rating\") :group-by \"genre\" :sort \"rating\" :sort-dir desc
   #+END:
 
   #+BEGIN: roam-table :tags (\"book\") :columns (title backlinks) :sort backlinks :sort-dir desc :limit 5
   #+END:"
-  (let* ((vulpea-dblocks--field-memo (make-hash-table :test #'equal))
-         (vulpea-dblocks--current-meta-types (plist-get params :meta-types))
-         (columns     (or (plist-get params :columns) '(title)))
-         (sort-param  (plist-get params :sort))
-         (sort-dir    (or (plist-get params :sort-dir) 'asc))
-         (flatten-col (plist-get params :flatten))
-         (vulpea-dblocks--flatten-field flatten-col)
-         (group-by    (plist-get params :group-by))
-         (limit       (plist-get params :limit))
-         ;; Normalise :sort + :sort-dir: legacy single-column form becomes a cons.
-         (sort-spec   (when sort-param
-                        (vulpea-dblocks--normalize-sort-spec
-                         (if (or (symbolp sort-param) (stringp sort-param))
-                             (cons sort-param sort-dir)
-                           sort-param))))
-         ;; Pipeline: query → flatten → sort rows → [group → sort groups] → render
-         (notes (vulpea-dblocks--query params))
-         (rows  (vulpea-dblocks--flatten-rows notes flatten-col))
-         (rows  (vulpea-dblocks--sort-rows rows sort-spec)))
-    (if group-by
-        (vulpea-dblocks--insert-grouped-table
-         (vulpea-dblocks--sort-groups
-          (vulpea-dblocks--group-rows rows group-by)
-          sort-spec)
-         columns limit)
-      (vulpea-dblocks--insert-flat-table
-       (vulpea-dblocks--apply-limit rows limit)
-       columns))))
+  ;; Editable tables are not auto-rebuilt on save; only an explicit
+  ;; `org-update-dblock' (with --in-autoupdate nil) regenerates them, after
+  ;; first writing any cell edits back to the notes.  `org-prepare-dblock'
+  ;; has already emptied the block, so during an autoupdate sweep we must
+  ;; re-insert the captured :content verbatim rather than regenerate (which
+  ;; would clobber pending edits) or do nothing (which would empty it).
+  (if (and vulpea-dblocks--in-autoupdate (plist-get params :editable))
+      (let ((content (plist-get params :content)))
+        (when (and content (not (string-empty-p content)))
+          (insert (string-trim-right content "\n"))))
+    (let* ((vulpea-dblocks--field-memo (make-hash-table :test #'equal))
+           (vulpea-dblocks--current-meta-types (plist-get params :meta-types))
+           ;; Write-back runs first so the query below sees the updated DB.
+           (_writeback (vulpea-dblocks--writeback params))
+           (columns     (or (plist-get params :columns) '(title)))
+           (sort-param  (plist-get params :sort))
+           (sort-dir    (or (plist-get params :sort-dir) 'asc))
+           (flatten-col (plist-get params :flatten))
+           (vulpea-dblocks--flatten-field flatten-col)
+           (group-by    (plist-get params :group-by))
+           (limit       (plist-get params :limit))
+           ;; Normalise :sort + :sort-dir: legacy single-column form → cons.
+           (sort-spec   (when sort-param
+                          (vulpea-dblocks--normalize-sort-spec
+                           (if (or (symbolp sort-param) (stringp sort-param))
+                               (cons sort-param sort-dir)
+                             sort-param))))
+           ;; Pipeline: query → flatten → sort rows → [group → sort groups] → render
+           (notes (vulpea-dblocks--query params))
+           (rows  (vulpea-dblocks--flatten-rows notes flatten-col))
+           (rows  (vulpea-dblocks--sort-rows rows sort-spec)))
+      (if group-by
+          (vulpea-dblocks--insert-grouped-table
+           (vulpea-dblocks--sort-groups
+            (vulpea-dblocks--group-rows rows group-by)
+            sort-spec)
+           columns limit)
+        (vulpea-dblocks--insert-flat-table
+         (vulpea-dblocks--apply-limit rows limit)
+         columns)))))
+
+;;; ============================================================
+;;; Write-back (:editable tables push edits back to notes)
+;;; ============================================================
+;;
+;; When a roam-table has :editable t, editing the rendered tags / metadata
+;; cells and running `org-update-dblock' (C-c C-c) propagates the changes
+;; back into the underlying notes BEFORE the table is regenerated.
+;;
+;; Constraints:
+;;   * Requires a `title' column (its id: link is the row->note key).
+;;   * Only `tags' and metadata (string/cons) columns are writable.
+;;     title/todo/scheduled/deadline/backlinks/computed/aggregate are read-only.
+;;   * Disabled for grouped / flattened / aggregated tables (rows are not 1:1
+;;     with notes there).
+;;   * Idempotent: a cell is written only when it differs from a freshly
+;;     rendered cell of the note's current DB value.
+;;   * Sync is vulpea-native via `vulpea-db-update-file' (no org-roam).
+;;
+;; :editable also removes the block from save-triggered auto-rebuild (see
+;; `vulpea-dblocks--in-autoupdate'), so a save never clobbers pending edits.
+
+;;; --- column-spec classification -----------------------------
+
+(defun vulpea-dblocks--spec-title-p (spec)
+  "Return non-nil if column SPEC (HEADER . KEY) is the title column."
+  (eq (cdr spec) 'title))
+
+(defun vulpea-dblocks--spec-tags-p (spec)
+  "Return non-nil if SPEC is a tags column.
+A tags column key is the symbol `tags', or a list whose car is `tags'
+\(the (tags :exclude (...)) form)."
+  (let ((key (cdr spec)))
+    (or (eq key 'tags)
+        (and (consp key) (eq (car key) 'tags)))))
+
+(defun vulpea-dblocks--spec-tags-excludes (spec)
+  "Return the list of excluded tag strings for a tags SPEC, or nil.
+Reads the :exclude plist entry from a (tags :exclude (a b)) key."
+  (let ((key (cdr spec)))
+    (when (and (consp key) (eq (car key) 'tags))
+      (mapcar (lambda (x) (if (symbolp x) (symbol-name x) x))
+              (plist-get (cdr key) :exclude)))))
+
+(defun vulpea-dblocks--spec-meta-key (spec)
+  "Return the metadata key string for SPEC if it is a writable meta column.
+Returns nil for title/tags/builtin/computed/aggregate columns."
+  (let ((key (cdr spec)))
+    (cond
+     ;; Any list key (aggregate, tags-with-options) is not a meta column.
+     ((consp key) nil)
+     ;; Builtin read-only symbols.
+     ((memq key '(title tags todo scheduled deadline priority level id
+                  backlinks aliases))
+      nil)
+     ;; Bare symbol that is not a builtin → treat as meta key.
+     ((symbolp key) (symbol-name key))
+     ;; String key → meta key, unless it is a builtin or file. form.
+     ((stringp key)
+      (if (or (string-prefix-p "file." key)
+              (member key '("title" "tags" "todo" "scheduled" "deadline"
+                            "priority" "level" "id" "backlinks" "aliases")))
+          nil
+        key))
+     (t nil))))
+
+;;; --- parsing the rendered table -----------------------------
+
+(defconst vulpea-dblocks--id-link-re
+  "\\[\\[id:\\([^]]+\\)\\]\\[\\([^]]*\\)\\]\\]"
+  "Match an org id: link, capturing the id and the description.")
+
+(defun vulpea-dblocks--split-table-row (line)
+  "Split an org table LINE into a list of trimmed cell strings.
+LINE must start and end with `|'.  The leading/trailing empty cells
+produced by the surrounding pipes are dropped."
+  (let* ((inner (string-trim line "^\\s-*|" "|\\s-*$"))
+         (cells (split-string inner "|")))
+    (mapcar #'string-trim cells)))
+
+(defun vulpea-dblocks--cell-id (cell)
+  "Return the id embedded in a title CELL via [[id:...][...]], or nil."
+  (when (string-match vulpea-dblocks--id-link-re cell)
+    (match-string 1 cell)))
+
+(defun vulpea-dblocks--parse-table-rows (content specs)
+  "Parse rendered table CONTENT into rows aligned to SPECS.
+Returns a list of (ID . CELLS) where CELLS is a list of cell strings in
+column order.  Only data rows with a resolvable id in the title column are
+returned; header, separator and group rows are skipped."
+  (let* ((title-idx (cl-position-if #'vulpea-dblocks--spec-title-p specs))
+         (ncols     (length specs))
+         rows)
+    (when title-idx
+      (with-temp-buffer
+        (insert content)
+        (goto-char (point-min))
+        (while (not (eobp))
+          (let ((line (buffer-substring-no-properties
+                       (line-beginning-position) (line-end-position))))
+            (when (and (string-match-p "^\\s-*|" line)
+                       (not (string-match-p "^\\s-*|[-+]" line))) ; skip |---
+              (let ((cells (vulpea-dblocks--split-table-row line)))
+                (when (= (length cells) ncols)
+                  (let ((id (vulpea-dblocks--cell-id (nth title-idx cells))))
+                    (when id
+                      (push (cons id cells) rows)))))))
+          (forward-line 1))))
+    (nreverse rows)))
+
+;;; --- value normalisation for idempotent diffing -------------
+
+(defun vulpea-dblocks--parse-meta-cell (cell)
+  "Parse a rendered meta CELL string into a list of value strings.
+Splits on commas, trims, and drops empty fragments.  An empty cell
+yields nil (meaning: remove the property)."
+  (let ((parts (mapcar #'string-trim (split-string (or cell "") "," t))))
+    (seq-remove #'string-empty-p parts)))
+
+(defun vulpea-dblocks--meta-cell-changed-p (note key cell)
+  "Return non-nil if meta CELL differs from NOTE's current KEY value.
+Compares the parsed cell list against the freshly rendered current value
+so that identical content (after round-trip) is treated as unchanged."
+  (let* ((current   (vulpea-note-meta-get-list note key))
+         (rendered  (vulpea-dblocks--format-value current))
+         (cell-norm (string-join (vulpea-dblocks--parse-meta-cell cell) ", ")))
+    (not (string= rendered cell-norm))))
+
+(defun vulpea-dblocks--parse-tags-cell (cell)
+  "Parse a rendered tags CELL into a list of tag strings (comma-separated)."
+  (mapcar #'string-trim (split-string (or cell "") "," t "\\s-*")))
+
+;;; --- per-field write-back -----------------------------------
+
+(defun vulpea-dblocks--writeback-meta (note key cell)
+  "Write meta CELL back to NOTE under KEY if changed.  Return non-nil if written.
+An empty cell removes the property; otherwise the comma-split list is set.
+For heading-level notes the write is scoped to the heading subtree (BOUND
+\\='heading); without this the meta API defaults to whole-buffer scope and
+appends the value at the end of the file instead of inside the heading."
+  (when (vulpea-dblocks--meta-cell-changed-p note key cell)
+    (let ((values (vulpea-dblocks--parse-meta-cell cell))
+          (bound  (when (> (vulpea-note-level note) 0) 'heading)))
+      (vulpea-utils-with-note note
+        (if values
+            (vulpea-buffer-meta-set key values nil bound)
+          (vulpea-buffer-meta-remove key bound))
+        (save-buffer)))
+    t))
+
+(defun vulpea-dblocks--writeback-tags (note cell excludes)
+  "Write tags CELL back to NOTE, preserving EXCLUDES.  Return non-nil if written.
+The new tag set is the visible (edited) tags from CELL, unioned with any
+EXCLUDES the note already had.  Excluded tags are never shown in CELL and
+are never added to a note that lacked them."
+  (let* ((current   (vulpea-note-tags note))
+         (kept-excl (seq-intersection current excludes))
+         ;; Defensively drop any excluded tag a user typed into the visible
+         ;; cell, so it cannot be used to inject onto a note that lacked it.
+         (visible   (seq-difference (vulpea-dblocks--parse-tags-cell cell)
+                                    excludes))
+         (new-tags  (seq-uniq (append visible kept-excl)))
+         ;; Set comparison, order-independent.
+         (changed   (not (and (null (seq-difference current new-tags))
+                              (null (seq-difference new-tags current))))))
+    (when changed
+      (vulpea-utils-with-note note
+        (apply #'vulpea-buffer-tags-set new-tags)
+        (save-buffer))
+      t)))
+
+;;; --- orchestration ------------------------------------------
+
+(defun vulpea-dblocks--table-editable-p (params)
+  "Return non-nil if the roam-table PARAMS opt into write-back.
+Write-back is only allowed on flat tables (no :group-by, no :flatten)."
+  (and (plist-get params :editable)
+       (not (plist-get params :group-by))
+       (not (plist-get params :flatten))))
+
+(defun vulpea-dblocks--writeback (params)
+  "Propagate edits in the current roam-table dblock back to notes.
+Reads :content from PARAMS, matches rows to notes by title-cell id, and
+writes changed tags / meta cells.  Returns the number of notes touched.
+No-op (returns 0) unless `vulpea-dblocks--table-editable-p'.
+
+After writing, the touched files are re-parsed into the vulpea DB with
+`vulpea-db-update-file' so the table re-render in the same command reflects
+the new state."
+  (if (not (vulpea-dblocks--table-editable-p params))
+      0
+    (let* ((columns (or (plist-get params :columns) '(title)))
+           (specs   (mapcar #'vulpea-dblocks--parse-column-spec columns))
+           (content (or (plist-get params :content) ""))
+           (rows    (vulpea-dblocks--parse-table-rows content specs))
+           (paths   (make-hash-table :test #'equal)))
+      (unless (cl-position-if #'vulpea-dblocks--spec-title-p specs)
+        (user-error
+         "vulpea-dblocks: :editable table needs a `title' column to anchor rows"))
+      (dolist (row rows)
+        (let* ((id    (car row))
+               (cells (cdr row))
+               (note  (vulpea-db-get-by-id id)))
+          (when note
+            (cl-loop
+             for spec in specs
+             for cell in cells
+             do (cond
+                 ((vulpea-dblocks--spec-tags-p spec)
+                  (when (vulpea-dblocks--writeback-tags
+                         note cell (vulpea-dblocks--spec-tags-excludes spec))
+                    (puthash (vulpea-note-path note) t paths)))
+                 ((vulpea-dblocks--spec-meta-key spec)
+                  (when (vulpea-dblocks--writeback-meta
+                         note (vulpea-dblocks--spec-meta-key spec) cell)
+                    (puthash (vulpea-note-path note) t paths))))))))
+      ;; Re-parse touched files so the immediate re-render sees the edits.
+      (maphash (lambda (path _) (vulpea-db-update-file path)) paths)
+      (hash-table-count paths))))
+
 
 ;;; ============================================================
 ;;; Auto-update
@@ -972,12 +1256,15 @@ Examples:
 
 (defun vulpea-dblocks-maybe-autoupdate ()
   "Update all dblocks if file has #+ROAM_DBLOCKS_AUTOUPDATE: t.
-Skips update if point is inside a dblock (to preserve edits in progress)."
+Skips update if point is inside a dblock (to preserve edits in progress).
+Editable roam-tables are not regenerated here (see
+`vulpea-dblocks--in-autoupdate')."
   (when (and (string= "t" (cadr (car (org-collect-keywords
                                       '("ROAM_DBLOCKS_AUTOUPDATE")))))
              (not (vulpea-dblocks--point-in-dblock-p)))
-    (save-excursion
-      (org-update-all-dblocks))))
+    (let ((vulpea-dblocks--in-autoupdate t))
+      (save-excursion
+        (org-update-all-dblocks)))))
 
 ;;;###autoload
 (define-minor-mode vulpea-dblocks-mode
