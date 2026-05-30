@@ -4161,6 +4161,13 @@ _S_manual
   :vc (:url "https://github.com/isamert/corg.el")
   :hook (org-mode-hook . corg-setup))
 
+;;; ** Book import
+
+(use-package js-book-capture
+  :load-path "~/.emacs.d/lisp"
+  :commands js-book-capture
+  :bind ("C-c n b k" . js-book-capture))
+
 ;;; * org-static-blog
 ;;; Blog + Personal website configuration
 
