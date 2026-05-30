@@ -3332,6 +3332,10 @@ Uses cite key at point, then current node's ref, then prompts."
   :config
   (citar-org-roam-mode))
 
+
+
+
+
 ;;; * Vulpea
 
 ;;; ** Basic config
@@ -3563,7 +3567,7 @@ Each function is called with two arguments: the tag and the buffer.")
 ;;; ** Anki
 
 (use-package anki-editor
-  :after org
+  :defer t
   :if (not (eq system-type 'android))
   :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all anki-editor-push-notes anki/my/after-snippet-tag-handler
   :bind
@@ -3753,12 +3757,10 @@ With prefix C-u, force-repush all notes (ignores hash/unchanged check)."
 		 total (if force " (forced)" "")))))
 
   (defun my/anki-annotations-files ()
-    "Return list of org-roam files tagged :annotations:."
-    (delete-dups
-     (mapcar #'org-roam-node-file
-             (seq-filter
-              (lambda (n) (member "annotations" (org-roam-node-tags n)))
-              (org-roam-node-list)))))
+    "Return list of note files tagged :annotations:."
+    (seq-uniq
+     (mapcar #'vulpea-note-path
+             (vulpea-db-query-by-tags-some '("annotations")))))
 
   (defun my/anki-annotation-push-all (&optional all)
     "Push annotation files to Anki.
@@ -4526,6 +4528,9 @@ signature, in that order."
 	      ("y" . elfeed-search-yank)
 	      ("V" . elpapers-ingest-full)
 	      ("K" . elpapers-semantic-search)
+              ("l" . elfeed-search-watchlist)
+              ("L" . elfeed-filter-watchlist)
+
               :map elfeed-show-mode-map
               ("SPC" . elfeed-scroll-up-command)
               ("S-SPC" . elfeed-scroll-down-command)
@@ -4538,7 +4543,8 @@ signature, in that order."
 	      ("W" . js/elfeed-entries-to-wallabag)
 	      ("O" . js/elfeed-dispatch-entries)
 	      ("V" . elpapers-ingest-full)
-	      ("y" . elfeed-show-yank))
+	      ("y" . elfeed-show-yank)
+              ("l" . elfeed-show-watchlist))
   :hook
   (elfeed-show-mode-hook . mixed-pitch-mode)
   (elfeed-show-mode-hook . visual-line-mode)
@@ -4568,7 +4574,7 @@ signature, in that order."
     (message "Deleted %d entries" (length entries))))
 
 ;; Variables
-(setq-default elfeed-search-filter "-trash -asmr @7-days-ago +unread")
+(setq-default elfeed-search-filter "-trash -asmr -later @7-days-ago +unread")
 
 ;; Functions
 (defun elfeed-scroll-up-command (&optional arg)
@@ -4664,6 +4670,23 @@ signature, in that order."
   "Open up the asmr tagged feed."
   (interactive)
   (elfeed-filter-maker "-trash +asmr @1-months-ago" "Showing ASMR."))
+
+;; Watchlist
+(defun elfeed-search-watchlist ()
+  "Toggle the watchlist tag on the selection in search mode."
+  (interactive)
+  (elfeed-search-toggle-all 'later))
+
+(defun elfeed-show-watchlist ()
+  "Tag the item as watchlist and move to the next item in show mode."
+  (interactive)
+  (elfeed-show-tag 'later 'unread)
+  (elfeed-show-next))
+
+(defun elfeed-filter-watchlist ()
+  "Open the watchlist feed."
+  (interactive)
+  (elfeed-filter-maker "-trash +later @3-months-ago" "Showing watchlist."))
 
 (defun elfeed-filter-papers ()
   "Open up the papers tagged feed."
@@ -5298,11 +5321,30 @@ If none of the selected entries are downloaded, a message is shown."
 ;;; * Annotation importer
 
 (use-package org-roam-annotation-import
-  :after org anki-editor
+  :defer t
   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
-  :bind* ("C-c n p r a" . wallabag-synchronise-annotations)
+  :bind* (("C-c n p r a" . wallabag-synchronise-annotations)
+          ("C-c n p z" . js/anki-push-zotero)
+          ("C-c n p w" . js/anki-push-wallabag)
+          ("C-c n p k" . js/anki-push-koreader)
+          ("C-c n p A" . js/anki-push-all-annotations)
+          ("C-c n p a" . js/anki-push-recent-annotations)
+          ("C-c n p r z" . zotero-synchronise-annotations))
   :config
-  (require 'wallabag-backend))
+  (require 'wallabag-backend)
+  (require 'zotero-backend)
+  :custom
+  (zotero-anki-deck "Zotero")
+  :init
+  (with-eval-after-load 'ol
+    (org-link-set-parameters
+     "zotero"
+     :follow (lambda (path _)
+               (let ((uri (concat "zotero:" path)))
+                 (pcase system-type
+                   ('darwin     (call-process "open" nil nil nil uri))
+                   ('gnu/linux  (call-process "xdg-open" nil nil nil uri))
+                   (_           (browse-url uri))))))))
 
 ;;; * Wallabag
 
@@ -6087,8 +6129,9 @@ When pressed twice, make the sub/superscript roman."
   (clojure-indent-keyword-style 'always-indent)
   (clojure-enable-indent-specs nil)
   (clojure-align-forms-automatically t)
-  :hook
-  (clojure-mode-hook . aggressive-indent-mode))
+  ;; :hook
+  ;; (clojure-mode-hook . aggressive-indent-mode)
+  )
 
 (use-package cider
   :defer t
