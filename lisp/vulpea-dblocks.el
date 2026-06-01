@@ -1,7 +1,7 @@
 ;;; vulpea-dblocks.el --- Org dynamic blocks powered by vulpea -*- lexical-binding: t -*-
 
 ;; Author: Jure Smolar
-;; Version: 0.5.2
+;; Version: 0.6.0
 ;; Package-Requires: ((emacs "28.1") (vulpea "0.3") (org "9.6"))
 ;; Keywords: org, roam, vulpea, dynamic-blocks
 
@@ -12,7 +12,18 @@
 ;;   roam-links  — inserts heading links to matching roam nodes
 ;;   roam-table  — inserts an org table of matching nodes with metadata columns
 ;;
-;; v0.4.0 is the consolidated baseline.  It keeps the v0.3.0 architecture
+;; v0.6.0 decouples table direction.  Previously an `:editable' table wrote
+;; its cell edits back to the underlying notes on every `org-update-dblock'
+;; (C-c C-c), which meant a routine refresh could silently clobber changes
+;; made to the note files out of band — especially for fields that were
+;; empty in the table.  Now `org-update-dblock' on a roam-table ALWAYS pulls
+;; (regenerates from the DB and never writes), and a separate command,
+;; `vulpea-dblocks-push', writes the current table's edits back to the notes
+;; before regenerating.  `:editable' no longer means "write back on update";
+;; it means "this table may be pushed, and is protected from save-time
+;; regeneration."  See the "Editable tables" section below.
+;;
+;; v0.4.0 was the consolidated baseline.  It keeps the v0.3.0 architecture
 ;; (the :from/:where source DSL, the row struct with :flatten support,
 ;; aggregates, and group-level sort) and fixes the v0.3.0 regression in
 ;; which a legacy `:meta-filter' with the `=' operator compared a
@@ -46,7 +57,9 @@
 ;;   (today)      midnight today as float
 ;;   (days N)     N days in seconds
 ;;   (parse-ts S) parse timestamp string S to float
-;; DSL evaluation errors exclude the note silently.
+;; The DSL body is ordinary elisp: `and', `or', `not', `member', `let', etc.
+;; all nest arbitrarily.  DSL evaluation errors exclude the note silently;
+;; use the explicit (lambda (note) ...) form to let errors surface instead.
 ;;
 ;; LEGACY QUERY PARAMS (still supported, rewritten to :from/:where)
 ;; ---------------------------------------------------------------
@@ -54,7 +67,7 @@
 ;;   :tags-every   list of tags, notes with ALL
 ;;   :exclude-tags list of tags to exclude
 ;;   :title-match  regex on title
-;;   :meta-filter  (KEY OP VALUE), OP in (= < > <= >=)
+;;   :meta-filter  (KEY OP VALUE), OP in (= < > <= >= in)
 ;;   :limit        max number of results (applied after sort)
 ;;
 ;; roam-links additional params:
@@ -83,26 +96,43 @@
 ;;   (tags :exclude (a b))     tags column hiding tags a, b
 ;;   ("Header" tags :exclude (a b)) same, with a custom header
 ;;
-;; Editable tables (write-back):
-;;   With :editable t, editing the rendered `tags' and metadata cells and
-;;   running `org-update-dblock' (C-c C-c) writes the changes back into the
-;;   underlying notes (via vulpea-buffer-*), then re-renders.  Requires a
-;;   `title' column (its id: link anchors each row to a note).  Only tags and
-;;   metadata columns are writable; title/todo/scheduled/deadline/backlinks/
-;;   computed/aggregate cells are read-only and ignored.  Disabled when
-;;   :group-by or :flatten is set (rows are not 1:1 with notes there).
-;;   Editable blocks are excluded from save-triggered auto-rebuild.
+;; Editable tables (push-to-notes):
+;;   `:editable t' marks a table as pushable and protects it from save-time
+;;   regeneration.  It does NOT cause writes on a normal update.
+;;
+;;     C-c C-c (`org-update-dblock')   pulls only: regenerates from the DB,
+;;                                     never touches the note files.
+;;     M-x vulpea-dblocks-push          writes the current table's tags and
+;;                                     metadata cell edits back into the notes
+;;                                     (via vulpea-buffer-*), re-parses the
+;;                                     touched files, then regenerates.
+;;
+;;   This split exists so a routine refresh can never overwrite changes made
+;;   to the underlying notes out of band — push is always deliberate.  Push
+;;   is still last-write-wins at cell granularity: editing a cell here and
+;;   editing the same field in the file means push wins; it just cannot
+;;   happen by accident on a refresh.
+;;
+;;   Push requires a `title' column (its id: link anchors each row to a
+;;   note).  Only tags and metadata columns are writable; title/todo/
+;;   scheduled/deadline/backlinks/computed/aggregate cells are read-only and
+;;   ignored.  Push is disabled when :group-by or :flatten is set (rows are
+;;   not 1:1 with notes there); on such a table, and on a non-:editable
+;;   table, `vulpea-dblocks-push' is a harmless pull.
 ;;
 ;;   A tags column with :exclude hides the listed tags; they cannot be removed
-;;   by editing (re-added on write-back if the note already had them) and are
-;;   never injected onto a note that lacked them.  Multi-valued metadata cells
-;;   are joined and split on `vulpea-dblocks-meta-separator' (default " ;; "),
+;;   by editing (re-added on push if the note already had them) and are never
+;;   injected onto a note that lacked them.  Multi-valued metadata cells are
+;;   joined and split on `vulpea-dblocks-meta-separator' (default " ;; "),
 ;;   not a comma, so values containing commas (plain strings or link
 ;;   descriptions) round-trip safely.
 ;;
 ;; Auto-update:
 ;;   Add #+ROAM_DBLOCKS_AUTOUPDATE: t to a file to refresh all blocks on save.
 ;;   Blocks are skipped if point is inside them (to avoid clobbering edits).
+;;   Editable roam-tables are re-inserted verbatim on save rather than
+;;   regenerated, so a save never pulls canonical DB state over edits you
+;;   have not yet pushed.
 
 ;;; Code:
 
@@ -158,10 +188,17 @@ querying the DB for this field, so each exploded row shows its own value.")
 
 (defvar vulpea-dblocks--in-autoupdate nil
   "Non-nil while `vulpea-dblocks-maybe-autoupdate' is running.
-Editable tables (`:editable t') skip both write-back and regeneration in
-this context, so a buffer save never clobbers in-progress edits.  Only an
-explicit `org-update-dblock'/`org-update-all-dblocks' (with this flag nil)
-processes an editable block.")
+Editable tables (`:editable t') are re-inserted verbatim in this context
+\(neither pushed nor regenerated), so a buffer save never clobbers
+in-progress edits.  Only an explicit `org-update-dblock'/`org-update-all-
+dblocks' (with this flag nil) regenerates such a block.")
+
+(defvar vulpea-dblocks--pushing nil
+  "Non-nil while `vulpea-dblocks-push' is propagating table edits to notes.
+A plain `org-update-dblock' leaves this nil and therefore only pulls
+\(regenerates from the DB), so out-of-band changes to the underlying note
+files are never overwritten.  Only `vulpea-dblocks-push' binds this to t,
+running write-back before the table is regenerated.")
 
 ;;; ============================================================
 ;;; Row struct
@@ -277,6 +314,11 @@ OP semantics:
                a numeric match is also accepted (so (\"rating\" = 8)
                works whether rating is stored as \"8\").
   < > <= >=    numeric comparison; both sides are coerced to numbers.
+  in           membership: VALUE is a list of candidates; matches when ANY
+               of the note's values for KEY (multi-valued aware) equals,
+               as a string, one of the candidates.  Candidates may be
+               symbols, strings, or numbers, e.g.
+               (\"status\" in (to-read antilibrary)).
   other        treated as string equality.
 
 This corrects the v0.3.0 regression where `=' compared
@@ -291,6 +333,18 @@ This corrects the v0.3.0 regression where `=' compared
             (or (equal v ,(if (numberp val) (number-to-string val) val))
                 ,(when (numberp val)
                    `(= (string-to-number v) ,val))))))
+      ((or 'in 'member)
+       (let* ((cands (if (listp val) val (list val)))
+              (cand-strings
+               (mapcar (lambda (c)
+                         (cond ((stringp c) c)
+                               ((symbolp c) (symbol-name c))
+                               ((numberp c) (number-to-string c))
+                               (t (format "%s" c))))
+                       cands)))
+         `(lambda (n)
+            (let ((vs (vulpea-note-meta-get-list n ,key)))
+              (seq-some (lambda (v) (member v ',cand-strings)) vs)))))
       ((or '< '> '<= '>=)
        (let ((op-fn (pcase op ('< '<) ('> '>) ('<= '<=) ('>= '>=))))
          `(lambda (n)
@@ -994,7 +1048,7 @@ Query params (shared with roam-links):
   :tags-every   list of tags, notes with ALL
   :title-match  regex matched against note title
   :exclude-tags list of tags to exclude
-  :meta-filter  (KEY OP VALUE) e.g. (\"rating\" >= 8)
+  :meta-filter  (KEY OP VALUE) e.g. (\"rating\" >= 8) or (\"status\" in (a b))
   :limit        max results (per group if :group-by is set)
 
 Display params:
@@ -1006,10 +1060,13 @@ Display params:
   :sort-dir     asc (default) or desc
   :group-by     metadata key or symbol to group results into sections
   :flatten      metadata key to explode into one row per value
-  :editable     when t, edits to tags/metadata cells are written back to the
-                underlying notes on `org-update-dblock'.  Requires a `title'
-                column.  Disabled with :group-by or :flatten.  Editable blocks
-                are excluded from save-triggered auto-rebuild.
+  :editable     when t, marks the table as pushable and excludes it from
+                save-triggered auto-rebuild.  A plain `org-update-dblock'
+                (C-c C-c) on the table still only PULLS (regenerates from the
+                DB, never writes to notes); to write tags/metadata cell edits
+                back to the notes, run `vulpea-dblocks-push'.  Requires a
+                `title' column to push.  Push is disabled with :group-by or
+                :flatten.
   :meta-types   alist of (KEY . TYPE) for typed metadata reads
                 e.g. ((\"rating\" . number) (\"author\" . note))
 
@@ -1017,7 +1074,7 @@ Examples:
   #+BEGIN: roam-table :tags (\"book\") :columns (title \"rating\" \"author\") :sort \"rating\" :sort-dir desc
   #+END:
 
-  #+BEGIN: roam-table :from (tag (\"book\")) :meta-filter (\"status\" = \"to-read\") :columns (title \"author\" \"status\")
+  #+BEGIN: roam-table :from (tag (\"book\")) :meta-filter (\"status\" in (to-read antilibrary)) :columns (title \"author\" \"status\")
   #+END:
 
   #+BEGIN: roam-table :editable t :from (tag \"book\") :columns (title \"status\" \"rating\" (\"Tags\" tags :exclude (book)))
@@ -1028,20 +1085,29 @@ Examples:
 
   #+BEGIN: roam-table :tags (\"book\") :columns (title backlinks) :sort backlinks :sort-dir desc :limit 5
   #+END:"
-  ;; Editable tables are not auto-rebuilt on save; only an explicit
-  ;; `org-update-dblock' (with --in-autoupdate nil) regenerates them, after
-  ;; first writing any cell edits back to the notes.  `org-prepare-dblock'
-  ;; has already emptied the block, so during an autoupdate sweep we must
-  ;; re-insert the captured :content verbatim rather than regenerate (which
-  ;; would clobber pending edits) or do nothing (which would empty it).
+  ;; Direction is decoupled (v0.6.0):
+  ;;   * A plain `org-update-dblock' (--pushing nil) PULLS only: it
+  ;;     regenerates from the DB and never writes to the note files, so a
+  ;;     routine refresh can never clobber out-of-band edits to the notes.
+  ;;   * `vulpea-dblocks-push' (--pushing t) writes cell edits back first,
+  ;;     then regenerates from the now-updated DB.
+  ;;   * An autoupdate sweep (--in-autoupdate t) over an editable table
+  ;;     re-inserts the captured :content verbatim (neither pushes nor
+  ;;     regenerates), so a save never pulls canonical state over unpushed
+  ;;     edits.  `org-prepare-dblock' has already emptied the block, so we
+  ;;     must re-insert rather than do nothing (which would empty it).
   (if (and vulpea-dblocks--in-autoupdate (plist-get params :editable))
       (let ((content (plist-get params :content)))
         (when (and content (not (string-empty-p content)))
           (insert (string-trim-right content "\n"))))
     (let* ((vulpea-dblocks--field-memo (make-hash-table :test #'equal))
            (vulpea-dblocks--current-meta-types (plist-get params :meta-types))
-           ;; Write-back runs first so the query below sees the updated DB.
-           (_writeback (vulpea-dblocks--writeback params))
+           ;; Write-back only when explicitly pushing (vulpea-dblocks-push).
+           ;; A plain `org-update-dblock' pulls from the DB and never writes
+           ;; back, so out-of-band edits to the note files are never clobbered.
+           ;; Runs before the query so the re-render sees the updated DB.
+           (_writeback (when vulpea-dblocks--pushing
+                         (vulpea-dblocks--writeback params)))
            (columns     (or (plist-get params :columns) '(title)))
            (sort-param  (plist-get params :sort))
            (sort-dir    (or (plist-get params :sort-dir) 'asc))
@@ -1070,25 +1136,29 @@ Examples:
          columns)))))
 
 ;;; ============================================================
-;;; Write-back (:editable tables push edits back to notes)
+;;; Write-back (vulpea-dblocks-push pushes table edits to notes)
 ;;; ============================================================
 ;;
-;; When a roam-table has :editable t, editing the rendered tags / metadata
-;; cells and running `org-update-dblock' (C-c C-c) propagates the changes
-;; back into the underlying notes BEFORE the table is regenerated.
+;; Write-back is invoked ONLY from `vulpea-dblocks-push' (which binds
+;; `vulpea-dblocks--pushing' to t).  A plain `org-update-dblock' never calls
+;; it, so a routine refresh only pulls and can never overwrite changes made
+;; to the note files out of band.
+;;
+;; Push edits the rendered tags / metadata cells back into the underlying
+;; notes BEFORE the table is regenerated from the (now-updated) DB.
 ;;
 ;; Constraints:
 ;;   * Requires a `title' column (its id: link is the row->note key).
 ;;   * Only `tags' and metadata (string/cons) columns are writable.
 ;;     title/todo/scheduled/deadline/backlinks/computed/aggregate are read-only.
 ;;   * Disabled for grouped / flattened / aggregated tables (rows are not 1:1
-;;     with notes there).
+;;     with notes there); push on such a table is a harmless pull.
 ;;   * Idempotent: a cell is written only when it differs from a freshly
 ;;     rendered cell of the note's current DB value.
 ;;   * Sync is vulpea-native via `vulpea-db-update-file' (no org-roam).
-;;
-;; :editable also removes the block from save-triggered auto-rebuild (see
-;; `vulpea-dblocks--in-autoupdate'), so a save never clobbers pending edits.
+;;   * Still last-write-wins at cell granularity — push wins over a concurrent
+;;     file edit to the same field — but this can no longer happen by accident
+;;     on a refresh, only on a deliberate push.
 
 ;;; --- column-spec classification -----------------------------
 
@@ -1248,8 +1318,8 @@ are never added to a note that lacked them."
 ;;; --- orchestration ------------------------------------------
 
 (defun vulpea-dblocks--table-editable-p (params)
-  "Return non-nil if the roam-table PARAMS opt into write-back.
-Write-back is only allowed on flat tables (no :group-by, no :flatten)."
+  "Return non-nil if the roam-table PARAMS opt into push (write-back).
+Push is only allowed on flat tables (no :group-by, no :flatten)."
   (and (plist-get params :editable)
        (not (plist-get params :group-by))
        (not (plist-get params :flatten))))
@@ -1259,6 +1329,9 @@ Write-back is only allowed on flat tables (no :group-by, no :flatten)."
 Reads :content from PARAMS, matches rows to notes by title-cell id, and
 writes changed tags / meta cells.  Returns the number of notes touched.
 No-op (returns 0) unless `vulpea-dblocks--table-editable-p'.
+
+Called only from `vulpea-dblocks-push' (via `vulpea-dblocks--pushing'); a
+plain `org-update-dblock' never reaches this function.
 
 After writing, the touched files are re-parsed into the vulpea DB with
 `vulpea-db-update-file' so the table re-render in the same command reflects
@@ -1272,7 +1345,7 @@ the new state."
            (paths   (make-hash-table :test #'equal)))
       (unless (cl-position-if #'vulpea-dblocks--spec-title-p specs)
         (user-error
-         "vulpea-dblocks: :editable table needs a `title' column to anchor rows"))
+         "vulpea-dblocks: push needs a `title' column to anchor rows"))
       (dolist (row rows)
         (let* ((id    (car row))
                (cells (cdr row))
@@ -1292,8 +1365,27 @@ the new state."
                     (puthash (vulpea-note-path note) t paths))))))))
       ;; Re-parse touched files so the immediate re-render sees the edits.
       (maphash (lambda (path _) (vulpea-db-update-file path)) paths)
-      (hash-table-count paths))))
+      (let ((n (hash-table-count paths)))
+        (when (> n 0)
+          (message "vulpea-dblocks: pushed edits to %d note%s"
+                   n (if (= n 1) "" "s")))
+        n))))
 
+;;;###autoload
+(defun vulpea-dblocks-push ()
+  "Push edits in the roam-table dynamic block at point back to the notes.
+
+A plain `org-update-dblock' (C-c C-c) only pulls: it regenerates the table
+from the vulpea DB and never writes to the note files.  Run this command
+when you have edited tags / metadata cells in an `:editable' table and want
+those edits committed to the underlying notes.  After writing, the table is
+regenerated so it reflects the canonical (merged) DB state.
+
+Errors if point is not in a dynamic block.  A non-editable, grouped, or
+flattened table is pulled only (no edits are written)."
+  (interactive)
+  (let ((vulpea-dblocks--pushing t))
+    (org-update-dblock)))
 
 ;;; ============================================================
 ;;; Auto-update
@@ -1311,8 +1403,9 @@ the new state."
 (defun vulpea-dblocks-maybe-autoupdate ()
   "Update all dblocks if file has #+ROAM_DBLOCKS_AUTOUPDATE: t.
 Skips update if point is inside a dblock (to preserve edits in progress).
-Editable roam-tables are not regenerated here (see
-`vulpea-dblocks--in-autoupdate')."
+Editable roam-tables are re-inserted verbatim here rather than regenerated
+\(see `vulpea-dblocks--in-autoupdate'), so a save never pulls canonical DB
+state over edits that have not yet been pushed with `vulpea-dblocks-push'."
   (when (and (string= "t" (cadr (car (org-collect-keywords
                                       '("ROAM_DBLOCKS_AUTOUPDATE")))))
              (not (vulpea-dblocks--point-in-dblock-p)))
