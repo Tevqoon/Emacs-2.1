@@ -1381,11 +1381,20 @@ when you have edited tags / metadata cells in an `:editable' table and want
 those edits committed to the underlying notes.  After writing, the table is
 regenerated so it reflects the canonical (merged) DB state.
 
+Works from anywhere inside the block — point need not be on the `#+BEGIN'
+line.  (`org-update-dblock' delegates to `org-prepare-dblock', which only
+acts when point is `looking-at' the block start and otherwise errors with
+\"Not at a dynamic block\"; interactive C-c C-c hides this by seeking the
+start first via `org-ctrl-c-ctrl-c', but a direct call does not, so we seek
+to the start ourselves.)
+
 Errors if point is not in a dynamic block.  A non-editable, grouped, or
 flattened table is pulled only (no edits are written)."
   (interactive)
   (let ((vulpea-dblocks--pushing t))
-    (org-update-dblock)))
+    (save-excursion
+      (org-beginning-of-dblock)   ; seek to #+BEGIN from anywhere inside; errors if not in a block
+      (org-update-dblock))))
 
 ;;; ============================================================
 ;;; Auto-update

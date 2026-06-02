@@ -4096,6 +4096,7 @@ _S_manual
 (use-package vulpea-dblocks
   :after vulpea
   :load-path "~/.emacs.d/lisp"
+  :bind* ("C-c n p d" . vulpea-dblocks-push)
   :config
   (vulpea-dblocks-mode +1)
   ;; Refresh dblocks before export so published HTML/LaTeX never contains stale content.
@@ -4515,43 +4516,43 @@ signature, in that order."
 (use-package elfeed
   :defer t
   :commands elfeed
-  :bind* ("C-x w" . elfeed)
-  :bind (:map elfeed-search-mode-map
-              ("SPC" . elfeed-search-show-entry)
-	      ("t" . elfeed-search-trash)
-              ("T" . elfeed-filter-trash)
-	      ("A" . elfeed-filter-asmr)
-	      ("P" . elfeed-filter-papers)
-              ("i" . open-downloaded-youtube-in-iina)
-              ("I" . download-selected-youtube-videos)
-              ("D" . elfeed-filter-downloaded)
-	      ("s" . my/elfeed-show-default)
-	      ("U" . js/log-elfeed-process)
-	      ("B" . elfeed-browse-with-secondary-browser)
-	      ("W" . js/elfeed-entries-to-wallabag)
-	      ("O" . js/elfeed-dispatch-entries)
-	      ("<wheel-up>" . previous-line)
-	      ("<wheel-down>" . next-line)
-	      ("y" . elfeed-search-yank)
-	      ("V" . elpapers-ingest-full)
-	      ("K" . elpapers-semantic-search)
-              ("l" . elfeed-search-watchlist)
-              ("L" . elfeed-filter-watchlist)
+  :bind (("C-x w" . elfeed)
+         (:map elfeed-search-mode-map
+               ("SPC" . elfeed-search-show-entry)
+	       ("t" . elfeed-search-trash)
+               ("T" . elfeed-filter-trash)
+	       ("A" . elfeed-filter-asmr)
+	       ("P" . elfeed-filter-papers)
+               ("i" . open-downloaded-youtube-in-iina)
+               ("I" . download-selected-youtube-videos)
+               ("D" . elfeed-filter-downloaded)
+	       ("s" . my/elfeed-show-default)
+	       ("U" . js/log-elfeed-process)
+	       ("B" . elfeed-browse-with-secondary-browser)
+	       ("W" . js/elfeed-entries-to-wallabag)
+	       ("O" . js/elfeed-dispatch-entries)
+	       ("<wheel-up>" . previous-line)
+	       ("<wheel-down>" . next-line)
+	       ("y" . elfeed-search-yank)
+	       ("V" . elpapers-ingest-full)
+	       ("K" . elpapers-semantic-search)
+               ("l" . elfeed-search-watchlist)
+               ("L" . elfeed-filter-watchlist)
 
-              :map elfeed-show-mode-map
-              ("SPC" . elfeed-scroll-up-command)
-              ("S-SPC" . elfeed-scroll-down-command)
-	      ("U" . js/log-elfeed-process)
-              ;; If called with C-u then bring up the capture buffer
-	      ("t" . elfeed-show-trash)
-              ("i" . open-downloaded-youtube-in-iina)
-	      ("M-o" . ace-link-safari)
-	      ("B" . elfeed-browse-with-secondary-browser)
-	      ("W" . js/elfeed-entries-to-wallabag)
-	      ("O" . js/elfeed-dispatch-entries)
-	      ("V" . elpapers-ingest-full)
-	      ("y" . elfeed-show-yank)
-              ("l" . elfeed-show-watchlist))
+               :map elfeed-show-mode-map
+               ("SPC" . elfeed-scroll-up-command)
+               ("S-SPC" . elfeed-scroll-down-command)
+	       ("U" . js/log-elfeed-process)
+               ;; If called with C-u then bring up the capture buffer
+	       ("t" . elfeed-show-trash)
+               ("i" . open-downloaded-youtube-in-iina)
+	       ("M-o" . ace-link-safari)
+	       ("B" . elfeed-browse-with-secondary-browser)
+	       ("W" . js/elfeed-entries-to-wallabag)
+	       ("O" . js/elfeed-dispatch-entries)
+	       ("V" . elpapers-ingest-full)
+	       ("y" . elfeed-show-yank)
+               ("l" . elfeed-show-watchlist)))
   :hook
   (elfeed-show-mode-hook . mixed-pitch-mode)
   (elfeed-show-mode-hook . visual-line-mode)
@@ -5368,56 +5369,56 @@ If none of the selected entries are downloaded, a message is shown."
   :commands wallabag
   :bind* (("C-x W" . wallabag)
 	  ("C-c n y w" . js/add-wallabag-at-point))
-  :bind (:map wallabag-search-mode-map
-              ;; Basic navigation and viewing
-              ("SPC" . wallabag-view)
-              ("b" . wallabag-browse-url)
-              ("B" . wallabag-browse-url-firefox)
-              ("n" . wallabag-next-entry)
-              ("p" . wallabag-previous-entry)
-              ("q" . wallabag-search-quit)
+  :bind ((:map wallabag-search-mode-map
+               ;; Basic navigation and viewing
+               ("SPC" . wallabag-view)
+               ("b" . wallabag-browse-url)
+               ("B" . wallabag-browse-url-firefox)
+               ("n" . wallabag-next-entry)
+               ("p" . wallabag-previous-entry)
+               ("q" . wallabag-search-quit)
 
-              ;; Filtering and display options
-              ("c" . my/wallabag-show-unarchived) ; Mirror elfeed's clear filter - show default view
-              ("s" . my/wallabag-show-all) ; Show all entries including archived
-              ("S" . wallabag-search-live-filter) ; Search functionality
+               ;; Filtering and display options
+               ("c" . my/wallabag-show-unarchived) ; Mirror elfeed's clear filter - show default view
+               ("s" . my/wallabag-show-all) ; Show all entries including archived
+               ("S" . wallabag-search-live-filter) ; Search functionality
 
-              ;; Tag and status management
-              ("+" . wallabag-add-tags)
-              ("-" . wallabag-remove-tag)
-              ("t" . wallabag-delete-entry)
-              ("f" . wallabag-update-entry-starred)
+               ;; Tag and status management
+               ("+" . wallabag-add-tags)
+               ("-" . wallabag-remove-tag)
+               ("t" . wallabag-delete-entry)
+               ("f" . wallabag-update-entry-starred)
 
-              ;; Other functions
-              ("y" . wallabag-org-link-copy)
-              ("i" . wallabag-add-entry)
-              ("g" . wallabag-search-refresh-and-clear-filter)
-              ("G" . wallabag-search-update-and-clear-filter)
-	      ("R" . wallabag-search-synchronize-and-clear-filter)
-	      ("Y" . wallabag-full-update)
-              ("r" . wallabag-update-entry-archive)
-	      ("R" . js/wallabag-roamify-entry)
+               ;; Other functions
+               ("y" . wallabag-org-link-copy)
+               ("i" . wallabag-add-entry)
+               ("g" . wallabag-search-refresh-and-clear-filter)
+               ("G" . wallabag-search-update-and-clear-filter)
+	       ("R" . wallabag-search-synchronize-and-clear-filter)
+	       ("Y" . wallabag-full-update)
+               ("r" . wallabag-update-entry-archive)
+	       ("R" . js/wallabag-roamify-entry)
 
-              :map wallabag-entry-mode-map
-              ;; Entry mode keys (same as before)
-              ("SPC" . scroll-up-command)
-              ("S-SPC" . scroll-down-command)
-              ("M-o" . ace-link-safari)
-              ("b" . wallabag-browse-url)
-              ("+" . wallabag-add-tags)
-              ("-" . wallabag-remove-tag)
-              ("q" . wallabag-entry-quit)
-              ("n" . wallabag-next-entry)
-              ("p" . wallabag-previous-entry)
-              ("g" . wallabag-view)
-              ("t" . wallabag-delete-entry)
-              ("<" . beginning-of-buffer)
-              (">" . end-of-buffer)
-              ("y" . wallabag-org-link-copy)
-              ("f" . wallabag-update-entry-starred)
-              ("x" . wallabag-update-entry-archive)
-	      ("r" . wallabag-update-entry-archive)
-	      ("R" . js/wallabag-roamify-entry))
+               :map wallabag-entry-mode-map
+               ;; Entry mode keys (same as before)
+               ("SPC" . scroll-up-command)
+               ("S-SPC" . scroll-down-command)
+               ("M-o" . ace-link-safari)
+               ("b" . wallabag-browse-url)
+               ("+" . wallabag-add-tags)
+               ("-" . wallabag-remove-tag)
+               ("q" . wallabag-entry-quit)
+               ("n" . wallabag-next-entry)
+               ("p" . wallabag-previous-entry)
+               ("g" . wallabag-view)
+               ("t" . wallabag-delete-entry)
+               ("<" . beginning-of-buffer)
+               (">" . end-of-buffer)
+               ("y" . wallabag-org-link-copy)
+               ("f" . wallabag-update-entry-starred)
+               ("x" . wallabag-update-entry-archive)
+	       ("r" . wallabag-update-entry-archive)
+	       ("R" . js/wallabag-roamify-entry)))
   :init
   ;; contains the wallabag info
 
@@ -6205,6 +6206,7 @@ When pressed twice, make the sub/superscript roman."
 
   :preface
   (defun js/fix-agda-highlight-face (&rest _)
+    (interactive)
     (let* ((dark (eq (frame-parameter nil 'background-mode) 'dark))
            (bg (if dark "#073642" "#eee8d5"))
            (fg (if dark "#93a1a1" "#586e75")))
