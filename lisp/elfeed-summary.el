@@ -7,54 +7,65 @@
   "Overlay for displaying GPTel streaming responses dynamically.")
 
 (defcustom elfeed-summary-prompts
-  '(("Decide to read" . "Triage this RSS item. Be direct, no hedging.
+  '(("Brief" . "Summarize this item in 3–4 sentences of dense prose. No labels, no structure, no evaluation.
 
-**Step 1 — Flag the format:**
-- Is this primarily informational or reactive/entertainment?
-- Does the long-form medium (video, long article) add value, or is it stretching a small core?
-- Is the title engineering urgency (ALL CAPS, crisis framing, vague hooks)?
+First sentence: what happened or what is argued — written as a sharp subheadline would be, not as a topic sentence. Remaining sentences: key specifics (names, numbers, sources, methods, findings). If the item is mostly filler, say so in one sentence and stop.
 
-**Step 2 — Output:**
-
-- **Category:** News commentary / Analysis / Entertainment / Tutorial / Technical / Other
-- **Verdict:** Watch/Read · Summary only · Skip
-  - *Watch/Read:* format adds genuine value over a summary
-  - *Summary only:* real content exists, but the medium adds more drag than signal
-  - *Skip:* nothing worth extracting (filler, reaction, pure entertainment)
-- **Reasoning:** One sentence on why this verdict.
-- **If \"Summary only\":** 2–3 sentences. Just what happened or what's argued, stripped of affect and framing.
-
-Do not pad. Do not soften.")
+No affect. No framing. No meta-commentary.")
 
     ("Short summary" . "Summarize this item in under 150 words.
 
-**Cover:**
-- What's argued or what happened (the core, not the framing)
-- Key evidence or specifics (numbers, names, sources)
-- What's actually actionable, if anything
+First, identify the content kind: hard news / analysis / opinion / tutorial / research / entertainment.
+Then summarize accordingly:
+
+- *Hard news:* What happened, who, when, what changes downstream.
+- *Analysis/opinion:* Core claim in one sentence. Key evidence or reasoning. What it implies if correct.
+- *Tutorial/technical:* What problem it solves. The approach. What you'd need to act on it.
+- *Research:* Question, method, finding, caveat.
+- *Entertainment:* State the one extractable claim or observation if any exists, then stop.
 
 **Rules:**
-- No affect, no dramatization, no rhetorical flourishes
-- Skip throat-clearing intros and conclusions
-- If the item is mostly filler, say so in one sentence and stop
-
-**Then assess:** substantive for an information diet, or noise? One sentence.")
+- No affect, no dramatization
+- Skip intros and conclusions
+- Be specific: names, numbers, sources over vague characterizations
+- If the item is mostly filler, say so in one sentence and stop")
 
     ("Comprehensive summary" . "Provide detailed coverage of this item.
 
-**Structure:**
-- **Argument:** Core claim and the context it's responding to
-- **Evidence:** Specific data, sources, or examples backing the claim
-- **Implications:** What's actionable or what changes downstream
-- **Gaps:** Unsupported claims, missing context, weak links in the reasoning
-- **Source quality:** Author credibility, evidence rigor, primary vs derivative
+First, identify the content kind: hard news / analysis / opinion / tutorial / research / entertainment.
+Structure your summary for that kind:
+
+**For analysis or opinion:**
+- *Claim:* The core argument and what it's responding to
+- *Reasoning:* How the author gets from premises to conclusion
+- *Evidence:* Specific data, examples, or sources cited
+- *Gaps:* Unsupported assertions, missing context, weak links
+- *Source:* Author's relevant expertise or track record
+
+**For hard news:**
+- *What happened:* Event, actors, timeline
+- *Why it matters:* Immediate and downstream consequences
+- *What's uncertain:* What's confirmed vs. reported vs. speculated
+- *Source quality:* Primary, secondary, or derivative?
+
+**For tutorial/technical:**
+- *Problem:* What it solves
+- *Approach:* Core method or insight
+- *Prerequisites:* What you need to use it
+- *Limitations:* Where it breaks down
+- *Actionability:* Can you apply this directly?
+
+**For research:**
+- *Question:* What was investigated
+- *Method:* How (briefly)
+- *Finding:* The actual result, with effect sizes or specifics if available
+- *Caveats:* Sample, scope, replication status
+- *Implication:* What changes if this holds
 
 **Rules:**
 - Be specific. \"The author argues X\" not \"the author discusses important themes\"
-- Name names, cite numbers
-- Flag speculation as speculation
-
-**Then assess:** Does this merit deep engagement, or is the comprehensive summary the whole value?"))
+- Name names, cite numbers, flag speculation as speculation
+- Entertainment gets one extractable claim if any, then stop"))
   "Prompts for entry summaries."
   :type 'alist
   :group 'elfeed)

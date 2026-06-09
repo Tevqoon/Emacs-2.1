@@ -92,6 +92,7 @@
   (global-auto-revert-non-file-buffers t)
   (delete-by-moving-to-trash t)
   (sentence-end-double-space nil)
+  (indent-tabs-mode nil)
 
   (auto-hscroll-mode t)
   (mouse-wheel-scroll-amount '(1 ((meta))
@@ -232,8 +233,8 @@ are defining or executing a macro."
   (project-kill-buffers-display-buffer-list t)
   :config (project-forget-zombie-projects)
   :hook (find-file-hook . (lambda ()
-		       (when-let ((pr (project-current)))
-			 (project-remember-project pr)))))
+			    (when-let ((pr (project-current)))
+			      (project-remember-project pr)))))
 
 ;;; * Look and feel
 ;;; ** Theme & Symbols
@@ -858,6 +859,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   ;; (outline-stars-mode 1)
   :hook
   (prog-mode-hook . outline-stars-setup)
+  (agda2-mode-hook . outline-stars-setup)
   :bind
   (:map prog-mode-map
 	("<backtab>" . outline-stars-cycle-buffer)
@@ -1538,6 +1540,15 @@ Produces multiple regions so expreg can step through them."
 	      openai/gpt-4o
 	      openai/o4-mini-deep-research
 	      anthropic/claude-sonnet-4.6))
+
+  (gptel-make-openai "Cerebras"
+    :host "api.cerebras.ai"
+    :endpoint "/v1/chat/completions"
+    :stream nil
+    :key 'gptel-api-key-from-auth-source
+    :models '(gpt-oss-120b
+              zai-glm-4.7))
+
   (require 'gptel-integrations)
   (require 'gptel-org)
 
@@ -1634,6 +1645,8 @@ Produces multiple regions so expreg can step through them."
   :custom
   (agent-shell-preferred-agent-config 'opencode)
   (agent-shell-opencode-default-model-id "github-copilot/claude-haiku-4.5")
+  (agent-shell-anthropic-authentication
+   (agent-shell-anthropic-make-authentication :login t))
   (agent-shell-prefer-viewport-interaction t)
   (agent-shell-session-strategy 'new)
   (agent-shell-show-usage-at-turn-end t)
@@ -1803,25 +1816,25 @@ Produces multiple regions so expreg can step through them."
   (add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
   ;; Open links in the same window
   (setf (alist-get 'file org-link-frame-setup) #'find-file)
-
+  (setq org-latex-compiler "pdflatex")
   (setq org-latex-classes
-      '(("article" "\\documentclass[11pt,a4paper]{article}"
-	 ("\\section{%s}" . "\\section*{%s}")
-	 ("\\subsection{%s}" . "\\subsection*{%s}")
-	 ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
-	 ("\\paragraph{%s}" . "\\paragraph*{%s}")
-	 ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))
-	("report" "\\documentclass[11pt,a4paper]{report}"
-	 ("\\part{%s}" . "\\part*{%s}") ("\\chapter{%s}" . "\\chapter*{%s}")
-	 ("\\section{%s}" . "\\section*{%s}")
-	 ("\\subsection{%s}" . "\\subsection*{%s}")
-	 ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))
-	("book" "\\documentclass[11pt,a4paper]{book}"
-	 ("\\part{%s}" . "\\part*{%s}")
-	 ("\\chapter{%s}" . "\\chapter*{%s}")
-	 ("\\section{%s}" . "\\section*{%s}")
-	 ("\\subsection{%s}" . "\\subsection*{%s}")
-	 ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
+	'(("article" "\\documentclass[11pt,a4paper]{article}"
+	   ("\\section{%s}" . "\\section*{%s}")
+	   ("\\subsection{%s}" . "\\subsection*{%s}")
+	   ("\\subsubsection{%s}" . "\\subsubsection*{%s}")
+	   ("\\paragraph{%s}" . "\\paragraph*{%s}")
+	   ("\\subparagraph{%s}" . "\\subparagraph*{%s}"))
+	  ("report" "\\documentclass[11pt,a4paper]{report}"
+	   ("\\part{%s}" . "\\part*{%s}") ("\\chapter{%s}" . "\\chapter*{%s}")
+	   ("\\section{%s}" . "\\section*{%s}")
+	   ("\\subsection{%s}" . "\\subsection*{%s}")
+	   ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))
+	  ("book" "\\documentclass[11pt,a4paper]{book}"
+	   ("\\part{%s}" . "\\part*{%s}")
+	   ("\\chapter{%s}" . "\\chapter*{%s}")
+	   ("\\section{%s}" . "\\section*{%s}")
+	   ("\\subsection{%s}" . "\\subsection*{%s}")
+	   ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
   (setq org-export-with-section-numbers nil)
 
   )
@@ -1925,6 +1938,18 @@ This function is expected to be hooked in org-mode."
           ((and clipboard-url (not point-in-link))
            (insert (js/format-link clipboard-url)))
           (t (call-interactively 'org-insert-link)))))
+
+(defun js/youtube-channel-rss (url)
+  "Extract the RSS feed URL from a YouTube channel URL."
+  (interactive "sYouTube channel URL: ")
+  (let* ((feed (shell-command-to-string
+                (format "curl -s %S | grep -o 'feeds/videos\\.xml?channel_id=[^\"]*' | head -1 | xargs -I{} echo 'https://www.youtube.com/{}'" url)))
+         (feed (string-trim feed)))
+    (if (string-empty-p feed)
+        (user-error "No RSS feed found for %s" url)
+      (progn
+        (kill-new feed)
+        (message "Copied: %s" feed)))))
 
 ;;; ** Browser integration
 
@@ -3086,6 +3111,8 @@ you can catch it with `condition-case'."
   (org-node-alter-candidates t) ; OLP support
   (org-node-stay-in-source-buffer t)
 
+  (org-node-affixation-fn #'js/org-node-affix-olp-hashtags-aligned)  ; Add tag search support
+
   ;; Performance tuning
   (org-node-perf-keep-file-name-handlers nil)  ; Max speed
 
@@ -3123,6 +3150,30 @@ With C-u prefix, insert a transclusion instead."
     (if arg
 	(org-node-insert-transclusion)
       (org-node-insert-link*)))
+
+  (defun js/org-node-affix-olp-hashtags-aligned (node title)
+    "OLP prefix, right-aligned #hashtags suffix."
+    (let* ((width  (- (frame-width)
+                      (fringe-columns 'right)
+                      (fringe-columns 'left)))
+           (olp    nil))
+      (list title
+            (when (org-mem-entry-subtree-p node)
+              (let ((ancestors (org-mem-olpath-with-file-title node)))
+		(setq olp (concat (mapconcat (lambda (anc)
+                                               (propertize anc 'face 'org-node-parent))
+                                             ancestors " > ")
+                                  " > "))))
+            (let ((tags (org-mem-entry-tags node)))
+              (when tags
+		(let* ((tag-str (propertize
+				 (mapconcat (lambda (tag) (concat "#" tag)) tags " ")
+				 'face 'org-node-tag))
+                       (padding (max 2 (- width
+                                          (string-width title)
+                                          (string-width (or olp ""))
+                                          (string-width tag-str)))))
+                  (concat (make-string padding ?\s) tag-str)))))))
 
   ;; Modified to work outside of org-mode buffers, so i can use it in the minibuffer
   (defun org-node-insert-link (&optional region-as-initial-input novisit)
@@ -3200,20 +3251,99 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
 (with-eval-after-load 'org-roam
   (require 'org-protocol)
 
- ;; Handler: org-protocol://roam-id?id=<UUID> → visit that node
- (defun js/org-protocol-open-roam-id (data)
-   "Open org-roam node by ID received via org-protocol."
-   (when-let* ((id (plist-get data :id))
-               (node (org-roam-node-from-id id)))
-     (tab-new)
-     (org-roam-node-visit node nil 'force))
-   nil)			; return nil: don't kill the emacsclient frame
+  ;; Handler: org-protocol://roam-id?id=<UUID> → visit that node
+  (defun js/org-protocol-open-roam-id (data)
+    "Open org-roam node by ID received via org-protocol."
+    (when-let* ((id (plist-get data :id))
+		(node (org-roam-node-from-id id)))
+      (tab-new)
+      (org-roam-node-visit node nil 'force))
+    nil)			; return nil: don't kill the emacsclient frame
 
- (add-to-list 'org-protocol-protocol-alist
-              '("roam-id"
-		:protocol "roam-id"
-		:function js/org-protocol-open-roam-id
-		:kill-client nil)))
+  (add-to-list 'org-protocol-protocol-alist
+               '("roam-id"
+		 :protocol "roam-id"
+		 :function js/org-protocol-open-roam-id
+		 :kill-client nil)))
+
+;;; ** Citations
+
+(use-package oc
+  :ensure nil
+  :init
+  (setq org-cite-global-bibliography
+        (list (expand-file-name "library.bib" org-directory)))
+  :config
+  (setq org-cite-insert-processor   'citar
+        org-cite-follow-processor   'citar
+        org-cite-activate-processor 'citar))
+
+(use-package citar
+  :after oc
+  :custom
+  (citar-bibliography org-cite-global-bibliography)
+  (citar-open-entry-function #'citar-open-entry-in-zotero)
+  :config
+  (defvar citar-capture-template
+    '(("r" "reference" plain "%?"
+       :target (file+head "references/${citar-citekey}.org"
+                          "#+title: ${note-title}\n#+filetags: :literature:")
+       :unnarrowed t)))
+
+  (defun js/citar--citekey-at-node ()
+    "Return the first citekey for the current org-roam node, or nil."
+    (when-let* ((node (and (fboundp 'org-roam-node-at-point)
+                           (org-roam-node-at-point)))
+                (keys (citar-org-roam--node-cite-refs node)))
+      (car keys)))
+
+  (defun js/citar-open-pdf ()
+    "Open PDF for reference at point, current node, or prompt."
+    (interactive)
+    (citar-open-files
+     (if-let ((key (or (citar-key-at-point)
+                       (js/citar--citekey-at-node))))
+         (list key)
+       (citar-select-refs))))
+
+  (defun js/citar-open-in-zotero ()
+    "Open reference in Zotero.
+Uses cite key at point, then current node's ref, then prompts."
+    (interactive)
+    (citar-open-entry-in-zotero
+     (or (citar-key-at-point)
+         (js/citar--citekey-at-node)
+         (citar-select-ref))))
+
+  (defun js/citar-open-note ()
+    "Select a reference and open or create its org-roam note."
+    (interactive)
+    (let ((org-roam-capture-templates citar-capture-template))
+      (citar-open-notes (citar-select-refs))))
+
+  (defun js/citar-insert-citation ()
+    "Select a reference and insert a citation."
+    (interactive)
+    (citar-insert-citation (citar-select-refs)))
+
+  :bind
+  (("C-c n b z" . js/citar-open-in-zotero)
+   ("C-c n b f" . js/citar-open-note)
+   ("C-c n b i" . js/citar-insert-citation)
+   ("C-c n b d" . js/citar-open-pdf)))
+
+(use-package citar-org-roam
+  :after (citar org-roam)
+  :custom
+  (citar-org-roam-note-title-template "${author} (${year}) - ${title}")
+  (citar-org-roam-subdir "references")
+  (citar-org-roam-capture-template-key "r")
+  :config
+  (citar-org-roam-mode))
+
+
+
+
 
 ;;; * Vulpea
 
@@ -3425,11 +3555,11 @@ Each function is called with two arguments: the tag and the buffer.")
   :config
   (defvar js/vulpea-monthly-template
     '(:file-name "journal/monthlies/%Y-%m-monthly.org"
-			 :title "%Y-%m"
-			 :tags ("journal")
-			 :entry-level 1
-			 :entry-title "%Y-%m-%d %A"
-			 :head "#+created: %<[%Y-%m-%d]>\n#+startup: show2levels"))
+		 :title "%Y-%m"
+		 :tags ("journal")
+		 :entry-level 1
+		 :entry-title "%Y-%m-%d %A"
+		 :head "#+created: %<[%Y-%m-%d]>\n#+startup: show2levels"))
 
   (vulpea-journal-setup)
 
@@ -3446,7 +3576,7 @@ Each function is called with two arguments: the tag and the buffer.")
 ;;; ** Anki
 
 (use-package anki-editor
-  :after org
+  :defer t
   :if (not (eq system-type 'android))
   :commands my/anki-flashcard-push-current-buffer my/anki-flashcard-push-all anki-editor-push-notes anki/my/after-snippet-tag-handler
   :bind
@@ -3636,12 +3766,10 @@ With prefix C-u, force-repush all notes (ignores hash/unchanged check)."
 		 total (if force " (forced)" "")))))
 
   (defun my/anki-annotations-files ()
-    "Return list of org-roam files tagged :annotations:."
-    (delete-dups
-     (mapcar #'org-roam-node-file
-             (seq-filter
-              (lambda (n) (member "annotations" (org-roam-node-tags n)))
-              (org-roam-node-list)))))
+    "Return list of note files tagged :annotations:."
+    (seq-uniq
+     (mapcar #'vulpea-note-path
+             (vulpea-db-query-by-tags-some '("annotations")))))
 
   (defun my/anki-annotation-push-all (&optional all)
     "Push annotation files to Anki.
@@ -3650,26 +3778,27 @@ By default, pushes only files modified by the last sync
 With prefix argument ALL, push all files tagged :annotations:."
     (interactive "P")
     (anki-flashcard-clear-error-buffer)
-    (let* ((files (if (or all (null annotation--recently-modified-files))
+    (let* ((files (if all
                       (my/anki-annotations-files)
                     annotation--recently-modified-files))
-           (scope (if (or all (null annotation--recently-modified-files))
-                      "all" "recently modified"))
+           (scope (if all "all" "recently modified"))
            (total (length files))
            (success 0))
-      (message "Pushing %d %s annotation file(s) to Anki..." total scope)
-      (dolist (file files)
-	(condition-case err
-            (with-current-buffer (find-file-noselect file)
-              (save-excursion (anki-editor-push-notes 'file))
-              (cl-incf success))
-          (error (anki-flashcard-report-error file (error-message-string err)))))
-      (if (< success total)
-          (progn
-            (message "Pushed %d/%d %s, %d errors — see %s"
-                     success total scope (- total success) anki-flashcard-error-buffer)
-            (display-buffer anki-flashcard-error-buffer))
-	(message "Pushed all %d %s annotation files" total scope))))
+      (if (null files)
+          (message "No annotation files to push.")
+	(message "Pushing %d %s annotation file(s) to Anki..." total scope)
+	(dolist (file files)
+          (condition-case err
+              (with-current-buffer (find-file-noselect file)
+		(save-excursion (anki-editor-push-notes 'file))
+		(cl-incf success))
+            (error (anki-flashcard-report-error file (error-message-string err)))))
+	(if (< success total)
+            (progn
+              (message "Pushed %d/%d %s, %d errors — see %s"
+                       success total scope (- total success) anki-flashcard-error-buffer)
+              (display-buffer anki-flashcard-error-buffer))
+          (message "Pushed all %d %s annotation files" total scope)))))
   )
 
 ;;; ** Agenda
@@ -3679,18 +3808,18 @@ With prefix argument ALL, push all files tagged :annotations:."
   :ensure nil
   :bind* ("C-c a" . open-org-agenda)
   :bind (:map org-agenda-mode-map
-	 ("o" . my/ace-link-agenda-current-line)
-	 ("M-o" . my/ace-link-org-agenda-urls)
-	 ;; This one doesn't change the view
-	 ("g" . org-agenda-redo)
-	 ("r" . roam-agenda-files-update)
-	 ("<tab>" . outline-toggle-children)
-	 ("<backtab>" . outline-cycle-buffer)
-	 ("<return>" . org-agenda-goto)
-	 ("S-<return>" . org-agenda-switch-to)
-	 ("R" . js/agenda-refile)
-	 ("O" . js/agenda-roamify)
-	 )
+	      ("o" . my/ace-link-agenda-current-line)
+	      ("M-o" . my/ace-link-org-agenda-urls)
+	      ;; This one doesn't change the view
+	      ("g" . org-agenda-redo)
+	      ("r" . roam-agenda-files-update)
+	      ("<tab>" . outline-toggle-children)
+	      ("<backtab>" . outline-cycle-buffer)
+	      ("<return>" . org-agenda-goto)
+	      ("S-<return>" . org-agenda-switch-to)
+	      ("R" . js/agenda-refile)
+	      ("O" . js/agenda-roamify)
+	      )
 
   :custom
   (org-todo-keywords
@@ -3971,6 +4100,23 @@ _S_manual
     ("o" open-urls-at-point-or-region)
     ("q" js/triage-quit :color blue)))
 
+;;; ** Dynamic queries
+
+(use-package vulpea-dblocks
+  :after vulpea
+  :load-path "~/.emacs.d/lisp"
+  :bind* ("C-c n p d" . vulpea-dblocks-push)
+  :config
+  (vulpea-dblocks-mode +1)
+  ;; Refresh dblocks before export so published HTML/LaTeX never contains stale content.
+  (defun vulpea-dblocks--update-on-export (_backend)
+    "Update all roam-* dblocks in the current buffer before export."
+    (when (derived-mode-p 'org-mode)
+      (save-excursion
+        (org-update-all-dblocks))))
+  (add-hook 'org-export-before-processing-functions
+            #'vulpea-dblocks--update-on-export))
+
 ;;; ** Babel
 
 (use-package org ;;babel
@@ -4024,6 +4170,13 @@ _S_manual
   :defer t
   :vc (:url "https://github.com/isamert/corg.el")
   :hook (org-mode-hook . corg-setup))
+
+;;; ** Book import
+
+(use-package js-book-capture
+  :load-path "~/.emacs.d/lisp"
+  :commands js-book-capture
+  :bind ("C-c n b k" . js-book-capture))
 
 ;;; * org-static-blog
 ;;; Blog + Personal website configuration
@@ -4372,39 +4525,43 @@ signature, in that order."
 (use-package elfeed
   :defer t
   :commands elfeed
-  :bind* ("C-x w" . elfeed)
-  :bind (:map elfeed-search-mode-map
-         ("SPC" . elfeed-search-show-entry)
-	 ("t" . elfeed-search-trash)
-         ("T" . elfeed-filter-trash)
-	 ("A" . elfeed-filter-asmr)
-	 ("P" . elfeed-filter-papers)
-         ("i" . open-downloaded-youtube-in-iina)
-         ("I" . download-selected-youtube-videos)
-         ("D" . elfeed-filter-downloaded)
-	 ("s" . my/elfeed-show-default)
-	 ("U" . js/log-elfeed-process)
-	 ("B" . elfeed-browse-with-secondary-browser)
-	 ("W" . js/elfeed-entries-to-wallabag)
-	 ("O" . js/elfeed-dispatch-entries)
-	 ("<wheel-up>" . previous-line)
-	 ("<wheel-down>" . next-line)
-	 ("y" . elfeed-search-yank)
-	 ("V" . elpapers-ingest-full)
-	 ("K" . elpapers-semantic-search)
-         :map elfeed-show-mode-map
-         ("SPC" . elfeed-scroll-up-command)
-         ("S-SPC" . elfeed-scroll-down-command)
-	 ("U" . js/log-elfeed-process)
-         ;; If called with C-u then bring up the capture buffer
-	 ("t" . elfeed-show-trash)
-         ("i" . open-downloaded-youtube-in-iina)
-	 ("M-o" . ace-link-safari)
-	 ("B" . elfeed-browse-with-secondary-browser)
-	 ("W" . js/elfeed-entries-to-wallabag)
-	 ("O" . js/elfeed-dispatch-entries)
-	 ("V" . elpapers-ingest-full)
-	 ("y" . elfeed-show-yank))
+  :bind (("C-x w" . elfeed)
+         (:map elfeed-search-mode-map
+               ("SPC" . elfeed-search-show-entry)
+	       ("t" . elfeed-search-trash)
+               ("T" . elfeed-filter-trash)
+	       ("A" . elfeed-filter-asmr)
+	       ("P" . elfeed-filter-papers)
+               ("i" . open-downloaded-youtube-in-iina)
+               ("I" . download-selected-youtube-videos)
+               ("D" . elfeed-filter-downloaded)
+	       ("s" . my/elfeed-show-default)
+	       ("U" . js/log-elfeed-process)
+	       ("B" . elfeed-browse-with-secondary-browser)
+	       ("W" . js/elfeed-entries-to-wallabag)
+	       ("O" . js/elfeed-dispatch-entries)
+	       ("<wheel-up>" . previous-line)
+	       ("<wheel-down>" . next-line)
+	       ("y" . elfeed-search-yank)
+	       ("V" . elpapers-ingest-full)
+	       ("K" . elpapers-semantic-search)
+               ("l" . elfeed-search-watchlist)
+               ("L" . elfeed-filter-watchlist)
+
+               :map elfeed-show-mode-map
+               ("SPC" . elfeed-scroll-up-command)
+               ("S-SPC" . elfeed-scroll-down-command)
+	       ("U" . js/log-elfeed-process)
+               ;; If called with C-u then bring up the capture buffer
+	       ("t" . elfeed-show-trash)
+               ("i" . open-downloaded-youtube-in-iina)
+	       ("M-o" . ace-link-safari)
+	       ("B" . elfeed-browse-with-secondary-browser)
+	       ("W" . js/elfeed-entries-to-wallabag)
+	       ("O" . js/elfeed-dispatch-entries)
+	       ("V" . elpapers-ingest-full)
+	       ("y" . elfeed-show-yank)
+               ("l" . elfeed-show-watchlist)))
   :hook
   (elfeed-show-mode-hook . mixed-pitch-mode)
   (elfeed-show-mode-hook . visual-line-mode)
@@ -4434,7 +4591,7 @@ signature, in that order."
     (message "Deleted %d entries" (length entries))))
 
 ;; Variables
-(setq-default elfeed-search-filter "-trash -asmr @7-days-ago +unread")
+(setq-default elfeed-search-filter "-trash -asmr -later @7-days-ago +unread")
 
 ;; Functions
 (defun elfeed-scroll-up-command (&optional arg)
@@ -4530,6 +4687,23 @@ signature, in that order."
   "Open up the asmr tagged feed."
   (interactive)
   (elfeed-filter-maker "-trash +asmr @1-months-ago" "Showing ASMR."))
+
+;; Watchlist
+(defun elfeed-search-watchlist ()
+  "Toggle the watchlist tag on the selection in search mode."
+  (interactive)
+  (elfeed-search-toggle-all 'later))
+
+(defun elfeed-show-watchlist ()
+  "Tag the item as watchlist and move to the next item in show mode."
+  (interactive)
+  (elfeed-show-tag 'later 'unread)
+  (elfeed-show-next))
+
+(defun elfeed-filter-watchlist ()
+  "Open the watchlist feed."
+  (interactive)
+  (elfeed-filter-maker "-trash +later @3-months-ago" "Showing watchlist."))
 
 (defun elfeed-filter-papers ()
   "Open up the papers tagged feed."
@@ -5164,10 +5338,94 @@ If none of the selected entries are downloaded, a message is shown."
 ;;; * Annotation importer
 
 (use-package org-roam-annotation-import
-  :after org
+  :defer t
   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
+  :bind* (("C-c n p r a" . wallabag-synchronise-annotations)
+          ("C-c n p z" . js/anki-push-zotero)
+          ("C-c n p w" . js/anki-push-wallabag)
+          ("C-c n p k" . js/anki-push-koreader)
+          ("C-c n p A" . js/anki-push-all-annotations)
+          ("C-c n p a" . js/anki-push-recent-annotations)
+          ("C-c n p r z" . zotero-synchronise-annotations))
   :config
-  (require 'wallabag-backend))
+  (require 'wallabag-backend)
+  (require 'zotero-backend)
+
+  (defun js/zotero--known-refs ()
+    "Hash set of DB refs normalised to the form `js/zotero-import-all-items'
+compares against: cite refs as @key, others as TYPE:REF (scheme rejoined)."
+    (let ((table (make-hash-table :test 'equal)))
+      (dolist (row (org-roam-db-query [:select [ref type] :from refs]))
+        (let ((ref  (car row))
+              (type (cadr row)))
+          (when (stringp ref)
+            (puthash
+             (cond ((equal type "cite") (concat "@" ref))
+                   (type                (concat type ":" ref))
+                   (t                   ref))
+             t table))))
+      table))
+
+  (defun js/zotero-import-all-items ()
+    "Create a bare citar literature note for every top-level Zotero item.
+Items whose ref (@citekey, else zotero://select) already exists in the
+org-roam DB are skipped without opening their files."
+    (interactive)
+    (message "Zotero: fetching top-level items...")
+    (let* ((items    (seq-remove
+                      (lambda (i)
+                        (member (alist-get 'itemType (alist-get 'data i))
+                                '("attachment" "note" "annotation")))
+                      (zotero--get-all "/items/top")))
+           (top-keys (delq nil (mapcar (lambda (i)
+                                         (alist-get 'key (alist-get 'data i)))
+                                       items)))
+           (citekeys (zotero--citekeys-for top-keys))
+           (known    (js/zotero--known-refs))
+           (n 0))
+      (dolist (item items)
+        (let* ((data       (alist-get 'data item))
+               (top-key    (alist-get 'key data))
+               (title      (alist-get 'title data))
+               (author     (zotero--creators-string (alist-get 'creators data)))
+               (year       (zotero--year data))
+               (citekey    (gethash top-key citekeys))
+               (have-key   (and citekey (not (string-empty-p citekey))))
+               (select-url (zotero--select-link top-key))
+               (ref        (if have-key (concat "@" citekey) select-url)))
+          ;; Skip if this ref is already in the DB — no buffer opened.
+          (unless (gethash ref known)
+            (let* ((entry (list :title (zotero--note-title author year title)
+                                :citekey (and have-key citekey)
+                                :ref ref :select-url select-url))
+                   (annotation-capture-templates
+                    (zotero--literature-capture-templates entry))
+                   (node (zotero--find-or-create-node entry)))
+              (save-window-excursion
+                (with-current-buffer (annotation--org-roam-node-open-or-create node)
+                  (goto-char (point-min))
+                  (when ref
+                    (let ((existing (org-entry-get (point) "ROAM_REFS" t)))
+                      (unless (and existing (string-match-p (regexp-quote ref) existing))
+                        (org-roam-ref-add ref))))
+                  (org-roam-tag-add '("zotero" "literature"))
+                  (when-let ((slug (annotation--slugify author)))
+                    (org-roam-tag-add (list slug)))
+                  (save-buffer)
+                  (cl-incf n)))))))
+      (message "Zotero item import done: %d new note(s)" n)))
+  :custom
+  (zotero-anki-deck "Zotero")
+  :init
+  (with-eval-after-load 'ol
+    (org-link-set-parameters
+     "zotero"
+     :follow (lambda (path _)
+               (let ((uri (concat "zotero:" path)))
+                 (pcase system-type
+                   ('darwin     (call-process "open" nil nil nil uri))
+                   ('gnu/linux  (call-process "xdg-open" nil nil nil uri))
+                   (_           (browse-url uri))))))))
 
 ;;; * Wallabag
 
@@ -5179,62 +5437,59 @@ If none of the selected entries are downloaded, a message is shown."
   :ensure t)
 
 (use-package wallabag
-  :defer t
-  :after request emacsql
   :commands wallabag
   :bind* (("C-x W" . wallabag)
 	  ("C-c n y w" . js/add-wallabag-at-point))
-  :bind (
-         :map wallabag-search-mode-map
-         ;; Basic navigation and viewing
-         ("SPC" . wallabag-view)
-         ("b" . wallabag-browse-url)
-         ("B" . wallabag-browse-url-firefox)
-         ("n" . wallabag-next-entry)
-         ("p" . wallabag-previous-entry)
-         ("q" . wallabag-search-quit)
+  :bind ((:map wallabag-search-mode-map
+               ;; Basic navigation and viewing
+               ("SPC" . wallabag-view)
+               ("b" . wallabag-browse-url)
+               ("B" . wallabag-browse-url-firefox)
+               ("n" . wallabag-next-entry)
+               ("p" . wallabag-previous-entry)
+               ("q" . wallabag-search-quit)
 
-         ;; Filtering and display options
-         ("c" . my/wallabag-show-unarchived) ; Mirror elfeed's clear filter - show default view
-         ("s" . my/wallabag-show-all) ; Show all entries including archived
-         ("S" . wallabag-search-live-filter) ; Search functionality
+               ;; Filtering and display options
+               ("c" . my/wallabag-show-unarchived) ; Mirror elfeed's clear filter - show default view
+               ("s" . my/wallabag-show-all) ; Show all entries including archived
+               ("S" . wallabag-search-live-filter) ; Search functionality
 
-         ;; Tag and status management
-         ("+" . wallabag-add-tags)
-         ("-" . wallabag-remove-tag)
-         ("t" . wallabag-delete-entry)
-         ("f" . wallabag-update-entry-starred)
+               ;; Tag and status management
+               ("+" . wallabag-add-tags)
+               ("-" . wallabag-remove-tag)
+               ("t" . wallabag-delete-entry)
+               ("f" . wallabag-update-entry-starred)
 
-         ;; Other functions
-         ("y" . wallabag-org-link-copy)
-         ("i" . wallabag-add-entry)
-         ("g" . wallabag-search-refresh-and-clear-filter)
-         ("G" . wallabag-search-update-and-clear-filter)
-	 ("R" . wallabag-search-synchronize-and-clear-filter)
-	 ("Y" . wallabag-full-update)
-         ("r" . wallabag-update-entry-archive)
-	 ("R" . js/wallabag-roamify-entry)
+               ;; Other functions
+               ("y" . wallabag-org-link-copy)
+               ("i" . wallabag-add-entry)
+               ("g" . wallabag-search-refresh-and-clear-filter)
+               ("G" . wallabag-search-update-and-clear-filter)
+	       ("R" . wallabag-search-synchronize-and-clear-filter)
+	       ("Y" . wallabag-full-update)
+               ("r" . wallabag-update-entry-archive)
+	       ("R" . js/wallabag-roamify-entry)
 
-         :map wallabag-entry-mode-map
-         ;; Entry mode keys (same as before)
-         ("SPC" . scroll-up-command)
-         ("S-SPC" . scroll-down-command)
-         ("M-o" . ace-link-safari)
-         ("b" . wallabag-browse-url)
-         ("+" . wallabag-add-tags)
-         ("-" . wallabag-remove-tag)
-         ("q" . wallabag-entry-quit)
-         ("n" . wallabag-next-entry)
-         ("p" . wallabag-previous-entry)
-         ("g" . wallabag-view)
-         ("t" . wallabag-delete-entry)
-         ("<" . beginning-of-buffer)
-         (">" . end-of-buffer)
-         ("y" . wallabag-org-link-copy)
-         ("f" . wallabag-update-entry-starred)
-         ("x" . wallabag-update-entry-archive)
-	 ("r" . wallabag-update-entry-archive)
-	 ("R" . js/wallabag-roamify-entry))
+               :map wallabag-entry-mode-map
+               ;; Entry mode keys (same as before)
+               ("SPC" . scroll-up-command)
+               ("S-SPC" . scroll-down-command)
+               ("M-o" . ace-link-safari)
+               ("b" . wallabag-browse-url)
+               ("+" . wallabag-add-tags)
+               ("-" . wallabag-remove-tag)
+               ("q" . wallabag-entry-quit)
+               ("n" . wallabag-next-entry)
+               ("p" . wallabag-previous-entry)
+               ("g" . wallabag-view)
+               ("t" . wallabag-delete-entry)
+               ("<" . beginning-of-buffer)
+               (">" . end-of-buffer)
+               ("y" . wallabag-org-link-copy)
+               ("f" . wallabag-update-entry-starred)
+               ("x" . wallabag-update-entry-archive)
+	       ("r" . wallabag-update-entry-archive)
+	       ("R" . js/wallabag-roamify-entry)))
   :init
   ;; contains the wallabag info
 
@@ -5251,6 +5506,24 @@ If none of the selected entries are downloaded, a message is shown."
   (wallabag-after-render-hook . my/wallabag-initialize-view)
 
   :config
+
+  (defun js/wallabag-org-link-store ()
+    "Store a wallabag org link from an entry buffer, for use with `org-store-link'."
+    (when (derived-mode-p 'wallabag-entry-mode)
+      (let* ((entry (get-text-property (point-min) 'wallabag-entry))
+             (id    (alist-get 'id entry))
+             (title (or (alist-get 'title entry) "No title")))
+	(org-link-store-props
+	 :type        "wallabag"
+	 :link        (format "wallabag:%s" id)
+	 :description title))))
+
+  (org-link-set-parameters
+   "wallabag"
+   :follow #'wallabag-org-link-view
+   :store  #'js/wallabag-org-link-store
+   :face   'wallabag-org-link)
+
   (setq wallabag-show-entry-switch #'switch-to-buffer)
 
   ;; Set up our custom parsers
@@ -5464,6 +5737,14 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
     (wallabag-insert-entry (unless (string= url "") url)
                            (unless (string= title "") title)
                            content)))
+;;; ** Wallabag edit
+
+(use-package wallabag-clean
+  :defer t
+  :load-path "~/.emacs.d/lisp"
+  :commands (js/wallabag-edit-entry js/wallabag-edit-clean)
+  :bind (:map wb-edit-mode-map
+              ("C-c C-l" . js/wallabag-edit-clean)))
 
 ;;; * LaTeX
 ;;; ** AucTex
@@ -5614,7 +5895,8 @@ When pressed twice, make the sub/superscript roman."
      ("ssned" "Inserts supersetneq dots" "\\supsetneq \\cdots \\supsetneq " nil nil nil t)
      ("leqd" "Inserts leq dots" "\\leq \\cdots \\leq " nil nil nil t)
      ("geqd" "Inserts geq dots" "\\geq \\cdots \\geq " nil nil nil t)
-
+     ("ceq" "Insert the pretty assignment coloneqq" "\\coloneqq" nil nil nil t)
+     ("Ceq" "Insert the pretty assignment Coloneqq" "\\Coloneqq" nil nil nil t)
 
      ("osuml"       "Insert \\bigoplus\\limits_{}^{}"
       "\\bigoplus\\limits_{?}^{}"  cdlatex-position-cursor nil nil t)
@@ -5637,6 +5919,7 @@ When pressed twice, make the sub/superscript roman."
       "\\binom{?}{}"  cdlatex-position-cursor nil nil t)
      ("oper"       "Insert \\operatorname{}"
       "\\operatorname{?}"  cdlatex-position-cursor nil nil t)
+
      ))
 
   (cdlatex-math-modify-alist
@@ -5649,6 +5932,7 @@ When pressed twice, make the sub/superscript roman."
      ( ?C    "\\Class"           nil        t   nil nil )
      ( ?B    "\\mathbb"            nil t   nil nil )
      ( ?d   "\\llbracket ? \\rrbracket"  nil        nil nil nil )
+     ( ?p   "\\llparenthesis ? \\rrparenthesis"  nil        nil nil nil )
      ))
 
   (cdlatex-math-symbol-alist
@@ -5837,21 +6121,19 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** LSP Eglot
 
 (use-package eglot
-  :defer t
+  :ensure t
+  :pin gnu
   :bind (:map eglot-mode-map
-	 ("C-c e a" . eglot-code-actions)
-	 )
-  :ensure nil
-  :hook ((python-mode-hook . eglot-ensure)
-         (c-mode-hook . eglot-ensure)
-         (C++-mode-hook . eglot-ensure)
-         (rust-mode-hook . eglot-ensure)
-         ;; (haskell-ts-mode-hook . eglot-ensure)
-	 )
-
+              ("C-c e a" . eglot-code-actions))
+  :hook ((python-mode-hook        . eglot-ensure)
+         (c-mode-hook             . eglot-ensure)
+         (c++-mode-hook           . eglot-ensure)
+         (rust-mode-hook          . eglot-ensure)
+         (eglot-managed-mode-hook . eglot-semantic-tokens-mode))
   :custom
   (eglot-autoshutdown t)
-  (eglot-sync-connect nil))
+  (eglot-sync-connect nil)
+  (eglot-extend-to-xref t))
 
 (use-package eglot-booster
   :vc (:url "https://github.com/jdtsmith/eglot-booster")
@@ -5869,7 +6151,7 @@ When pressed twice, make the sub/superscript roman."
   :defer t
   :after eglot
   :bind (:map eglot-mode-map
-         ("<f1> ," . eldoc-box-help-at-point))
+              ("<f1> ," . eldoc-box-help-at-point))
   :custom
   (eldoc-box-clear-with-C-g t))
 
@@ -5932,8 +6214,9 @@ When pressed twice, make the sub/superscript roman."
   (clojure-indent-keyword-style 'always-indent)
   (clojure-enable-indent-specs nil)
   (clojure-align-forms-automatically t)
-  :hook
-  (clojure-mode-hook . aggressive-indent-mode))
+  ;; :hook
+  ;; (clojure-mode-hook . aggressive-indent-mode)
+  )
 
 (use-package cider
   :defer t
@@ -6000,6 +6283,7 @@ When pressed twice, make the sub/superscript roman."
 
   :preface
   (defun js/fix-agda-highlight-face (&rest _)
+    (interactive)
     (let* ((dark (eq (frame-parameter nil 'background-mode) 'dark))
            (bg (if dark "#073642" "#eee8d5"))
            (fg (if dark "#93a1a1" "#586e75")))
@@ -6009,28 +6293,28 @@ When pressed twice, make the sub/superscript roman."
                           :box nil)))
 
   (defun js/agda-tab ()
-    "Next goal if in a hole, else eri-indent."
+    "Next goal if in a hole; cycle subtree if on a heading; else eri-indent."
     (interactive)
-    (if (agda2-goal-at (point))
-        (agda2-next-goal)
-      (eri-indent)))
+    (cond
+     ((agda2-goal-at (point))  (agda2-next-goal))
+     ((outline-on-heading-p t) (outline-cycle))
+     (t                        (eri-indent))))
 
   (defun js/agda-backtab ()
-    "Previous goal if in a hole, else eri-indent-reverse."
+    "Previous goal if in a hole, else cycle outline visibility."
     (interactive)
     (if (agda2-goal-at (point))
-        (agda2-previous-goal)
-      (eri-indent-reverse)))
+	(agda2-previous-goal)
+      (outline-stars-cycle-buffer)))
+
   :config
   (advice-add 'agda2-next-goal     :before #'push-mark)
   (advice-add 'agda2-previous-goal :before #'push-mark)
-
+  (advice-add 'enable-theme :after #'js/fix-agda-highlight-face)
 
   :bind (:map agda2-mode-map
               ("<tab>"       . js/agda-tab)
-              ("S-<tab>" . js/agda-backtab))
-
-  :hook (load-theme . js/fix-agda-highlight-face))
+              ("S-<tab>" . js/agda-backtab)))
 
 ;;; ** Lean
 
@@ -6171,6 +6455,63 @@ If more than 100 hours remain, shows days + hours instead."
             (message "Time until %s %s: %d days, %d hours, %d minutes (beyond 100h timer limit)"
                      date time days remaining-hours minutes)
             (format "%dd %02dh %02dm" days remaining-hours minutes))))))))
+
+(defun outline-copy-visible (keepp)
+  "Create a copy of the visible part of the current buffer and add
+it to the kill ring so it can be copied into other buffers or programs.
+The copy is created in a temporary buffer and removed after use.
+As a special case, if you have a prefix arg KEEPP, the temporary
+buffer will not be removed but presented to you so that you can
+continue to use it.
+This function is derived from org-export-visible."
+  (interactive "P")
+  (let* ((file buffer-file-name)
+	 (buffer (get-buffer-create "*Outline Yank Visible*"))
+	 s e)
+    (with-current-buffer buffer (erase-buffer))
+    (save-excursion
+      (setq s (goto-char (point-min)))
+      (while (not (= (point) (point-max)))
+	(goto-char (outline-find-invisible))
+	(append-to-buffer buffer s (point))
+	(setq s (goto-char (outline-find-visible))))
+      (goto-char (point-min))
+      (set-buffer buffer)
+      (kill-new (buffer-substring (point-min) (point-max)))
+      (if (not keepp)
+	  (kill-buffer buffer)
+	(switch-to-buffer-other-window buffer)
+	(goto-char (point-min))))))
+
+(defun outline-find-visible ()
+  (let ((s (point)))
+    (while (and (not (= (point-max) (setq s (next-overlay-change s))))
+		(get-char-property s 'invisible)))
+    s))
+
+(defun outline-find-invisible ()
+  (let ((s (point)))
+    (while (and (not (= (point-max) (setq s (next-overlay-change s))))
+		(not (get-char-property s 'invisible))))
+    s))
+
+(defun js/insert-words (letters &optional length)
+  "Insert words containing all LETTERS into current buffer.
+Optionally filter by LENGTH."
+  (interactive
+   (list (read-string "Letters (no spaces): ")
+         (let ((n (read-number "Length (0 for all): " 0)))
+           (unless (zerop n) n))))
+  (let* ((wordlist "/usr/share/dict/words")
+         (length-filter (if length
+                            (format "grep -Eiw '[a-z]{%d}' %s" length wordlist)
+                          (format "grep -Ei '^[a-z]+$' %s" wordlist)))
+         (filter (mapconcat (lambda (c)
+                              (format "grep -i '%c'" c))
+                            (string-to-list letters)
+                            " | "))
+         (cmd (format "%s | %s" length-filter filter)))
+    (shell-command cmd (current-buffer))))
 
 ;;;
 ;;; End of configuration file.
