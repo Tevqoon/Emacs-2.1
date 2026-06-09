@@ -63,6 +63,7 @@
         ivy-occur-delete-candidate
         js/agda-backtab
         js/agenda-refile
+        js/cdlatex-sub-superscript
         js/yas-cdlatex-tab
         kill-region
         kill-visual-line

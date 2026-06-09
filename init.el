@@ -1540,6 +1540,15 @@ Produces multiple regions so expreg can step through them."
 	      openai/gpt-4o
 	      openai/o4-mini-deep-research
 	      anthropic/claude-sonnet-4.6))
+
+  (gptel-make-openai "Cerebras"
+    :host "api.cerebras.ai"
+    :endpoint "/v1/chat/completions"
+    :stream nil
+    :key 'gptel-api-key-from-auth-source
+    :models '(gpt-oss-120b
+              zai-glm-4.7))
+
   (require 'gptel-integrations)
   (require 'gptel-org)
 
@@ -1807,7 +1816,7 @@ Produces multiple regions so expreg can step through them."
   (add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
   ;; Open links in the same window
   (setf (alist-get 'file org-link-frame-setup) #'find-file)
-
+  (setq org-latex-compiler "pdflatex")
   (setq org-latex-classes
 	'(("article" "\\documentclass[11pt,a4paper]{article}"
 	   ("\\section{%s}" . "\\section*{%s}")
@@ -5341,6 +5350,70 @@ If none of the selected entries are downloaded, a message is shown."
   :config
   (require 'wallabag-backend)
   (require 'zotero-backend)
+
+  (defun js/zotero--known-refs ()
+    "Hash set of DB refs normalised to the form `js/zotero-import-all-items'
+compares against: cite refs as @key, others as TYPE:REF (scheme rejoined)."
+    (let ((table (make-hash-table :test 'equal)))
+      (dolist (row (org-roam-db-query [:select [ref type] :from refs]))
+        (let ((ref  (car row))
+              (type (cadr row)))
+          (when (stringp ref)
+            (puthash
+             (cond ((equal type "cite") (concat "@" ref))
+                   (type                (concat type ":" ref))
+                   (t                   ref))
+             t table))))
+      table))
+
+  (defun js/zotero-import-all-items ()
+    "Create a bare citar literature note for every top-level Zotero item.
+Items whose ref (@citekey, else zotero://select) already exists in the
+org-roam DB are skipped without opening their files."
+    (interactive)
+    (message "Zotero: fetching top-level items...")
+    (let* ((items    (seq-remove
+                      (lambda (i)
+                        (member (alist-get 'itemType (alist-get 'data i))
+                                '("attachment" "note" "annotation")))
+                      (zotero--get-all "/items/top")))
+           (top-keys (delq nil (mapcar (lambda (i)
+                                         (alist-get 'key (alist-get 'data i)))
+                                       items)))
+           (citekeys (zotero--citekeys-for top-keys))
+           (known    (js/zotero--known-refs))
+           (n 0))
+      (dolist (item items)
+        (let* ((data       (alist-get 'data item))
+               (top-key    (alist-get 'key data))
+               (title      (alist-get 'title data))
+               (author     (zotero--creators-string (alist-get 'creators data)))
+               (year       (zotero--year data))
+               (citekey    (gethash top-key citekeys))
+               (have-key   (and citekey (not (string-empty-p citekey))))
+               (select-url (zotero--select-link top-key))
+               (ref        (if have-key (concat "@" citekey) select-url)))
+          ;; Skip if this ref is already in the DB — no buffer opened.
+          (unless (gethash ref known)
+            (let* ((entry (list :title (zotero--note-title author year title)
+                                :citekey (and have-key citekey)
+                                :ref ref :select-url select-url))
+                   (annotation-capture-templates
+                    (zotero--literature-capture-templates entry))
+                   (node (zotero--find-or-create-node entry)))
+              (save-window-excursion
+                (with-current-buffer (annotation--org-roam-node-open-or-create node)
+                  (goto-char (point-min))
+                  (when ref
+                    (let ((existing (org-entry-get (point) "ROAM_REFS" t)))
+                      (unless (and existing (string-match-p (regexp-quote ref) existing))
+                        (org-roam-ref-add ref))))
+                  (org-roam-tag-add '("zotero" "literature"))
+                  (when-let ((slug (annotation--slugify author)))
+                    (org-roam-tag-add (list slug)))
+                  (save-buffer)
+                  (cl-incf n)))))))
+      (message "Zotero item import done: %d new note(s)" n)))
   :custom
   (zotero-anki-deck "Zotero")
   :init
@@ -5364,8 +5437,6 @@ If none of the selected entries are downloaded, a message is shown."
   :ensure t)
 
 (use-package wallabag
-  :defer t
-  :after request emacsql
   :commands wallabag
   :bind* (("C-x W" . wallabag)
 	  ("C-c n y w" . js/add-wallabag-at-point))
@@ -5666,6 +5737,14 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
     (wallabag-insert-entry (unless (string= url "") url)
                            (unless (string= title "") title)
                            content)))
+;;; ** Wallabag edit
+
+(use-package wallabag-clean
+  :defer t
+  :load-path "~/.emacs.d/lisp"
+  :commands (js/wallabag-edit-entry js/wallabag-edit-clean)
+  :bind (:map wb-edit-mode-map
+              ("C-c C-l" . js/wallabag-edit-clean)))
 
 ;;; * LaTeX
 ;;; ** AucTex
@@ -6042,21 +6121,19 @@ When pressed twice, make the sub/superscript roman."
 ;;; ** LSP Eglot
 
 (use-package eglot
-  :defer t
+  :ensure t
+  :pin gnu
   :bind (:map eglot-mode-map
-	      ("C-c e a" . eglot-code-actions)
-	      )
-  :ensure nil
-  :hook ((python-mode-hook . eglot-ensure)
-         (c-mode-hook . eglot-ensure)
-         (C++-mode-hook . eglot-ensure)
-         (rust-mode-hook . eglot-ensure)
-         ;; (haskell-ts-mode-hook . eglot-ensure)
-	 )
-
+              ("C-c e a" . eglot-code-actions))
+  :hook ((python-mode-hook        . eglot-ensure)
+         (c-mode-hook             . eglot-ensure)
+         (c++-mode-hook           . eglot-ensure)
+         (rust-mode-hook          . eglot-ensure)
+         (eglot-managed-mode-hook . eglot-semantic-tokens-mode))
   :custom
   (eglot-autoshutdown t)
-  (eglot-sync-connect nil))
+  (eglot-sync-connect nil)
+  (eglot-extend-to-xref t))
 
 (use-package eglot-booster
   :vc (:url "https://github.com/jdtsmith/eglot-booster")

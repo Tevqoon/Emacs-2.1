@@ -210,3 +210,42 @@
 	\ext@arrow 3095\leftleftarrowsfill@{#1}{#2}%
 }
 \makeatother
+
+% Programming language / intrinsic typing macros
+\providecommand{\intsym}[1]{\underline{#1}}
+\providecommand{\kwd}[1]{\mathbf{#1}}
+\providecommand{\kwdpre}[1]{\kwd{#1}\;}
+\providecommand{\kwdmid}[1]{\;\kwd{#1}\;}
+\providecommand{\kwdpost}[1]{\;\kwd{#1}}
+
+\providecommand{\true}{\kwd{true}}
+\providecommand{\false}{\kwd{false}}
+\providecommand{\tbool}{\kwd{true}}
+\providecommand{\ifthenelse}[3]{\kwdpre{if} #1 \kwdmid{then} #2 \kwdmid{else} #3}
+\providecommand{\whiledo}[2]{\kwdpre{while} #1 \kwdmid{do} #2}
+\providecommand{\skip}{\kwd{skip}}
+
+\providecommand{\fst}{\kwdpre{fst}}
+\providecommand{\snd}{\kwdpre{snd}}
+\providecommand{\inl}{\kwdpre{inl}}
+\providecommand{\inr}{\kwdpre{inr}}
+\providecommand{\match}{\kwdpre{match}}
+\providecommand{\with}{\kwdmid{with}}
+\providecommand{\matchsum}[5]{\match #1 \with \inl #2 \mapsto #3 \; \inr #4 \mapsto #5}
+\providecommand{\matchlist}[5]{\match #1 \with [] \mapsto #2 \; #3 :: #4 \mapsto #5}
+
+\providecommand{\ttt}{t\!t}
+\providecommand{\fff}{f\!\!f}
+\providecommand{\infer}[2]{\displaystyle{\frac{#1}{#2}}}
+
+\providecommand{\boolty}{\kwd{bool}}
+\providecommand{\intty}{\kwd{int}}
+\providecommand{\eqs}{\mathcal{E}}
+\providecommand{\ctxt}{\mathcal{C}}
+\providecommand{\itp}[1]{[\![ #1 ]\!]}
+
+\providecommand{\return}{\kwdpre{return}}
+\providecommand{\letin}[1]{\kwdpre{let} #1 \kwdmid{in}}
+\providecommand{\just}{\kwdpre{Just}}
+\providecommand{\nothing}{\kwdpre{Nothing}}
+\providecommand{\op}{\mathrm{op}}
