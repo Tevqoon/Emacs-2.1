@@ -76,7 +76,7 @@
   (tooltip-mode -1)
   (set-fringe-mode 5)
   (column-number-mode)
-  (delete-selection-mode nil)		; For lispy
+  (delete-selection-mode nil)
   (global-auto-revert-mode 1)
   (savehist-mode +1)
   (when (eq system-type 'darwin)
@@ -854,7 +854,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   :vc (:url "https://codeberg.org/phmcc/outline-stars")
   :custom
   (outline-stars-level-1-overline)
-  (outline-start-default-state 'folded)
+  (outline-stars-default-state 'folded)
   ;; :config
   ;; (outline-stars-mode 1)
   :hook
@@ -3360,7 +3360,7 @@ Uses cite key at point, then current node's ref, then prompts."
   (setq tags/updating-tags (mapcar #'car tag-checkers))
 
   :init
-  (dolist (tag (cons "trail" (cons "interesting" (cons "summary" tags/updating-tags)))) ;TODO: Remove double cons
+  (dolist (tag (cons "zotero" (cons "book" (cons "trail" (cons "interesting" (cons "summary" tags/updating-tags)))))) ;TODO: Remove double cons
     (add-to-list 'org-tags-exclude-from-inheritance tag))
 
   (with-eval-after-load 'org
@@ -5350,70 +5350,6 @@ If none of the selected entries are downloaded, a message is shown."
   :config
   (require 'wallabag-backend)
   (require 'zotero-backend)
-
-  (defun js/zotero--known-refs ()
-    "Hash set of DB refs normalised to the form `js/zotero-import-all-items'
-compares against: cite refs as @key, others as TYPE:REF (scheme rejoined)."
-    (let ((table (make-hash-table :test 'equal)))
-      (dolist (row (org-roam-db-query [:select [ref type] :from refs]))
-        (let ((ref  (car row))
-              (type (cadr row)))
-          (when (stringp ref)
-            (puthash
-             (cond ((equal type "cite") (concat "@" ref))
-                   (type                (concat type ":" ref))
-                   (t                   ref))
-             t table))))
-      table))
-
-  (defun js/zotero-import-all-items ()
-    "Create a bare citar literature note for every top-level Zotero item.
-Items whose ref (@citekey, else zotero://select) already exists in the
-org-roam DB are skipped without opening their files."
-    (interactive)
-    (message "Zotero: fetching top-level items...")
-    (let* ((items    (seq-remove
-                      (lambda (i)
-                        (member (alist-get 'itemType (alist-get 'data i))
-                                '("attachment" "note" "annotation")))
-                      (zotero--get-all "/items/top")))
-           (top-keys (delq nil (mapcar (lambda (i)
-                                         (alist-get 'key (alist-get 'data i)))
-                                       items)))
-           (citekeys (zotero--citekeys-for top-keys))
-           (known    (js/zotero--known-refs))
-           (n 0))
-      (dolist (item items)
-        (let* ((data       (alist-get 'data item))
-               (top-key    (alist-get 'key data))
-               (title      (alist-get 'title data))
-               (author     (zotero--creators-string (alist-get 'creators data)))
-               (year       (zotero--year data))
-               (citekey    (gethash top-key citekeys))
-               (have-key   (and citekey (not (string-empty-p citekey))))
-               (select-url (zotero--select-link top-key))
-               (ref        (if have-key (concat "@" citekey) select-url)))
-          ;; Skip if this ref is already in the DB — no buffer opened.
-          (unless (gethash ref known)
-            (let* ((entry (list :title (zotero--note-title author year title)
-                                :citekey (and have-key citekey)
-                                :ref ref :select-url select-url))
-                   (annotation-capture-templates
-                    (zotero--literature-capture-templates entry))
-                   (node (zotero--find-or-create-node entry)))
-              (save-window-excursion
-                (with-current-buffer (annotation--org-roam-node-open-or-create node)
-                  (goto-char (point-min))
-                  (when ref
-                    (let ((existing (org-entry-get (point) "ROAM_REFS" t)))
-                      (unless (and existing (string-match-p (regexp-quote ref) existing))
-                        (org-roam-ref-add ref))))
-                  (org-roam-tag-add '("zotero" "literature"))
-                  (when-let ((slug (annotation--slugify author)))
-                    (org-roam-tag-add (list slug)))
-                  (save-buffer)
-                  (cl-incf n)))))))
-      (message "Zotero item import done: %d new note(s)" n)))
   :custom
   (zotero-anki-deck "Zotero")
   :init
@@ -5426,6 +5362,12 @@ org-roam DB are skipped without opening their files."
                    ('darwin     (call-process "open" nil nil nil uri))
                    ('gnu/linux  (call-process "xdg-open" nil nil nil uri))
                    (_           (browse-url uri))))))))
+
+(use-package zotero-mass-import
+  :load-path "~/.emacs.d/lisp/zotero-mass-import"
+  :commands (zotero-mass-import
+             zotero-mass-import-items
+             zotero-mass-import-metadata))
 
 ;;; * Wallabag
 
