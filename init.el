@@ -231,7 +231,7 @@ are defining or executing a macro."
   (project-vc-extra-root-markers
    '(".dir-locals.el" "flake.nix" "package.json" "Cargo.toml" "pyproject.toml"))
   (project-kill-buffers-display-buffer-list t)
-  :config (project-forget-zombie-projects)
+  ;; :config (project-forget-zombie-projects)
   :hook (find-file-hook . (lambda ()
 			    (when-let ((pr (project-current)))
 			      (project-remember-project pr)))))
@@ -308,7 +308,7 @@ are defining or executing a macro."
   :hook prog-mode-hook)
 
 (use-package alert
-  :defer t
+  :demand t
   :commands alert
   :config
   (if (eq system-type 'darwin)
@@ -482,6 +482,14 @@ are defining or executing a macro."
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(file-name-concat org-directory "tasks.org")))
    (set-register ?j `(file . ,(file-name-concat org-directory "journal/Journelly.org")))
+   (defun js/open-journelly ()
+     "Jump to the Journelly.org file stored in register ?j."
+     (interactive)
+     (jump-to-register ?j))
+
+   (keymap-global-set "<f6> <f6>" #'js/open-journelly)
+
+
    (set-register ?p `(file . ,(file-name-concat org-directory "20260509100451-process.org")))
 
 ;;; https://www.reddit.com/r/emacs/comments/1qlnde7/comment/o1fq5lj/
@@ -800,14 +808,19 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
                '(org-node-collection . js/ivy-org-node-mtime-compare)))
 
 (defun js/ivy-org-node-mtime-compare (a b)
-  "Compare org-node candidates A and B by file mtime, most recent first."
-  (let* ((node-a (gethash a org-node--candidate<>entry))
-         (node-b (gethash b org-node--candidate<>entry))
-         (mtime-a (and node-a (ignore-errors (org-mem-file-mtime node-a))))
-         (mtime-b (and node-b (ignore-errors (org-mem-file-mtime node-b)))))
-    (cond ((null mtime-a) nil)
-          ((null mtime-b) t)
-          (t (time-less-p mtime-b mtime-a)))))
+  "Compare org-node candidates A and B: by file mtime descending, then by level ascending."
+  (let* ((ea (gethash a org-node--candidate<>entry))
+         (eb (gethash b org-node--candidate<>entry))
+         (fa (and ea (org-mem-file-truename ea)))
+         (fb (and eb (org-mem-file-truename eb))))
+    (if (equal fa fb)
+        (< (if ea (org-mem-entry-level ea) 0)
+           (if eb (org-mem-entry-level eb) 0))
+      (let ((ma (and ea (ignore-errors (org-mem-file-mtime ea))))
+            (mb (and eb (ignore-errors (org-mem-file-mtime eb)))))
+        (cond ((null ma) nil)
+              ((null mb) t)
+              (t (time-less-p mb ma)))))))
 
 (use-package ivy-rich
   :after ivy
@@ -963,8 +976,8 @@ Preserve original point position instead of jumping to the bottom of selection."
 	("C-c ^ ^" . unpackaged/smerge-hydra/body))
   :config
   (defhydra unpackaged/smerge-hydra
-    (:color pink :hint nil :post (smerge-auto-leave))
-    "
+            (:color pink :hint nil :post (smerge-auto-leave))
+            "
 ^Move^       ^Keep^               ^Diff^                 ^Other^
 ^^-----------^^-------------------^^---------------------^^-------
 _n_ext       _b_ase               _<_: upper/base        _C_ombine
@@ -973,28 +986,28 @@ _p_rev       _u_pper              _=_: upper/lower       _r_esolve
 ^^           _a_ll                _R_efine
 ^^           _RET_: current       _E_diff
 "
-    ("n" smerge-next)
-    ("p" smerge-prev)
-    ("b" smerge-keep-base)
-    ("u" smerge-keep-upper)
-    ("l" smerge-keep-lower)
-    ("a" smerge-keep-all)
-    ("RET" smerge-keep-current)
-    ("\C-m" smerge-keep-current)
-    ("<" smerge-diff-base-upper)
-    ("=" smerge-diff-upper-lower)
-    (">" smerge-diff-base-lower)
-    ("R" smerge-refine)
-    ("E" smerge-ediff)
-    ("C" smerge-combine-with-next)
-    ("r" smerge-resolve)
-    ("k" smerge-kill-current)
-    ("ZZ" (lambda ()
-            (interactive)
-            (save-buffer)
-            (bury-buffer))
-     "Save and bury buffer" :color blue)
-    ("q" nil "cancel" :color blue)))
+            ("n" smerge-next)
+            ("p" smerge-prev)
+            ("b" smerge-keep-base)
+            ("u" smerge-keep-upper)
+            ("l" smerge-keep-lower)
+            ("a" smerge-keep-all)
+            ("RET" smerge-keep-current)
+            ("\C-m" smerge-keep-current)
+            ("<" smerge-diff-base-upper)
+            ("=" smerge-diff-upper-lower)
+            (">" smerge-diff-base-lower)
+            ("R" smerge-refine)
+            ("E" smerge-ediff)
+            ("C" smerge-combine-with-next)
+            ("r" smerge-resolve)
+            ("k" smerge-kill-current)
+            ("ZZ" (lambda ()
+                    (interactive)
+                    (save-buffer)
+                    (bury-buffer))
+             "Save and bury buffer" :color blue)
+            ("q" nil "cancel" :color blue)))
 
 
 
@@ -1378,9 +1391,9 @@ Produces multiple regions so expreg can step through them."
 
       ;; Use avy to let the user choose a link
       (setq pt (avy-with custom-ace-link-org-agenda
-		 (avy-process
-                  (mapcar #'cdr (nreverse link-candidates))
-                  (avy--style-fn avy-style))))
+		         (avy-process
+                          (mapcar #'cdr (nreverse link-candidates))
+                          (avy--style-fn avy-style))))
 
       ;; Open the selected link
       (when pt
@@ -1532,22 +1545,22 @@ Produces multiple regions so expreg can step through them."
   (setq-default gptel-include-tool-results 'auto)
 
   (gptel-make-openai "OpenRouter"
-    :host "openrouter.ai"
-    :endpoint "/api/v1/chat/completions"
-    :stream t
-    :key 'gptel-api-key-from-auth-source
-    :models '(openai/gpt-5-mini
-	      openai/gpt-4o
-	      openai/o4-mini-deep-research
-	      anthropic/claude-sonnet-4.6))
+                     :host "openrouter.ai"
+                     :endpoint "/api/v1/chat/completions"
+                     :stream t
+                     :key 'gptel-api-key-from-auth-source
+                     :models '(openai/gpt-5-mini
+	                       openai/gpt-4o
+	                       openai/o4-mini-deep-research
+	                       anthropic/claude-sonnet-4.6))
 
   (gptel-make-openai "Cerebras"
-    :host "api.cerebras.ai"
-    :endpoint "/v1/chat/completions"
-    :stream nil
-    :key 'gptel-api-key-from-auth-source
-    :models '(gpt-oss-120b
-              zai-glm-4.7))
+                     :host "api.cerebras.ai"
+                     :endpoint "/v1/chat/completions"
+                     :stream nil
+                     :key 'gptel-api-key-from-auth-source
+                     :models '(gpt-oss-120b
+                               zai-glm-4.7))
 
   (require 'gptel-integrations)
   (require 'gptel-org)
@@ -2351,7 +2364,7 @@ Falls back to #+attr_latex :options for backwards compatibility."
   (advice-add 'org-roam-db-update-file :around
 	      (defun +org-roam-db-update-file (fn &rest args)
 		(emacsql-with-transaction (org-roam-db)
-                  (apply fn args)))))
+                                          (apply fn args)))))
 
 (defun js/org-sort-siblings-by-todo ()
   "Sort sibling entries by todo state order."
@@ -3128,7 +3141,7 @@ you can catch it with `condition-case'."
          (expand-file-name org-roam-dailies-directory org-roam-directory)))
 
   ;; Customs
-  (org-node-display-sort-fn #'org-node-sort-by-file-mtime)
+  (org-node-display-sort-fn #'org-node-sort-by-file-mtime) ; Seems like this does nothing with ivy
 
   :config
   ;; Your custom filtering logic
@@ -3381,46 +3394,46 @@ Uses cite key at point, then current node's ref, then prompts."
     "Return non-nil if current buffer has a todo entry.
 Ignores headlines under ARCHIVE-tagged ancestors."
     (org-element-map
-	(org-element-parse-buffer 'headline)
-	'headline
-      (lambda (h)
-	;; Skip if this headline or any ancestor has :ARCHIVE: tag
-	(unless (org-element-lineage-map h
-                    (lambda (ancestor)
-		      (member "ARCHIVE" (org-element-property :tags ancestor)))
-                  'headline 'with-self 'first-match)
-          (eq (org-element-property :todo-type h) 'todo)))
-      nil 'first-match))
+     (org-element-parse-buffer 'headline)
+     'headline
+     (lambda (h)
+       ;; Skip if this headline or any ancestor has :ARCHIVE: tag
+       (unless (org-element-lineage-map h
+                                        (lambda (ancestor)
+		                          (member "ARCHIVE" (org-element-property :tags ancestor)))
+                                        'headline 'with-self 'first-match)
+         (eq (org-element-property :todo-type h) 'todo)))
+     nil 'first-match))
 
   (defun org/has-anki-flashcards-p ()
     "Return non-nil if current buffer has ANKI-related properties in actual drawers.
 Ignores headlines under ARCHIVE-tagged ancestors."
     (org-element-map
-	(org-element-parse-buffer 'headline)
-	'headline
-      (lambda (h)
-	;; Skip if this headline or any ancestor has :ARCHIVE: tag
-	(unless (org-element-lineage-map h
-                    (lambda (ancestor)
-		      (member "ARCHIVE" (org-element-property :tags ancestor)))
-                  'headline 'with-self 'first-match)
-          (or (org-element-property :ANKI_NOTE_TYPE h)
-	      (org-element-property :ANKI_DECK h)
-	      (org-element-property :ANKI_NOTE_ID h)
-	      (org-element-property :ANKI_TAGS h))))
-      nil 'first-match))
+     (org-element-parse-buffer 'headline)
+     'headline
+     (lambda (h)
+       ;; Skip if this headline or any ancestor has :ARCHIVE: tag
+       (unless (org-element-lineage-map h
+                                        (lambda (ancestor)
+		                          (member "ARCHIVE" (org-element-property :tags ancestor)))
+                                        'headline 'with-self 'first-match)
+         (or (org-element-property :ANKI_NOTE_TYPE h)
+	     (org-element-property :ANKI_DECK h)
+	     (org-element-property :ANKI_NOTE_ID h)
+	     (org-element-property :ANKI_TAGS h))))
+     nil 'first-match))
 
   (defun org/has-gptel-chatlog-p ()
     "Return non-nil if current buffer has GPTEL-related properties in actual drawers."
     (org-element-map
-	(org-element-parse-buffer 'headline)
-	'headline
-      (lambda (h)
-	(or (org-element-property :GPTEL_TOPIC h)
-            (org-element-property :GPTEL_MESSAGES h)
-            (org-element-property :GPTEL_MODEL h)
-            (org-element-property :GPTEL_CONTEXT h)))
-      nil 'first-match))
+     (org-element-parse-buffer 'headline)
+     'headline
+     (lambda (h)
+       (or (org-element-property :GPTEL_TOPIC h)
+           (org-element-property :GPTEL_MESSAGES h)
+           (org-element-property :GPTEL_MODEL h)
+           (org-element-property :GPTEL_CONTEXT h)))
+     nil 'first-match))
 
   (defvar tags/tag-added-hook nil
     "Hook run when a tag is added to a file.
@@ -4007,7 +4020,7 @@ EXTRA-STATES is an optional list of additional states to block on."
   (interactive)
   (let ((dest-node (org-roam-node-read nil nil nil 'require-match)))
     (org-agenda-with-point-at-orig-entry nil
-      (org-node-refile dest-node)))
+                                         (org-node-refile dest-node)))
   (next-line))
 
 (defun js/agenda-refile ()
@@ -4041,8 +4054,8 @@ the current entry at point and move to the next line."
   "Roamify URL at point from agenda."
   (interactive)
   (org-agenda-with-point-at-orig-entry nil
-    (end-of-line)
-    (call-interactively #'js/roamify-url-at-point)))
+                                       (end-of-line)
+                                       (call-interactively #'js/roamify-url-at-point)))
 
 ;;; ** Org triage
 (use-package js-triage-session
@@ -4070,8 +4083,8 @@ the current entry at point and move to the next line."
    ("C-c n j j" . js/triage-hydra/body))
   :config
   (defhydra js/triage-hydra
-    (:color pink :hint nil)
-    "
+            (:color pink :hint nil)
+            "
 ^Move^              ^Action^             ^Meta^
 ^^-----------------^^------------------^^-----------
 _n_ext              _t_odo               _q_uit
@@ -4082,28 +4095,29 @@ _s_ooner            _w_org refile
 _l_ater             _a_rchive
 _S_manual
 "
-    ("." js/triage-goto-current)
-    ("," js/triage-status)
-    ("n" js/triage-next)
-    ("p" js/triage-goto-prev)
-    ("d" js/triage-done)
-    ("c" js/triage-cancel)
-    ("a" org-archive-subtree-default)
-    ("s" js/triage-snooze-soon)
-    ("l" js/triage-snooze-later)
-    ("<space>" js/triage-snooze-later)
-    ("S" js/triage-manual)
-    ("t" org-todo)
-    ("r" org-node-refile)
-    ("w" org-refile)
-    ("R" js/roamify-url-at-point :exit t)
-    ("o" open-urls-at-point-or-region)
-    ("q" js/triage-quit :color blue)))
+            ("." js/triage-goto-current)
+            ("," js/triage-status)
+            ("n" js/triage-next)
+            ("p" js/triage-goto-prev)
+            ("d" js/triage-done)
+            ("c" js/triage-cancel)
+            ("a" org-archive-subtree-default)
+            ("s" js/triage-snooze-soon)
+            ("l" js/triage-snooze-later)
+            ("<space>" js/triage-snooze-later)
+            ("S" js/triage-manual)
+            ("t" org-todo)
+            ("r" org-node-refile)
+            ("w" org-refile)
+            ("R" js/roamify-url-at-point :exit t)
+            ("o" open-urls-at-point-or-region)
+            ("q" js/triage-quit :color blue)))
 
 ;;; ** Dynamic queries
 
 (use-package vulpea-dblocks
   :after vulpea
+  :demand t
   :load-path "~/.emacs.d/lisp"
   :bind* ("C-c n p d" . vulpea-dblocks-push)
   :config
@@ -4187,7 +4201,7 @@ _S_manual
   (org-html-htmlize-output-type 'css))
 
 (use-package org-static-blog
-  :after org-roam
+  :commands js/makovec-rss
   :bind
   ("C-c n b b" . org-static-blog-publish)
   ("C-c n b p" . js/sync-blog)
@@ -4366,8 +4380,8 @@ Falls back to standard org-html-link for other link types."
   (defun my/setup-blog-backend (&rest _args)
     "Ensure our custom link and tikzcd handlers are in the backend."
     (org-export-define-derived-backend 'org-static-blog-post-bare 'html
-      :translate-alist '((template . (lambda (contents info) contents))
-			 (link . my/org-static-blog-link))))
+                                       :translate-alist '((template . (lambda (contents info) contents))
+			                                  (link . my/org-static-blog-link))))
 
   (defun js/sync-blog (arg)
     "Sync blog to muffalo server via Makefile targets.
@@ -4569,6 +4583,7 @@ signature, in that order."
   (elfeed-search-mode-hook . my/setup-elfeed-scroll)
   :custom
   (elfeed-confirm-browse-url nil)
+  (elfeed-search-completion nil)
   :config
   (advice-add 'elfeed-search-clear-filter
 	      :after (lambda () (message "Clearing filter."))))
@@ -4711,78 +4726,78 @@ signature, in that order."
   (elfeed-filter-maker "-trash +papers @1-months-ago" "Showing papers."))
 
 ;; Alternative version of compile filter - adds searching by author for papers
-(defun elfeed-search-compile-filter (filter)
-  "Compile FILTER into a lambda function for `byte-compile'.
+;; (defun elfeed-search-compile-filter (filter)
+;;   "Compile FILTER into a lambda function for `byte-compile'.
 
-    Executing a filter in bytecode form is generally faster than
-    \"interpreting\" the filter with `elfeed-search-filter'."
-  (cl-destructuring-bind (&key after     before
-			       must-have must-not-have
-			       matches   not-matches
-			       feeds     not-feeds
-			       limit &allow-other-keys)
-      filter
-    `(lambda (,(if (or after matches not-matches must-have must-not-have feeds not-feeds)
-                   'entry
-                 '_entry)
-	      ,(if (or feeds not-feeds)
-                   'feed
-                 '_feed)
-	      ,(if limit
-                   'count
-                 '_count))
-       (let* (,@(when after
-                  '((date (elfeed-entry-date entry))
-		    (age (- (float-time) date))))
-	      ,@(when (or must-have must-not-have)
-                  '((tags (elfeed-entry-tags entry))))
-	      ,@(when (or matches not-matches)
-                  '((title (or (elfeed-meta entry :title)
-			       (elfeed-entry-title entry)))
-		    (link (elfeed-entry-link entry))))
-	      ,@(when (or feeds not-feeds)
-                  '((feed-id (elfeed-feed-id feed))
-		    (feed-title (or (elfeed-meta feed :title)
-				    (elfeed-feed-title feed)
-				    ""))
-		    (author-names (mapconcat (lambda (au) (plist-get au :name))
-					     (elfeed-meta entry :authors)
-					     " "))
-		    )))
-         ,@(when after
-	     `((when (> age ,after)
-                 (elfeed-db-return))))
-         ,@(when limit
-	     `((when (>= count ,limit)
-                 (elfeed-db-return))))
-         (and ,@(cl-loop for forbid in must-not-have
-                         collect `(not (memq ',forbid tags)))
-	      ,@(cl-loop for forbid in must-have
-                         collect `(memq ',forbid tags))
-	      ,@(cl-loop for regex in matches collect
-                         `(or (string-match-p ,regex title)
-			      (string-match-p ,regex link)))
-	      ,@(cl-loop for regex in not-matches collect
-                         `(not
-                           (or (string-match-p ,regex title)
-			       (string-match-p ,regex link))))
+;;     Executing a filter in bytecode form is generally faster than
+;;     \"interpreting\" the filter with `elfeed-search-filter'."
+;;   (cl-destructuring-bind (&key after     before
+;; 			       must-have must-not-have
+;; 			       matches   not-matches
+;; 			       feeds     not-feeds
+;; 			       limit &allow-other-keys)
+;;       filter
+;;     `(lambda (,(if (or after matches not-matches must-have must-not-have feeds not-feeds)
+;;                    'entry
+;;                  '_entry)
+;; 	      ,(if (or feeds not-feeds)
+;;                    'feed
+;;                  '_feed)
+;; 	      ,(if limit
+;;                    'count
+;;                  '_count))
+;;        (let* (,@(when after
+;;                   '((date (elfeed-entry-date entry))
+;; 		    (age (- (float-time) date))))
+;; 	      ,@(when (or must-have must-not-have)
+;;                   '((tags (elfeed-entry-tags entry))))
+;; 	      ,@(when (or matches not-matches)
+;;                   '((title (or (elfeed-meta entry :title)
+;; 			       (elfeed-entry-title entry)))
+;; 		    (link (elfeed-entry-link entry))))
+;; 	      ,@(when (or feeds not-feeds)
+;;                   '((feed-id (elfeed-feed-id feed))
+;; 		    (feed-title (or (elfeed-meta feed :title)
+;; 				    (elfeed-feed-title feed)
+;; 				    ""))
+;; 		    (author-names (mapconcat (lambda (au) (plist-get au :name))
+;; 					     (elfeed-meta entry :authors)
+;; 					     " "))
+;; 		    )))
+;;          ,@(when after
+;; 	     `((when (> age ,after)
+;;                  (elfeed-db-return))))
+;;          ,@(when limit
+;; 	     `((when (>= count ,limit)
+;;                  (elfeed-db-return))))
+;;          (and ,@(cl-loop for forbid in must-not-have
+;;                          collect `(not (memq ',forbid tags)))
+;; 	      ,@(cl-loop for forbid in must-have
+;;                          collect `(memq ',forbid tags))
+;; 	      ,@(cl-loop for regex in matches collect
+;;                          `(or (string-match-p ,regex title)
+;; 			      (string-match-p ,regex link)))
+;; 	      ,@(cl-loop for regex in not-matches collect
+;;                          `(not
+;;                            (or (string-match-p ,regex title)
+;; 			       (string-match-p ,regex link))))
 
-	      ;; Every = entry must be matched by either feed or title.
-	      ,@(when feeds
-		  `((and
-		     ,@(cl-loop for regex in feeds
-				collect `(or (string-match-p ,regex author-names)
-					     (string-match-p ,regex feed-id)
-					     (string-match-p ,regex feed-title))))))
-	      ,@(when not-feeds
-                  `((not
-		     (or ,@(cl-loop
-			    for regex in not-feeds
-			    collect `(string-match-p ,regex feed-id)
-			    collect `(string-match-p ,regex feed-title)
-			    collect `(string-match-p ,regex author-names))))))
-	      ,@(when before
-                  `((> age ,before))))))))
+;; 	      ;; Every = entry must be matched by either feed or title.
+;; 	      ,@(when feeds
+;; 		  `((and
+;; 		     ,@(cl-loop for regex in feeds
+;; 				collect `(or (string-match-p ,regex author-names)
+;; 					     (string-match-p ,regex feed-id)
+;; 					     (string-match-p ,regex feed-title))))))
+;; 	      ,@(when not-feeds
+;;                   `((not
+;; 		     (or ,@(cl-loop
+;; 			    for regex in not-feeds
+;; 			    collect `(string-match-p ,regex feed-id)
+;; 			    collect `(string-match-p ,regex feed-title)
+;; 			    collect `(string-match-p ,regex author-names))))))
+;; 	      ,@(when before
+;;                   `((> age ,before))))))))
 
 (defun elfeed-browse-with-secondary-browser ()
   "Visit the current entry in the secondary browser."
@@ -5577,48 +5592,48 @@ If none of the selected entries are downloaded, a message is shown."
          (host (wallabag-host))
          (token (or wallabag-token (wallabag-request-token))))
     (request (format "%s/api/entries.json" host)
-      :parser 'json-read
-      :type "POST"
-      :data `(("url" . ,url)
-	      ("archive" . 0)
-	      ("starred" . 0)
-	      ("tags" . ,tags)
-	      ("access_token" . ,token))
-      :headers `(("User-Agent" . "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36"))
-      :error
-      (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
-		     (message "Wallaget request error: %S" error-thrown)))
-      :status-code `((401 . ,(wallabag-request-token-retry #'wallabag-add-entry url)))
-      :success (cl-function
-                (lambda (&key data &allow-other-keys)
-                  ;; convert tags array to tag comma seperated string
-                  (setq data
-                        (progn
-                          (setf
-                           (alist-get 'tag data)
-                           (if (stringp (alist-get 'tag data))
-                               (alist-get 'tag data)
-			     (wallabag-convert-tags-to-tag data)))
-                          data))
-                  (let ((inhibit-read-only t)
-                        (id (alist-get 'id data)))
-		    ;; check id exists or not
-		    (if (eq 1 (caar (wallabag-db-sql
-				     `[:select :exists
-					       [:select id :from items :where (= id ,id)]])))
-                        (progn
-                          (message "Entry Already Exists")
-                          (goto-char (wallabag-find-candidate-location id))
-                          (wallabag-flash-show (line-beginning-position) (line-end-position) 'highlight 0.5))
-                      (wallabag-db-insert (list data))
-                      (if (buffer-live-p (get-buffer wallabag-search-buffer-name))
-                          (with-current-buffer (get-buffer wallabag-search-buffer-name)
-			    (save-excursion
-                              (goto-char (point-min))
-                              (funcall wallabag-search-print-entry-function data))) )
-                      (message "Add Entry: %s" id)
-                      (if wallabag-show-entry-after-creation
-                          (wallabag-show-entry (car (wallabag-db-select :id id))) ))))))))
+             :parser 'json-read
+             :type "POST"
+             :data `(("url" . ,url)
+	             ("archive" . 0)
+	             ("starred" . 0)
+	             ("tags" . ,tags)
+	             ("access_token" . ,token))
+             :headers `(("User-Agent" . "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/41.0.2272.101 Safari/537.36"))
+             :error
+             (cl-function (lambda (&rest args &key error-thrown &allow-other-keys)
+		            (message "Wallaget request error: %S" error-thrown)))
+             :status-code `((401 . ,(wallabag-request-token-retry #'wallabag-add-entry url)))
+             :success (cl-function
+                       (lambda (&key data &allow-other-keys)
+                         ;; convert tags array to tag comma seperated string
+                         (setq data
+                               (progn
+                                 (setf
+                                  (alist-get 'tag data)
+                                  (if (stringp (alist-get 'tag data))
+                                      (alist-get 'tag data)
+			            (wallabag-convert-tags-to-tag data)))
+                                 data))
+                         (let ((inhibit-read-only t)
+                               (id (alist-get 'id data)))
+		           ;; check id exists or not
+		           (if (eq 1 (caar (wallabag-db-sql
+				            `[:select :exists
+					              [:select id :from items :where (= id ,id)]])))
+                               (progn
+                                 (message "Entry Already Exists")
+                                 (goto-char (wallabag-find-candidate-location id))
+                                 (wallabag-flash-show (line-beginning-position) (line-end-position) 'highlight 0.5))
+                             (wallabag-db-insert (list data))
+                             (if (buffer-live-p (get-buffer wallabag-search-buffer-name))
+                                 (with-current-buffer (get-buffer wallabag-search-buffer-name)
+			           (save-excursion
+                                     (goto-char (point-min))
+                                     (funcall wallabag-search-print-entry-function data))) )
+                             (message "Add Entry: %s" id)
+                             (if wallabag-show-entry-after-creation
+                                 (wallabag-show-entry (car (wallabag-db-select :id id))) ))))))))
 
 (defun js/add-wallabag-at-point ()
   "Send the URL at point to wallabag.
@@ -5940,11 +5955,11 @@ When pressed twice, make the sub/superscript roman."
 	       (org-babel-info
 		(xenops-src-do-in-org-mode
 		 (org-babel-get-src-block-info 'light (org-element-context)))))
-	(xenops-util-plist-update
-	 element
-	 :type 'src
-	 :language (nth 0 org-babel-info)
-	 :org-babel-info org-babel-info))))
+	      (xenops-util-plist-update
+	       element
+	       :type 'src
+	       :language (nth 0 org-babel-info)
+	       :org-babel-info org-babel-info))))
 
 (use-package org-fragtog
   ;; :disabled ;; Seems like xenops is working again
@@ -6019,10 +6034,10 @@ When pressed twice, make the sub/superscript roman."
   :bind (("C-c C-r" . js/quickrun-dwim))
   :config
   (quickrun-add-command "python"
-    '((:command . "python3")
-      (:compile-only . "pyflakes %s")
-      (:description . "Run Python script"))
-    :override t)
+                        '((:command . "python3")
+                          (:compile-only . "pyflakes %s")
+                          (:description . "Run Python script"))
+                        :override t)
 
   (defun js/quickrun-dwim ()
     "Run quickrun on region if active, otherwise on buffer."
