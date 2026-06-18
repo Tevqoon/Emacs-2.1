@@ -4606,7 +4606,7 @@ signature, in that order."
     (message "Deleted %d entries" (length entries))))
 
 ;; Variables
-(setq-default elfeed-search-filter "-trash -asmr -later @7-days-ago +unread")
+(setq-default elfeed-search-filter "-trash -asmr -later @14-days-ago +unread")
 
 ;; Functions
 (defun elfeed-scroll-up-command (&optional arg)
@@ -4673,13 +4673,13 @@ signature, in that order."
 (defun my/elfeed-show-default ()
   "Set Elfeed search filter to exclude 'trash' tagged entries and start live filtering."
   (interactive)
-  (setq elfeed-search-filter "-trash @7-days-ago ")
+  (setq elfeed-search-filter "-trash @14-days-ago")
   (elfeed-search-update :force)
   (elfeed-search-live-filter))
 
 (defun my/elfeed-show-non-trash--no-search ()
   (interactive)
-  (setq elfeed-search-filter "-trash @7-days-ago ")
+  (setq elfeed-search-filter "-trash @14-days-ago")
   (elfeed-search-update :force))
 
 (defun elfeed-filter-trash ()
@@ -4806,6 +4806,84 @@ signature, in that order."
     (if (derived-mode-p 'elfeed-show-mode)
         (browse-url (elfeed-entry-link elfeed-show-entry))
       (elfeed-search-browse-url))))
+
+;;; ** Weekly gate — ration "videos" entries to a weekly boundary
+;;
+;; Only entries tagged `videos' (the entire * Video subtree in elfeed.org)
+;; are gated: they become visible only up to the most recent Sunday, so the
+;; current week accumulates in the DB invisibly and is revealed in one batch
+;; each Sunday. Everything else — asmr, papers, friends, text, podcasts,
+;; torrents — falls through untouched and behaves as if the gate didn't exist.
+;;
+;; Feeds still fetch continuously (run `G' as often as you like); the gate is
+;; purely a display filter. The per-view `@N-ago' clauses act as lower bounds
+;; and compose with this upper bound. Toggle off via M-x
+;; `js/elfeed-toggle-weekly-gate' to confirm fetching mid-week; no key binding.
+
+(defvar js/last-sunday-cache nil
+  "Cons of (DAY-STRING . CUTOFF-FLOAT) to avoid recomputing the cutoff per entry.")
+
+(defun js/last-sunday-cutoff ()
+  "Return float-time for end of the most recent Sunday (23:59:59 local), cached per day.
+If today is Sunday, that Sunday is the cutoff."
+  (let ((today (format-time-string "%Y-%m-%d")))
+    (unless (equal (car js/last-sunday-cache) today)
+      (let* ((now (current-time))
+             (dow (string-to-number (format-time-string "%w" now))) ; 0=Sun
+             (sunday (time-subtract now (days-to-time dow)))
+             (s (decode-time sunday)))
+        (setq js/last-sunday-cache
+              (cons today
+                    (float-time
+                     (encode-time 59 59 23 (nth 3 s) (nth 4 s) (nth 5 s)))))))
+    (cdr js/last-sunday-cache)))
+
+(defvar js/elfeed-weekly-gate t
+  "When non-nil, hide `videos'-tagged elfeed entries newer than last Sunday.")
+
+(defvar js/elfeed-weekly-gate-tag 'videos
+  "Only entries carrying this tag are subject to the weekly gate.")
+
+(defun js/elfeed-weekly-gate-entries (entries)
+  "Remove gated `videos' entries newer than last Sunday from ENTRIES."
+  (if (not js/elfeed-weekly-gate)
+      entries
+    (let ((cutoff (js/last-sunday-cutoff)))
+      (seq-remove
+       (lambda (entry)
+         (and (memq js/elfeed-weekly-gate-tag (elfeed-entry-tags entry))
+              (> (elfeed-entry-date entry) cutoff)))
+       entries))))
+
+(advice-add 'elfeed-search-entries :filter-return #'js/elfeed-weekly-gate-entries)
+
+(defun js/elfeed-toggle-weekly-gate ()
+  "Toggle the weekly cutoff gate and refresh the search buffer."
+  (interactive)
+  (setq js/elfeed-weekly-gate (not js/elfeed-weekly-gate))
+  (elfeed-search-update :force)
+  (message "elfeed weekly gate: %s" (if js/elfeed-weekly-gate "ON" "OFF")))
+
+(defface js/elfeed-weekly-gate-on-face
+  '((t :inherit elfeed-search-filter-face :weight bold))
+  "Face for the weekly-gate ON indicator in the elfeed header.")
+
+(defface js/elfeed-weekly-gate-off-face
+  '((t :inherit warning :weight bold))
+  "Face for the weekly-gate OFF indicator in the elfeed header.")
+
+(defun js/elfeed-header-add-gate (header)
+  "Append the weekly-gate state to the elfeed search HEADER string.
+Skips appending while a fetch is in progress (job-progress header)."
+  (if (or (null header) (elfeed--header-jobs))
+      header
+    (concat header
+            ", "
+            (if js/elfeed-weekly-gate
+                (propertize "gate:weekly" 'face 'js/elfeed-weekly-gate-on-face)
+              (propertize "gate:OFF" 'face 'js/elfeed-weekly-gate-off-face)))))
+
+(advice-add 'elfeed-search--header :filter-return #'js/elfeed-header-add-gate)
 
 ;;; ** Dispatcher
 
