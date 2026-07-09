@@ -19,6 +19,8 @@
 
 (setq custom-file "~/.emacs.d/custom.el")
 (load "~/.emacs.d/private-config.el")
+(when (facep 'gnus-group-news-low-empty)
+     (set-face-attribute 'gnus-group-news-low-empty nil :inherit 'unspecified))
 (when (file-exists-p custom-file)
   (load custom-file))
 
@@ -265,6 +267,14 @@ are defining or executing a macro."
   :init
   (my/apply-theme 'light))
 
+(define-advice face-spec-set-2 (:around (orig-fn &rest args) ignore-inheritance-cycles)
+  "Don't let a cyclic :inherit spec abort face recalculation entirely."
+  (condition-case err
+      (apply orig-fn args)
+    (error
+     (unless (string-match-p "inheritance cycle" (error-message-string err))
+       (signal (car err) (cdr err))))))
+
 (use-package nerd-icons)
 
 ;;; ** Modeline
@@ -501,7 +511,6 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
      (let ((process-connection-type nil))
        (apply fn args)))
 
-   (add-to-list 'Info-directory-list "/opt/homebrew/share/info")
 
 
 
@@ -1486,8 +1495,9 @@ Produces multiple regions so expreg can step through them."
 	("<volume-up>" . Info-scroll-down))
   :init
   (defvar js/info-directory (expand-file-name "info/" org-directory))
-
-  (add-to-list 'Info-directory-list js/info-directory)
+  :config
+  (info-initialize)
+  (add-to-list 'Info-directory-list js/info-directory t)
 
   (defun js/rebuild-info-dir ()
     (interactive)
@@ -1651,20 +1661,25 @@ Produces multiple regions so expreg can step through them."
 
 (use-package agent-shell
   :defer t
-  ;; :if (not (eq system-type 'android))
   :ensure t
   :ensure-system-package
-  ((opencode . "npm install -g opencode-ai"))
+  ((opencode . "npm install -g opencode-ai")
+   (claude-agent-acp . "npm install -g @zed-industries/claude-code-acp"))
   :custom
-  (agent-shell-preferred-agent-config 'opencode)
+  ;; default agent for M-x agent-shell
+  (agent-shell-preferred-agent-config 'claude-code)
+  ;; --- opencode ---
   (agent-shell-opencode-default-model-id "github-copilot/claude-haiku-4.5")
+  ;; --- claude code ---
+  (agent-shell-anthropic-default-model-id nil)
   (agent-shell-anthropic-authentication
    (agent-shell-anthropic-make-authentication :login t))
+  ;; --- shared ---
   (agent-shell-prefer-viewport-interaction t)
   (agent-shell-session-strategy 'new)
   (agent-shell-show-usage-at-turn-end t)
   :bind
-  ("C-c g a" . agent-shell)
+  ("C-c g a" . agent-shell)                              ; default (claude-code)
   (:map agent-shell-mode-map
 	("M-<tab>" . agent-shell-cycle-session-mode)
 	("C-c C-f" . agent-shell-prompt-compose)))
@@ -5443,6 +5458,8 @@ If none of the selected entries are downloaded, a message is shown."
   :config
   (require 'wallabag-backend)
   (require 'zotero-backend)
+  (require 'highlights-pdf-backend)
+
   :custom
   (zotero-anki-deck "Zotero")
   :init
@@ -5455,6 +5472,7 @@ If none of the selected entries are downloaded, a message is shown."
                    ('darwin     (call-process "open" nil nil nil uri))
                    ('gnu/linux  (call-process "xdg-open" nil nil nil uri))
                    (_           (browse-url uri))))))))
+
 
 (use-package zotero-mass-import
   :load-path "~/.emacs.d/lisp/zotero-mass-import"
@@ -6475,21 +6493,10 @@ If more than 100 hours remain, shows days + hours instead."
              (hours (floor (/ total-minutes 60)))
              (minutes (mod total-minutes 60)))
 
-        (cond
-         ;; If less than or equal to 100 hours, show HH:MM format for timer
-         ((<= hours 100)
-          (let ((result (format "%02d:%02d" hours minutes)))
-            (message "Time until %s %s: %s (set timer to %s)"
-                     date time result result)
-            result))
-
-         ;; If more than 100 hours, show days and remaining hours
-         ((> hours 100)
-          (let* ((days (floor (/ hours 24)))
-                 (remaining-hours (mod hours 24)))
-            (message "Time until %s %s: %d days, %d hours, %d minutes (beyond 100h timer limit)"
-                     date time days remaining-hours minutes)
-            (format "%dd %02dh %02dm" days remaining-hours minutes))))))))
+        (let ((result (format "%02d:%02d" hours minutes)))
+          (message "Time until %s %s: %s (set timer to %s)"
+                   date time result result)
+          result)))))
 
 (defun outline-copy-visible (keepp)
   "Create a copy of the visible part of the current buffer and add
@@ -6547,6 +6554,32 @@ Optionally filter by LENGTH."
                             " | "))
          (cmd (format "%s | %s" length-filter filter)))
     (shell-command cmd (current-buffer))))
+
+(defun js/anki-editor-prune-orphaned-notes (query &optional org-buffer-or-file dry-run)
+  "Delete Anki notes matching QUERY that have no ANKI_NOTE_ID in ORG-BUFFER-OR-FILE.
+QUERY is an AnkiConnect search string, e.g. \"deck:Math::LogRac::Lecture06\".
+ORG-BUFFER-OR-FILE defaults to the current buffer.
+With DRY-RUN non-nil (or a prefix arg interactively), only report what would be deleted."
+  (interactive
+   (list (read-string "AnkiConnect query: " "deck:")
+         nil
+         current-prefix-arg))
+  (let* ((anki-ids (anki-editor-api-call-result 'findNotes :query query))
+         (org-ids '()))
+    (with-current-buffer (if org-buffer-or-file
+                             (find-file-noselect org-buffer-or-file)
+                           (current-buffer))
+      (org-with-wide-buffer
+       (goto-char (point-min))
+       (while (re-search-forward "^:ANKI_NOTE_ID: +\\([0-9]+\\)" nil t)
+         (push (string-to-number (match-string 1)) org-ids))))
+    (let ((orphaned (seq-difference anki-ids org-ids)))
+      (if (null orphaned)
+          (message "No orphaned notes in %s." query)
+        (if dry-run
+            (message "Would delete %d orphaned note(s): %S" (length orphaned) orphaned)
+          (anki-editor-api-call-result 'deleteNotes :notes orphaned)
+          (message "Deleted %d orphaned note(s)." (length orphaned)))))))
 
 ;;;
 ;;; End of configuration file.

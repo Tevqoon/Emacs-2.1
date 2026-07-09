@@ -33,11 +33,11 @@
 
 (defconst js/anki-hint-fallback-block-types
   '("theorem" "thm" "lemma" "lem" "corollary" "cor"
-    "proposition" "prop" "remark" "rem" "example" "ex" "exercise")
+    "proposition" "prop" "ex" "exercise" )
   "Block types used as Hint fallback when no definition block is present.")
 
 (defconst js/anki-back-block-types
-  '("proof" "pf" "solution" "sol")
+  '("proof" "pf" "solution" "sol" "lexample" "remark" "rem" "example")
   "Block types whose body contributes to the Back field.")
 
 ;;; --- Parsed block representation ---
