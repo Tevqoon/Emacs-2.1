@@ -4224,7 +4224,7 @@ _S_manual
 
   :custom
   (org-static-blog-publish-title "My Blog")
-  (org-static-blog-publish-url "https://www.jure-smolar.com/")
+  (org-static-blog-publish-url "https://jure.smolar.si/")
   (org-static-blog-publish-directory "~/Documents/blog/")
   (org-static-blog-posts-directory org-roam-directory)
   (org-static-blog-drafts-directory org-roam-directory)

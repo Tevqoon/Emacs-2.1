@@ -64,6 +64,7 @@
         js/agda-backtab
         js/agenda-refile
         js/cdlatex-sub-superscript
+        js/dired-smart-eol
         js/yas-cdlatex-tab
         kill-region
         kill-visual-line
