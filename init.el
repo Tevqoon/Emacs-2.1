@@ -2856,6 +2856,14 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
        :info (list :ref url)
        :props (list :finalize #'roamify-finalizer)))))
 
+;;; *** Journal watch tracking
+(use-package jrnl-video-watch
+  :defer t
+  :load-path "~/.emacs.d/lisp"
+  :bind
+  (:map org-mode-map
+        ("C-c n w p" . jrnl-video-set-watch-pct)
+        ("C-c n w u" . jrnl-video-mark-unwatched)))
 ;;; ** Helper functions
 
 (defun js/org--derive-title ()
