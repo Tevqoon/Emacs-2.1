@@ -423,13 +423,18 @@ are defining or executing a macro."
                     (window-at-side-list (window-frame (selected-window)) 'bottom)))))
 
   (defun sinister-stillness--exit ()
-    "Restore window positions that were saved on entry."
+    "Restore window positions that were saved on entry.
+NOFORCE matters here: `minibuffer-exit-hook' runs before the minibuffer
+command's action does, so a command that moves point afterwards (e.g.
+`counsel-imenu' calling `imenu' from `ivy-call') would otherwise have its
+jump undone -- a forced window-start makes redisplay drag point back into
+the old view instead of scrolling to it."
     (when (and sinister-stillness--window-states (= (minibuffer-depth) 1))
       (dolist (state sinister-stillness--window-states)
 	(let ((w (car state))
               (start (cdr state)))
           (when (window-live-p w)
-            (set-window-start w start))))
+            (set-window-start w start t))))
       (setq sinister-stillness--window-states nil)))
 
   (advice-add 'swiper--update-input-ivy :around ; Make swiper play well with sinister
@@ -1231,6 +1236,29 @@ Produces multiple regions so expreg can step through them."
 (use-package iedit
   :defer t
   :bind ("C-;" . iedit-mode))
+
+(defun js/imenu-reveal-at-point ()
+  "Open any fold hiding point, so imenu jumps land somewhere visible.
+Folding backends tag their invisible overlays with an
+`isearch-open-invisible' function so isearch can open them; reuse that
+convention rather than special-casing outline, hideshow etc.  Without
+this, point lands inside invisible text and the command loop moves it
+straight back out, so the jump appears not to happen.  Loops because
+folds nest: opening the innermost can leave an ancestor still closed."
+  (let ((guard 0))
+    (while (and (invisible-p (point)) (< guard 10))
+      (setq guard (1+ guard))
+      (let ((opened nil))
+        (dolist (ov (overlays-at (point)))
+          (when-let* ((open (overlay-get ov 'isearch-open-invisible)))
+            (funcall open ov)
+            (setq opened t)))
+        ;; Nothing left that advertises how to open it; stop rather than spin.
+        (unless opened (setq guard 10))))))
+
+(use-package imenu
+  :ensure nil
+  :hook (imenu-after-jump-hook . js/imenu-reveal-at-point))
 
 (use-package imenu-list
   :defer t
