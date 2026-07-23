@@ -4367,6 +4367,31 @@ _S_manual
                       (member (downcase tag) orb-ignored-tags))
                     all-tags)))
 
+  (defun org-static-blog-explicit-date-p (post-filename)
+    "Return non-nil if POST-FILENAME has an explicit `#+date:' keyword."
+    (let ((case-fold-search t))
+      (with-temp-buffer
+        (insert-file-contents post-filename)
+        (goto-char (point-min))
+        (search-forward-regexp "^\\#\\+date:[ ]*[[<]?\\([^]>]+\\)[]>]?$" nil t))))
+
+  ;; Warn (via Emacs's own *Warnings* buffer) about blog posts missing an
+  ;; explicit #+date, rather than changing how the date renders.
+  ;; compilation-minor-mode makes the "file:1:" warnings clickable/jumpable
+  ;; with the usual compile.el bindings (RET, mouse-2, `next-error').
+  (defun org-static-blog-warn-missing-dates (&rest _)
+    "Warn about any blog post lacking an explicit #+date."
+    (dolist (post (org-static-blog-get-post-filenames))
+      (unless (org-static-blog-explicit-date-p post)
+        (display-warning 'org-static-blog (format "%s:1: missing #+date" post))))
+    (when-let ((buf (get-buffer "*Warnings*")))
+      (with-current-buffer buf
+        (unless (bound-and-true-p compilation-minor-mode)
+          (compilation-minor-mode 1))
+        (font-lock-ensure))))
+
+  (advice-add 'org-static-blog-publish :after #'org-static-blog-warn-missing-dates)
+
   ;; Turn on transclusions before exporting
   (defun org-static-blog-render-post-content (post-filename)
     "Render blog content as bare HTML without header."
