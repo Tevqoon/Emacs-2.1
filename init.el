@@ -3328,7 +3328,23 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
                '("roam-id"
 		 :protocol "roam-id"
 		 :function js/org-protocol-open-roam-id
-		 :kill-client nil)))
+		 :kill-client nil))
+
+
+(defun js/org-protocol-open-day (data)
+  "Open the org-roam daily note for the :date in DATA, received via org-protocol."
+  (when-let* ((date (plist-get data :date)))
+    (tab-new)
+    (org-roam-dailies--capture (org-time-string-to-time (concat date " 12:00")) t))
+  nil)
+
+(add-to-list 'org-protocol-protocol-alist
+             '("journal-day"
+               :protocol "journal-day"
+               :function js/org-protocol-open-day
+               :kill-client nil))
+
+  )
 
 ;;; ** Citations
 
