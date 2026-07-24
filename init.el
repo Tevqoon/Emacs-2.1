@@ -3331,12 +3331,20 @@ Argument NOVISIT for use by `org-node-insert-link-novisit'."
 		 :kill-client nil))
 
 
-(defun js/org-protocol-open-day (data)
-  "Open the org-roam daily note for the :date in DATA, received via org-protocol."
-  (when-let* ((date (plist-get data :date)))
-    (tab-new)
-    (org-roam-dailies--capture (org-time-string-to-time (concat date " 12:00")) t))
-  nil)
+  (defun js/org-protocol-open-day (data)
+    "Open the org-roam daily note for :date in DATA, received via org-protocol.
+If :heading is present, move point to the first headline containing it
+anywhere in its raw text (including link targets)."
+    (when-let* ((date (plist-get data :date)))
+      (tab-new)
+      (org-roam-dailies--capture (org-time-string-to-time (concat date " 12:00")) t)
+      (when-let* ((needle (plist-get data :heading)))
+        (goto-char (point-min))
+        (if (re-search-forward (concat "^\\*+ .*" (regexp-quote needle)) nil t)
+            (progn (org-back-to-heading t)
+                   (org-fold-show-context))
+          (message "js/org-protocol: no heading matching %s" needle)))
+      nil))
 
 (add-to-list 'org-protocol-protocol-alist
              '("journal-day"
@@ -4595,14 +4603,27 @@ display-math fragments are emitted inside a <p>, where a div is invalid."
       (or (and (js/blog-svg-env-p value) (js/blog-svg-html value))
           (org-html-latex-fragment element contents info))))
 
+;;; *** Wide tables
+
+  (defun js/blog-table (table contents info)
+    "Wrap TABLE in a scroll container so wide tables escape the text column.
+The prose column is deliberately narrow (sakura's 38em), which is right
+for reading but cramped for a nine-column table.  `.table-wrapper' in
+custom.css breaks out to the viewport width and scrolls horizontally if
+the table is wider still.  The table itself keeps display:table, so it
+stays a real table for screen readers."
+    (format "<div class=\"table-wrapper\">%s</div>"
+            (org-html-table table contents info)))
+
   ;; Redefine the backend every time before rendering
   (defun my/setup-blog-backend (&rest _args)
-    "Ensure our custom link and LaTeX handlers are in the backend."
+    "Ensure our custom link, LaTeX and table handlers are in the backend."
     (org-export-define-derived-backend 'org-static-blog-post-bare 'html
                                        :translate-alist '((template . (lambda (contents info) contents))
 			                                  (link . my/org-static-blog-link)
                                                           (latex-environment . js/blog-latex-environment)
-                                                          (latex-fragment . js/blog-latex-fragment))))
+                                                          (latex-fragment . js/blog-latex-fragment)
+                                                          (table . js/blog-table))))
 
   (defun js/sync-blog (arg)
     "Sync blog to muffalo server via Makefile targets.
