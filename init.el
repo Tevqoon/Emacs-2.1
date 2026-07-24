@@ -4452,12 +4452,141 @@ Falls back to standard org-html-link for other link types."
           (format "<a href=\"broken-link.html\" class=\"broken-link\">%s</a>"
                   (or desc fallback-desc))))))
 
+;;; *** LaTeX environments MathJax can't render -> SVG
+
+  ;; MathJax handles the overwhelming majority of the maths on the site, so
+  ;; everything falls through to it by default.  Only the environments listed
+  ;; here get compiled to SVG.  This lives on the blog backend alone, so Anki
+  ;; and LaTeX exports are unaffected.
+  (defcustom js/blog-svg-latex-environments '("tikzcd" "tikzpicture" "forest" "logicproof")
+    "LaTeX environments rendered to SVG on the blog instead of via MathJax.
+Compare `anki-editor-builtin-latex-environments', which serves the
+same purpose for Anki.  Note that prooftree/bprooftree are absent:
+MathJax renders those through its bussproofs extension."
+    :type '(repeat string))
+
+  (defvar js/blog-svg-image-directory "ltximg/"
+    "Where generated SVGs live, relative to `org-static-blog-publish-directory'.
+`make sync' rsyncs everything but static/, so this is published automatically.")
+
+  (defvar js/blog-svg-latex-header
+    (concat "\\documentclass[border=2pt]{standalone}\n"
+            "\\usepackage[usenames]{color}\n"
+            "\\usepackage{" (expand-file-name "defaults/js" user-emacs-directory) "}\n")
+    "Preamble for blog LaTeX->SVG rendering.
+`standalone' crops to the content, so no trimming step is needed.
+js.sty is the same preamble used for previews and LaTeX export, so
+tikz-cd, bussproofs, forest and the \\N/\\Z macros are all available.")
+
+  ;; tikz-cd needs a real PDF (it does not survive the dvi route), and dvisvgm
+  ;; would need Ghostscript to read PDFs, so go through pdf2svg instead.
+  (add-to-list 'org-preview-latex-process-alist
+               `(js-blog-svg
+                 :programs ("lualatex" "pdf2svg")
+                 :description "pdf > svg"
+                 :message "you need to install the programs: lualatex and pdf2svg."
+                 :image-input-type "pdf"
+                 :image-output-type "svg"
+                 :image-size-adjust (1.0 . 1.0)
+                 :latex-header ,js/blog-svg-latex-header
+                 :latex-compiler ("lualatex -interaction nonstopmode -output-directory %o %f")
+                 :image-converter ("pdf2svg %f %O")))
+
+  (defun js/blog-svg-env-p (value)
+    "Non-nil if VALUE contains an environment that must be rendered as SVG."
+    (cl-some (lambda (env)
+               (string-match-p (format "\\\\begin{%s}" env) value))
+             js/blog-svg-latex-environments))
+
+  (defvar js/blog-svg-colors '("#657b83" . "#839496")
+    "Diagram colours as (LIGHT . DARK).
+These are solarized base00/base0, matching --fg-primary in custom.css.")
+
+  (defvar js/blog-svg-scale 1.5
+    "How much to enlarge generated diagrams.
+Applied to the root <svg> width/height, leaving the viewBox alone, so
+the drawing scales as vector art.  Changing this changes the cache hash,
+so the next publish re-renders every diagram once.")
+
+  (defun js/blog-svg-postprocess (file)
+    "Theme and scale FILE.
+
+Black becomes currentColor and a stylesheet setting the root colour per
+`prefers-color-scheme' is injected -- necessary because an SVG referenced
+by <img> is a separate document and inherits nothing from the page's CSS,
+though media queries do still apply.  Width and height are then multiplied
+by `js/blog-svg-scale'."
+    (with-temp-file file
+      (insert-file-contents file)
+      (goto-char (point-min))
+      (while (re-search-forward "rgb(0%, *0%, *0%)" nil t)
+        (replace-match "currentColor" t t))
+      (goto-char (point-min))
+      (when (re-search-forward "<svg[^>]*>" nil t)
+        (replace-match
+         (concat (replace-regexp-in-string
+                  "\\(width\\|height\\)=\"\\([0-9.]+\\)pt\""
+                  (lambda (m)
+                    (format "%s=\"%.4fpt\""
+                            (match-string 1 m)
+                            (* js/blog-svg-scale
+                               (string-to-number (match-string 2 m)))))
+                  (match-string 0) t t)
+                 (format "<style>svg{color:%s}@media(prefers-color-scheme:dark){svg{color:%s}}</style>"
+                         (car js/blog-svg-colors) (cdr js/blog-svg-colors)))
+         t t))))
+
+  (defun js/blog-latex->svg (value)
+    "Compile VALUE to an SVG, returning its path relative to the blog root.
+The filename is a hash of the source and preamble, so a diagram is only
+recompiled when it actually changes.  Returns nil on failure."
+    (let* ((hash (sha1 (prin1-to-string
+                        (list js/blog-svg-latex-header js/blog-svg-scale value))))
+           (relpath (concat js/blog-svg-image-directory "latex-" hash ".svg"))
+           (abspath (expand-file-name relpath org-static-blog-publish-directory)))
+      (unless (file-exists-p abspath)
+        (make-directory (file-name-directory abspath) t)
+        (condition-case err
+            (progn
+              ;; copy-sequence: `org-create-formula-image' mutates its argument.
+              (org-create-formula-image (copy-sequence value) abspath
+                                        org-format-latex-options nil 'js-blog-svg)
+              (js/blog-svg-postprocess abspath))
+          (error
+           (display-warning
+            'org-static-blog
+            (format "LaTeX->SVG failed (%s), falling back to MathJax:\n%s"
+                    (error-message-string err) value)))))
+      (and (file-exists-p abspath) relpath)))
+
+  (defun js/blog-svg-html (value)
+    "Return an <img> tag for VALUE rendered as SVG, or nil if rendering failed.
+A span (displayed as a block by custom.css) rather than a div, because
+display-math fragments are emitted inside a <p>, where a div is invalid."
+    (when-let ((src (js/blog-latex->svg value)))
+      (format "<span class=\"latex-svg\"><img src=\"/%s\" alt=\"%s\" /></span>"
+              src (xml-escape-string value))))
+
+  (defun js/blog-latex-environment (element contents info)
+    "Render ELEMENT as SVG when MathJax cannot handle it, else defer to MathJax."
+    (let ((value (org-remove-indentation (org-element-property :value element))))
+      (or (and (js/blog-svg-env-p value) (js/blog-svg-html value))
+          (org-html-latex-environment element contents info))))
+
+  (defun js/blog-latex-fragment (element contents info)
+    "Handle \\=\\[\\begin{tikzcd}...\\end{tikzcd}\\=\\], which parses as a fragment."
+    (let ((value (org-element-property :value element)))
+      (or (and (js/blog-svg-env-p value) (js/blog-svg-html value))
+          (org-html-latex-fragment element contents info))))
+
   ;; Redefine the backend every time before rendering
   (defun my/setup-blog-backend (&rest _args)
-    "Ensure our custom link and tikzcd handlers are in the backend."
+    "Ensure our custom link and LaTeX handlers are in the backend."
     (org-export-define-derived-backend 'org-static-blog-post-bare 'html
                                        :translate-alist '((template . (lambda (contents info) contents))
-			                                  (link . my/org-static-blog-link))))
+			                                  (link . my/org-static-blog-link)
+                                                          (latex-environment . js/blog-latex-environment)
+                                                          (latex-fragment . js/blog-latex-fragment))))
 
   (defun js/sync-blog (arg)
     "Sync blog to muffalo server via Makefile targets.
