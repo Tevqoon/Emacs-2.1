@@ -3299,15 +3299,33 @@ Chosen to sit above any plausible mtime (a unix timestamp) so that
 anything opened recently outranks anything merely edited recently.")
 
   (defun js/vulpea--refresh-recency ()
-    "Rebuild the recency lookup tables for the selection about to run."
+    "Rebuild the recentf ranks for the selection about to run.
+
+`js/vulpea--mtime-cache' deliberately is *not* cleared here. It's the
+fallback key for files recentf hasn't seen, which on a large
+collection is most of them, and re-statting all of those on every
+C-c n f was the bulk of the remaining latency -- one syscall per file
+per invocation. Letting it persist makes that a once-per-session cost.
+The staleness this admits is close to harmless: a file whose mtime
+changed because you edited it is a file you opened, so recentf already
+outranks its mtime. Only files changed by something other than this
+Emacs (a sync, a git pull) can order stale, and
+`js/vulpea-clear-recency-cache' fixes that on demand."
     (clrhash js/vulpea--recentf-ranks)
-    (clrhash js/vulpea--mtime-cache)
     (let ((i 0))
       (dolist (file recentf-list)
         ;; recentf may store abbreviated names ("~/..."), vulpea-note-path
         ;; is absolute -- expand both sides so they compare equal.
         (puthash (expand-file-name file) i js/vulpea--recentf-ranks)
         (setq i (1+ i)))))
+
+  (defun js/vulpea-clear-recency-cache ()
+    "Drop the cached file mtimes used to order note selection.
+Only needed after notes change outside this Emacs -- a Syncthing pull,
+a git checkout -- and only affects ordering, never contents."
+    (interactive)
+    (clrhash js/vulpea--mtime-cache)
+    (message "Note selection mtime cache cleared."))
 
   (defun js/vulpea--recency-score (path)
     "Return a recency score for PATH. Higher sorts earlier.
