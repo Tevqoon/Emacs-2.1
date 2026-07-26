@@ -3376,18 +3376,12 @@ anywhere in its raw text (including link targets)."
   (citar-bibliography org-cite-global-bibliography)
   (citar-open-entry-function #'citar-open-entry-in-zotero)
   :config
-  (defvar citar-capture-template
-    '(("r" "reference" plain "%?"
-       :target (file+head "references/${citar-citekey}.org"
-                          "#+title: ${note-title}\n#+filetags: :literature:")
-       :unnarrowed t)))
-
   (defun js/citar--citekey-at-node ()
-    "Return the first citekey for the current org-roam node, or nil."
-    (when-let* ((node (and (fboundp 'org-roam-node-at-point)
-                           (org-roam-node-at-point)))
-                (keys (citar-org-roam--node-cite-refs node)))
-      (car keys)))
+    "Return the first citekey for the current vulpea note, or nil.
+Uses citar-vulpea's own (private) property-reading + parsing helpers,
+which already handle the space-separated \"@key1 @key2\" REFERENCES
+property correctly -- no need to hand-roll that parsing here."
+    (car (citar-vulpea--parse-refs (citar-vulpea--get-ref-property))))
 
   (defun js/citar-open-pdf ()
     "Open PDF for reference at point, current node, or prompt."
@@ -3408,10 +3402,12 @@ Uses cite key at point, then current node's ref, then prompts."
          (citar-select-ref))))
 
   (defun js/citar-open-note ()
-    "Select a reference and open or create its org-roam note."
+    "Select a reference and open or create its vulpea note.
+Note creation/lookup itself is handled by whichever `citar-notes-source'
+is active (see the citar-vulpea use-package below); no capture template
+binding needed here anymore."
     (interactive)
-    (let ((org-roam-capture-templates citar-capture-template))
-      (citar-open-notes (citar-select-refs))))
+    (citar-open-notes (citar-select-refs)))
 
   (defun js/citar-insert-citation ()
     "Select a reference and insert a citation."
@@ -3431,7 +3427,25 @@ Uses cite key at point, then current node's ref, then prompts."
   (citar-org-roam-subdir "references")
   (citar-org-roam-capture-template-key "r")
   :config
-  (citar-org-roam-mode))
+  ;; Superseded by citar-vulpea-mode below (vulpea-port Phase 9).
+  ;; Left staged rather than removed per the migration report's ground
+  ;; rules -- flip this back on and disable citar-vulpea-mode to revert.
+  ;; (citar-org-roam-mode)
+  )
+
+(use-package citar-vulpea
+  :ensure t
+  :after (citar vulpea)
+  :custom
+  ;; Same title format citar-org-roam used; citar-vulpea documents
+  ;; ${author}/${title}/${date} but goes through the same
+  ;; citar-format--entry engine citar-org-roam used, so ${year} works too.
+  (citar-vulpea-note-title-template "${author} (${year}) - ${title}")
+  ;; Same physical directory citar-org-roam-subdir pointed bibliography
+  ;; notes at, so existing reference notes keep resolving.
+  (citar-vulpea-notes-directory (expand-file-name "references" org-roam-directory))
+  :config
+  (citar-vulpea-mode))
 
 
 
@@ -3897,8 +3911,8 @@ See `js/anki-derive-fields' for full hierarchy details."
 
   (defun js/anki-editor--inject-source-field (note-plist)
     "Inject Source field with org-protocol link into already-exported NOTE-PLIST."
-    (when-let* ((node (org-roam-node-at-point))
-		(id (org-roam-node-id node))
+    (when-let* ((id (org-id-get))
+		(note (vulpea-db-get-by-id id))
 		(url (format "org-protocol://roam-id?id=%s" id))
 		(link (format "<a href=\"%s\">Open in Emacs</a>" url))
 		(fields (plist-get note-plist :fields)))
