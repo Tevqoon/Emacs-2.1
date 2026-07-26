@@ -5594,12 +5594,10 @@ If none of the selected entries are downloaded, a message is shown."
 
 (use-package org-roam-annotation-import
   :defer t
-  ;; Testing the vulpea port locally, off the `vulpea-port' branch of
-  ;; ~/Documents/repos/org-roam-annotation-import, before pushing it.
-  ;; Revert to the :vc form (fetches from GitHub main) once merged:
-  ;; :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
-  :load-path "~/Documents/repos/org-roam-annotation-import"
-  :ensure nil
+  ;; Pinned to the `vulpea-port' branch rather than :rev :newest (which
+  ;; would track the default branch) since the vulpea port hasn't been
+  ;; merged upstream yet. Drop :branch once vulpea-port is merged to main.
+  :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :branch "vulpea-port")
   :after vulpea
   :bind* (("C-c n p r a" . wallabag-synchronise-annotations)
           ("C-c n p z" . js/anki-push-zotero)
