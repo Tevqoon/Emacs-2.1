@@ -821,8 +821,9 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (setq ivy-re-builders-alist '((t . ivy--regex-ignore-order)))
   (setq swiper-use-visual-line-p #'ignore))
 ;; js/ivy-org-node-mtime-compare + its org-node-collection ivy-sort-functions-alist
-;; entry are gone with org-node; vulpea-find's default ordering is used instead.
-;; If mtime-sort is wanted back, it'd need a vulpea-native candidate source.
+;; entry are gone with org-node. Recency sort is back, vulpea-native, keyed
+;; on the caller instead of the collection -- see js/vulpea-ivy-mtime-compare
+;; in the `vulpea' use-package's :config.
 
 (use-package ivy-rich
   :after ivy
@@ -3216,7 +3217,7 @@ binding needed here anymore."
   (("C-c n f" . js/vulpea-find)
    ("C-c n i" . js/vulpea-insert)
    ("C-c n t" . js/vulpea-tags-add-at-point)
-   ("C-c n n a" . vulpea-buffer-alias-add)
+   ("C-c n n a" . js/vulpea-alias-add-at-point)
    ("C-c n n g" . org-id-get-create)
    ("C-c n o" . open-urls-at-point-or-region)
    ("C-c n r" . js/roamify-url-at-point)
@@ -3246,6 +3247,36 @@ binding needed here anymore."
   ;; The advice on org-roam-extract-subtree (and the extract-subtree
   ;; workflow itself) is gone along with org-roam -- see the note near
   ;; js/org-roam-extract-subtree's old location for the open question.
+;;; ** Recency sort for vulpea-find/vulpea-insert
+
+  ;; js/ivy-org-node-mtime-compare's org-node-collection entry (see the
+  ;; comment near the `counsel' use-package) doesn't have a vulpea
+  ;; equivalent to hook into: vulpea-select's completion table is a
+  ;; fresh anonymous lambda every call, not a stable named symbol, so
+  ;; `ivy-sort-functions-alist' can't key off the collection itself the
+  ;; way it did for org-node-collection. It CAN key off the caller
+  ;; (`ivy--sort-function' falls back to `(ivy-state-caller ivy-last)',
+  ;; which defaults to `this-command'), so this hooks js/vulpea-find and
+  ;; js/vulpea-insert directly instead.
+  (defun js/vulpea-candidate-mtime (candidate)
+    "Return the mtime of the file behind ivy CANDIDATE's vulpea note, or nil."
+    (when-let* ((id (get-text-property 0 'vulpea-note-id candidate))
+                (note (vulpea-db-get-by-id id))
+                (attrs (file-attributes (vulpea-note-path note))))
+      (file-attribute-modification-time attrs)))
+
+  (defun js/vulpea-ivy-mtime-compare (a b)
+    "Sort vulpea-find/-insert candidates most-recently-modified file first."
+    (let ((ta (js/vulpea-candidate-mtime a))
+          (tb (js/vulpea-candidate-mtime b)))
+      (cond ((and ta tb) (time-less-p tb ta))
+            (ta t)
+            (tb nil)
+            (t (string< a b)))))
+
+  (dolist (cmd '(js/vulpea-find js/vulpea-insert))
+    (add-to-list 'ivy-sort-functions-alist (cons cmd #'js/vulpea-ivy-mtime-compare)))
+
 ;;; ** Tag management
 
   (defun org/project-p ()
@@ -3417,6 +3448,19 @@ none do (which in practice is most of the time, but not always)."
         (goto-char (vulpea-note-pos note)))
       (call-interactively #'vulpea-buffer-tags-add)))
 
+  (defun js/vulpea-alias-add-at-point ()
+    "Add an alias to the vulpea note at point.
+Same fix as `js/vulpea-tags-add-at-point': `vulpea-buffer-alias-add'
+operates on whatever heading point happens to be inside, even if that
+heading has no :ID: of its own. This instead targets the enclosing
+*note* -- the nearest ancestor heading that carries an :ID:, or the
+file level if none do."
+    (interactive)
+    (save-excursion
+      (when-let* ((note (js/vulpea-note-at-point)))
+        (goto-char (vulpea-note-pos note)))
+      (call-interactively #'vulpea-buffer-alias-add)))
+
 ;;; ** Selection UI parity (OLP prefix + tags)
 
   ;; Shows "File → Heading → " before the title, like the old OLP+hashtag
@@ -3485,6 +3529,22 @@ vulpea db for a note that may not be indexed yet.")
        (file+function js/vulpea-capture--file js/vulpea-capture--insert-head)
        "%?" :unnarrowed t))
     "Isolated org-capture-templates used only by `js/vulpea-capture--do'.")
+
+  (defun js/vulpea-capture--suppress-save-on-abort ()
+    "Stop `org-capture-finalize' from writing the new file to disk on abort.
+For a `file+function' target, `org-capture-finalize' unconditionally
+save-buffers -- (unless (org-capture-get :no-save) (save-buffer)) --
+*before* it checks `org-note-abort' and discards the buffer. The
+kill-region step that undoes an aborted capture only removes the
+template text (%?), not the header js/vulpea-capture--insert-head
+already inserted directly into the buffer, so without this, aborting
+with C-c C-k still writes a file containing just that header. Setting
+:no-save when aborting skips that premature save; the later
+new-buffer + org-note-abort branch already discards the buffer
+unsaved, which is what actually prevents file creation."
+    (when (and org-note-abort (equal (org-capture-get :key) "v"))
+      (org-capture-put :no-save t)))
+  (add-hook 'org-capture-prepare-finalize-hook #'js/vulpea-capture--suppress-save-on-abort)
 
   (defun js/vulpea-capture--do (title on-finish &optional properties)
     "Capture a new vulpea note titled TITLE via org-capture.
@@ -3568,8 +3628,8 @@ org-roam-dailies-map (C-c n d)."
   "n" #'vulpea-journal-today
   "t" #'js/vulpea-journal-tomorrow
   "y" #'js/vulpea-journal-yesterday
-  "b" #'vulpea-journal-previous
-  "f" #'vulpea-journal-next
+  "b" #'js/vulpea-journal-previous-extant
+  "f" #'js/vulpea-journal-next-extant
   "c" #'vulpea-journal-date
   "v" #'vulpea-journal-date)
 
@@ -3598,6 +3658,47 @@ daily notes live in. Matches the :file-name template below.")
     "Open the journal directory in Dired."
     (interactive)
     (dired (expand-file-name js/vulpea-journal-directory org-roam-directory)))
+
+  ;; vulpea-journal-next/-previous track an "active date" that's set by
+  ;; the vulpea-ui sidebar's own prev/next buttons but not by ordinary
+  ;; find-file navigation of a journal buffer, so calling them directly
+  ;; from C-c n d f/b (outside the sidebar) lands on the wrong entry --
+  ;; this is also the likely source of the reported red "missing entry"
+  ;; markings in the sidebar, since that state ends up pointing at a
+  ;; date with no note. Sidestepping all of that: just scan the journal
+  ;; directory's actual files and step to the adjacent one on disk.
+  (defun js/vulpea-journal--files ()
+    "Return existing journal file paths, sorted chronologically.
+Relies on the default YYYY-MM-DD.org daily file-name template sorting
+the same lexicographically as chronologically."
+    (sort (directory-files
+           (expand-file-name js/vulpea-journal-directory org-roam-directory)
+           t "\\`[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\.org\\'")
+          #'string<))
+
+  (defun js/vulpea-journal-next-extant ()
+    "Visit the next existing journal file after the current one."
+    (interactive)
+    (let* ((files (js/vulpea-journal--files))
+           (current (buffer-file-name))
+           (pos (and current (seq-position files current #'string=))))
+      (cond
+       ((null files) (message "No journal entries"))
+       ((null pos) (find-file (car (last files))))
+       ((= pos (1- (length files))) (message "No next journal entry"))
+       (t (find-file (nth (1+ pos) files))))))
+
+  (defun js/vulpea-journal-previous-extant ()
+    "Visit the previous existing journal file before the current one."
+    (interactive)
+    (let* ((files (js/vulpea-journal--files))
+           (current (buffer-file-name))
+           (pos (and current (seq-position files current #'string=))))
+      (cond
+       ((null files) (message "No journal entries"))
+       ((null pos) (find-file (car files)))
+       ((= pos 0) (message "No previous journal entry"))
+       (t (find-file (nth (1- pos) files))))))
 
   ;; Daily journal, replacing org-roam-dailies.
   (setq vulpea-journal-default-template
