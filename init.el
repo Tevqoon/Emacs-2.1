@@ -3161,19 +3161,6 @@ binding needed here anymore."
    ("C-c n b i" . js/citar-insert-citation)
    ("C-c n b d" . js/citar-open-pdf)))
 
-(use-package citar-org-roam
-  :after (citar org-roam)
-  :custom
-  (citar-org-roam-note-title-template "${author} (${year}) - ${title}")
-  (citar-org-roam-subdir "references")
-  (citar-org-roam-capture-template-key "r")
-  :config
-  ;; Superseded by citar-vulpea-mode below (vulpea-port Phase 9).
-  ;; Left staged rather than removed per the migration report's ground
-  ;; rules -- flip this back on and disable citar-vulpea-mode to revert.
-  ;; (citar-org-roam-mode)
-  )
-
 (use-package citar-vulpea
   :ensure t
   :after (citar vulpea)
@@ -3216,6 +3203,11 @@ binding needed here anymore."
   :custom
   (vulpea-buffer-alias-property "ROAM_ALIASES")
   (vulpea-db-sync-scan-on-enable t) ; Detect changes while emacs was closed
+
+  ;; No org-roam-file-exclude-regexp equivalent is configured here on
+  ;; purpose: vulpea-db-sync--org-file-p rejects any path containing
+  ;; "/." unconditionally, so .stversions/, .git/, and dotfiles are
+  ;; already excluded from indexing without any config on our end.
 
   :hook
   (org-mode-hook . tags/enable-tag-updating)
