@@ -2409,9 +2409,8 @@ org-roam-capture- call did) rather than the shared list above, so its
 \"t\" key doesn't collide with the \"Task\" template already using it."
   (interactive)
   (let ((org-capture-templates
-         '(("t" "task" plain "** TODO %?"
-            :target (id "C6C9881B-7EF4-4DAF-A502-84D396372A68")
-            :unnarrowed nil))))
+         '(("t" "task" plain (id "C6C9881B-7EF4-4DAF-A502-84D396372A68")
+            "** TODO %?"))))
     (org-capture nil "t")))
 
 ;;; *** Org browser Integration
@@ -3121,11 +3120,12 @@ binding needed here anymore."
   :bind
   (("C-c n f" . js/vulpea-find)
    ("C-c n i" . js/vulpea-insert)
-   ("C-c n t" . vulpea-buffer-tags-add)
+   ("C-c n t" . js/vulpea-tags-add-at-point)
    ("C-c n n a" . vulpea-buffer-alias-add)
    ("C-c n n g" . org-id-get-create)
    ("C-c n o" . open-urls-at-point-or-region)
    ("C-c n r" . js/roamify-url-at-point)
+   ("C-c n c" . org-capture-task)
    ("C-c n n s" . vulpea-db-sync-full-scan)
    ("C-c n n r" . js/vulpea-refile-at-point)
    ;; Trails
@@ -3308,6 +3308,19 @@ With C-u prefix, show all notes including archived."
     (interactive "P")
     (vulpea-insert :filter-fn (if arg nil #'js/vulpea-note-not-archived-p)))
 
+  (defun js/vulpea-tags-add-at-point ()
+    "Add tags to the vulpea note at point.
+`vulpea-buffer-tags-add' operates on whatever heading point happens to
+be inside, even if that heading has no :ID: of its own. This instead
+mirrors org-roam-tag-add: it targets the enclosing *note* -- the
+nearest ancestor heading that carries an :ID:, or the file level if
+none do (which in practice is most of the time, but not always)."
+    (interactive)
+    (save-excursion
+      (when-let* ((note (js/vulpea-note-at-point)))
+        (goto-char (vulpea-note-pos note)))
+      (call-interactively #'vulpea-buffer-tags-add)))
+
 ;;; ** Selection UI parity (OLP prefix + tags)
 
   ;; Shows "File → Heading → " before the title, like the old OLP+hashtag
@@ -3348,28 +3361,56 @@ With C-u prefix, show all notes including archived."
   :defer t
   :bind ("C-c n v" . vulpea-ui-sidebar-toggle))
 
+(defvar-keymap js/vulpea-journal-map
+  :doc "Prefix map for vulpea-journal navigation, approximating the old
+org-roam-dailies-map (C-c n d)."
+  "." #'js/vulpea-journal-find-directory
+  "d" #'vulpea-journal-today
+  "n" #'vulpea-journal-today
+  "t" #'js/vulpea-journal-tomorrow
+  "y" #'js/vulpea-journal-yesterday
+  "b" #'vulpea-journal-previous
+  "f" #'vulpea-journal-next
+  "c" #'vulpea-journal-date
+  "v" #'vulpea-journal-date)
+
 (use-package vulpea-journal
   ;; :demand instead of :commands/:defer: js/vulpea-journal-append-heading
   ;; and friends (defined below) are called from logging/capture code paths
   ;; that don't otherwise autoload this package, e.g. js/url-target-log.
   :demand t
-  :bind
-  (("C-c n m" . js/vulpea-journal-month-today)
-   ("C-c n M" . js/vulpea-journal-month-date))
+  :bind-keymap ("C-c n d" . js/vulpea-journal-map)
   :config
   (defvar js/vulpea-journal-directory "journal/"
     "Relative directory (under `org-roam-directory') that vulpea-journal
 daily notes live in. Matches the :file-name template below.")
 
-  ;; Daily journal, replacing org-roam-dailies. The pre-existing monthly
-  ;; journal experiment (below) stays separate from this default.
+  (defun js/vulpea-journal-tomorrow ()
+    "Open journal for tomorrow."
+    (interactive)
+    (vulpea-journal (time-add (current-time) (days-to-time 1))))
+
+  (defun js/vulpea-journal-yesterday ()
+    "Open journal for yesterday."
+    (interactive)
+    (vulpea-journal (time-subtract (current-time) (days-to-time 1))))
+
+  (defun js/vulpea-journal-find-directory ()
+    "Open the journal directory in Dired."
+    (interactive)
+    (dired (expand-file-name js/vulpea-journal-directory org-roam-directory)))
+
+  ;; Daily journal, replacing org-roam-dailies.
   (setq vulpea-journal-default-template
         (vulpea-journal-template-daily
          :head "#+created: %<[%Y-%m-%d]>\n#+startup: show2levels"))
 
   (defun js/vulpea-journal-append-heading (heading content)
     "Append CONTENT as a level-2 entry under top-level HEADING in today's journal.
-Creates HEADING as a new level-1 heading if it doesn't exist yet."
+Creates HEADING as a new level-1 heading if it doesn't exist yet.
+Idempotent: like the old org-roam-capture find-or-create-olp behavior
+\(where the link text itself was the olp target\), if CONTENT already
+exists verbatim as a child heading under HEADING, nothing is inserted."
     (let* ((note (vulpea-journal-note (current-time)))
            (file (vulpea-note-path note)))
       (with-current-buffer (find-file-noselect file)
@@ -3380,8 +3421,10 @@ Creates HEADING as a new level-1 heading if it doesn't exist yet."
            (unless (bolp) (insert "\n"))
            (insert "* " heading "\n"))
          (org-back-to-heading t)
-         (org-end-of-subtree t t)
-         (insert "** " content "\n"))
+         (let ((subtree-end (save-excursion (org-end-of-subtree t t))))
+           (unless (re-search-forward (format "^\\*\\* %s[ \t]*$" (regexp-quote content)) subtree-end t)
+             (goto-char subtree-end)
+             (insert "** " content "\n"))))
         (save-buffer))))
 
   (defvar js/vulpea-process-file
@@ -3389,33 +3432,19 @@ Creates HEADING as a new level-1 heading if it doesn't exist yet."
     "Fixed vulpea note file that top-level PROCESS entries get appended to.")
 
   (defun js/vulpea-append-top-level (file heading)
-    "Append HEADING as a new level-1 entry at the end of FILE."
+    "Append HEADING as a new level-1 entry at the end of FILE.
+Idempotent: does nothing if a level-1 heading with this exact text
+already exists in FILE."
     (with-current-buffer (find-file-noselect file)
       (org-with-wide-buffer
-       (goto-char (point-max))
-       (unless (bolp) (insert "\n"))
-       (insert "* " heading "\n"))
+       (goto-char (point-min))
+       (unless (re-search-forward (format "^\\* %s[ \t]*$" (regexp-quote heading)) nil t)
+         (goto-char (point-max))
+         (unless (bolp) (insert "\n"))
+         (insert "* " heading "\n")))
       (save-buffer)))
 
-  (defvar js/vulpea-monthly-template
-    '(:file-name "journal/monthlies/%Y-%m-monthly.org"
-		 :title "%Y-%m"
-		 :tags ("journal")
-		 :entry-level 1
-		 :entry-title "%Y-%m-%d %A"
-		 :head "#+created: %<[%Y-%m-%d]>\n#+startup: show2levels"))
-
-  (vulpea-journal-setup)
-
-  (defun js/vulpea-journal-month-today ()
-    (interactive)
-    (let ((vulpea-journal-default-template js/vulpea-monthly-template))
-      (vulpea-journal (current-time))))
-
-  (defun js/vulpea-journal-month-date (date)
-    (interactive (list (vulpea-journal--read-date "Journal date: ")))
-    (let ((vulpea-journal-default-template js/vulpea-monthly-template))
-      (vulpea-journal date))))
+  (vulpea-journal-setup))
 
 ;;; ** Anki
 
@@ -4818,84 +4847,6 @@ signature, in that order."
     (if (derived-mode-p 'elfeed-show-mode)
         (browse-url (elfeed-entry-link elfeed-show-entry))
       (elfeed-search-browse-url))))
-
-;;; ** Weekly gate — ration "videos" entries to a weekly boundary
-;;
-;; Only entries tagged `videos' (the entire * Video subtree in elfeed.org)
-;; are gated: they become visible only up to the most recent Sunday, so the
-;; current week accumulates in the DB invisibly and is revealed in one batch
-;; each Sunday. Everything else — asmr, papers, friends, text, podcasts,
-;; torrents — falls through untouched and behaves as if the gate didn't exist.
-;;
-;; Feeds still fetch continuously (run `G' as often as you like); the gate is
-;; purely a display filter. The per-view `@N-ago' clauses act as lower bounds
-;; and compose with this upper bound. Toggle off via M-x
-;; `js/elfeed-toggle-weekly-gate' to confirm fetching mid-week; no key binding.
-
-(defvar js/last-sunday-cache nil
-  "Cons of (DAY-STRING . CUTOFF-FLOAT) to avoid recomputing the cutoff per entry.")
-
-(defun js/last-sunday-cutoff ()
-  "Return float-time for end of the most recent Sunday (23:59:59 local), cached per day.
-If today is Sunday, that Sunday is the cutoff."
-  (let ((today (format-time-string "%Y-%m-%d")))
-    (unless (equal (car js/last-sunday-cache) today)
-      (let* ((now (current-time))
-             (dow (string-to-number (format-time-string "%w" now))) ; 0=Sun
-             (sunday (time-subtract now (days-to-time dow)))
-             (s (decode-time sunday)))
-        (setq js/last-sunday-cache
-              (cons today
-                    (float-time
-                     (encode-time 59 59 23 (nth 3 s) (nth 4 s) (nth 5 s)))))))
-    (cdr js/last-sunday-cache)))
-
-(defvar js/elfeed-weekly-gate t
-  "When non-nil, hide `videos'-tagged elfeed entries newer than last Sunday.")
-
-(defvar js/elfeed-weekly-gate-tag 'videos
-  "Only entries carrying this tag are subject to the weekly gate.")
-
-(defun js/elfeed-weekly-gate-entries (entries)
-  "Remove gated `videos' entries newer than last Sunday from ENTRIES."
-  (if (not js/elfeed-weekly-gate)
-      entries
-    (let ((cutoff (js/last-sunday-cutoff)))
-      (seq-remove
-       (lambda (entry)
-         (and (memq js/elfeed-weekly-gate-tag (elfeed-entry-tags entry))
-              (> (elfeed-entry-date entry) cutoff)))
-       entries))))
-
-(advice-add 'elfeed-search-entries :filter-return #'js/elfeed-weekly-gate-entries)
-
-(defun js/elfeed-toggle-weekly-gate ()
-  "Toggle the weekly cutoff gate and refresh the search buffer."
-  (interactive)
-  (setq js/elfeed-weekly-gate (not js/elfeed-weekly-gate))
-  (elfeed-search-update :force)
-  (message "elfeed weekly gate: %s" (if js/elfeed-weekly-gate "ON" "OFF")))
-
-(defface js/elfeed-weekly-gate-on-face
-  '((t :inherit elfeed-search-filter-face :weight bold))
-  "Face for the weekly-gate ON indicator in the elfeed header.")
-
-(defface js/elfeed-weekly-gate-off-face
-  '((t :inherit warning :weight bold))
-  "Face for the weekly-gate OFF indicator in the elfeed header.")
-
-(defun js/elfeed-header-add-gate (header)
-  "Append the weekly-gate state to the elfeed search HEADER string.
-Skips appending while a fetch is in progress (job-progress header)."
-  (if (or (null header) (elfeed--header-jobs))
-      header
-    (concat header
-            ", "
-            (if js/elfeed-weekly-gate
-                (propertize "gate:weekly" 'face 'js/elfeed-weekly-gate-on-face)
-              (propertize "gate:OFF" 'face 'js/elfeed-weekly-gate-off-face)))))
-
-(advice-add 'elfeed-search--header :filter-return #'js/elfeed-header-add-gate)
 
 ;;; ** Dispatcher
 
