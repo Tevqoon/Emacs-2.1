@@ -4308,6 +4308,7 @@ _S_manual
     <link rel=\"icon\" href=\"static/favicon.ico\">
     <script src=\"static/mathjax-config.js\"></script>
     <script id=\"MathJax-script\" async src=\"https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js\"></script>
+    <script src=\"static/table-sort.js\" defer></script>
 
     <script>
     document.addEventListener('DOMContentLoaded', function () {

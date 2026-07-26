@@ -1004,6 +1004,34 @@ ROW may be a `vulpea-dblocks-row' struct or a bare `vulpea-note'."
             (vulpea-dblocks--field row key))))))
      specs)))
 
+(defconst vulpea-dblocks--preserved-keyword-re
+  "\\`[ \t]*#\\+\\(?:attr_[[:alnum:]]+\\|caption\\|name\\|header\\|plot\\):"
+  "Leading keyword lines in a dblock body that survive a rebuild.
+See `vulpea-dblocks--leading-keywords'.")
+
+(defun vulpea-dblocks--leading-keywords (content)
+  "Return the leading `#+KEYWORD:' lines of CONTENT, as a list of strings.
+
+A rebuild replaces the whole block body, so anything the user wrote above
+the table -- an export attribute like `#+ATTR_HTML: :class sortable', a
+`#+CAPTION:', a `#+NAME:' -- would be lost on every refresh, and there is
+nowhere else to put it (the `#+BEGIN:' line only takes dblock params).
+Carrying these lines across means they can be written once and kept.
+
+Only an unbroken run of keyword lines at the very start is preserved, so
+this can never pick up stray text from the generated table itself."
+  (when content
+    (seq-take-while
+     (lambda (line)
+       (let ((case-fold-search t))
+         (string-match-p vulpea-dblocks--preserved-keyword-re line)))
+     (split-string content "\n"))))
+
+(defun vulpea-dblocks--insert-leading-keywords (params)
+  "Re-insert the leading keyword lines captured in PARAMS' :content."
+  (dolist (line (vulpea-dblocks--leading-keywords (plist-get params :content)))
+    (insert line "\n")))
+
 (defun vulpea-dblocks--insert-flat-table (rows columns)
   "Insert a flat org table for ROWS with COLUMNS.
 Rows must be pre-sorted and pre-limited before this call."
@@ -1143,6 +1171,9 @@ Examples:
            (notes (vulpea-dblocks--query params))
            (rows  (vulpea-dblocks--flatten-rows notes flatten-col))
            (rows  (vulpea-dblocks--sort-rows rows sort-spec)))
+      ;; Carry over #+ATTR_HTML: / #+CAPTION: / ... written above the table,
+      ;; which the rebuild would otherwise discard.
+      (vulpea-dblocks--insert-leading-keywords params)
       (if group-by
           (vulpea-dblocks--insert-grouped-table
            (vulpea-dblocks--sort-groups
