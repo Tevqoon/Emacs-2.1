@@ -1616,37 +1616,22 @@ folds nest: opening the innermost can leave an ancestor still closed."
       (gptel-mode 1)))
 
   (defun org/save-gptel-chat-as-node ()
-    "Save the current gptel chat buffer as an org-roam node and link it in today's journal."
+    "Save the current gptel chat buffer as a vulpea note and link it in today's journal."
     (interactive)
-    (let* ((existing-id (org-id-get))
-           (title (read-string "Title for chat node: " (format-time-string "Chat %Y-%m-%d %H:%M")))
-           (chatlog-dir (expand-file-name org-roam-chatlogs-directory org-roam-directory))
-           (file-name (format-time-string "Chat-%Y-%m-%d_%H-%M.org"))
-           (full-path (expand-file-name file-name chatlog-dir)))
-
-      (if existing-id
-          (save-buffer)
-
-	(unless (file-directory-p chatlog-dir)
-          (make-directory chatlog-dir t))
-
-	(write-file full-path)
-
-	(goto-char (point-min))
-	(org-id-get-create)
-	(unless (save-excursion (re-search-forward "^#\\+title:" nil t))
-          (goto-char (point-min))
-          (when (re-search-forward "^:END:$" nil t)
-            (forward-line 1)
-            (insert (format "#+title: %s\n" title))))
-
-	(save-buffer)
-	(org-roam-db-sync)
-
-	(let* ((node-id (org-id-get))
-	       (link (org-roam-link-make-string node-id title)))
-          (org-roam-dailies-autocapture-today "c" link)
-          (message "Chat saved as '%s' and linked in today's journal." title)))))
+    (if (org-id-get)
+        (save-buffer)
+      (let* ((title (read-string "Title for chat node: " (format-time-string "Chat %Y-%m-%d %H:%M")))
+             (chatlog-dir (expand-file-name org-roam-chatlogs-directory org-roam-directory))
+             (file-name (format-time-string "Chat-%Y-%m-%d_%H-%M.org"))
+             (full-path (expand-file-name file-name chatlog-dir))
+             (body (buffer-substring-no-properties (point-min) (point-max)))
+             (old-buffer (current-buffer))
+             (note (vulpea-create title full-path :body body)))
+        (set-buffer-modified-p nil)
+        (kill-buffer old-buffer)
+        (find-file full-path)
+        (js/vulpea-journal-append-heading "Chats" (vulpea-utils-link-make-string note))
+        (message "Chat saved as '%s' and linked in today's journal." title))))
 
   )
 
@@ -1955,8 +1940,8 @@ This function is expected to be hooked in org-mode."
 
    ((string-prefix-p "id:" url t)
     (let* ((id (string-remove-prefix "id:" url))
-           (node (org-roam-node-from-id id)))
-      (org-roam-node-title node)))
+           (note (vulpea-db-get-by-id id)))
+      (vulpea-note-title note)))
 
    ((string-prefix-p "elfeed:" url t)
     (let* ((link (string-remove-prefix "elfeed:" url))
@@ -2673,14 +2658,12 @@ Using the org-mac-link, this comes pre-formatted with the url title."
 ;; Handler functions for each target
 (defun js/url-target-log (url-source)
   "Log URL-SOURCE to the daily journal."
-  (let ((org-roam-capture-content url-source))
-    (org-roam-dailies-autocapture-today "w"))
+  (js/vulpea-journal-append-heading "Web" url-source)
   "logged")
 
 (defun js/url-target-process (url-source)
   "Log URL-SOURCE as a top-level entry in the @Process node."
-  (let ((org-roam-capture-content url-source))
-    (js/org-roam-autocapture "p"))
+  (js/vulpea-append-top-level js/vulpea-process-file (format "PROCESS %s" url-source))
   "processed")
 
 (defun js/url-target-wallabag (url-source)
@@ -3679,11 +3662,50 @@ With C-u prefix, show all notes including archived."
   :bind ("C-c n v" . vulpea-ui-sidebar-toggle))
 
 (use-package vulpea-journal
-  :commands js/vulpea-journal-month-today js/vulpea-journal-month-date
+  ;; :demand instead of :commands/:defer: js/vulpea-journal-append-heading
+  ;; and friends (defined below) are called from logging/capture code paths
+  ;; that don't otherwise autoload this package, e.g. js/url-target-log.
+  :demand t
   :bind
   (("C-c n m" . js/vulpea-journal-month-today)
    ("C-c n M" . js/vulpea-journal-month-date))
   :config
+  ;; Daily journal, replacing org-roam-dailies. The pre-existing monthly
+  ;; journal experiment (below) stays separate from this default.
+  (setq vulpea-journal-default-template
+        (vulpea-journal-template-daily
+         :head "#+created: %<[%Y-%m-%d]>\n#+startup: show2levels"))
+
+  (defun js/vulpea-journal-append-heading (heading content)
+    "Append CONTENT as a level-2 entry under top-level HEADING in today's journal.
+Creates HEADING as a new level-1 heading if it doesn't exist yet."
+    (let* ((note (vulpea-journal-note (current-time)))
+           (file (vulpea-note-path note)))
+      (with-current-buffer (find-file-noselect file)
+        (org-with-wide-buffer
+         (goto-char (point-min))
+         (unless (re-search-forward (format "^\\* %s[ \t]*$" (regexp-quote heading)) nil t)
+           (goto-char (point-max))
+           (unless (bolp) (insert "\n"))
+           (insert "* " heading "\n"))
+         (org-back-to-heading t)
+         (org-end-of-subtree t t)
+         (insert "** " content "\n"))
+        (save-buffer))))
+
+  (defvar js/vulpea-process-file
+    (expand-file-name "20260509100451-process.org" org-roam-directory)
+    "Fixed vulpea note file that top-level PROCESS entries get appended to.")
+
+  (defun js/vulpea-append-top-level (file heading)
+    "Append HEADING as a new level-1 entry at the end of FILE."
+    (with-current-buffer (find-file-noselect file)
+      (org-with-wide-buffer
+       (goto-char (point-max))
+       (unless (bolp) (insert "\n"))
+       (insert "* " heading "\n"))
+      (save-buffer)))
+
   (defvar js/vulpea-monthly-template
     '(:file-name "journal/monthlies/%Y-%m-monthly.org"
 		 :title "%Y-%m"
@@ -5476,7 +5498,7 @@ If a key is provided, use it instead of the default capture template."
       (dolist (entry entries)
 	(when (or arg (js/elfeed-entry-should-be-logged-p entry))
           (let ((link (js/make-elfeed-entry-link entry)))
-            (org-roam-dailies-autocapture-today (or keys "e") link)
+            (js/vulpea-journal-append-heading "Elfeed" link)
             (elfeed-tag entry 'logged))))
       (elfeed-db-save)))
 
