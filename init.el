@@ -2817,16 +2817,40 @@ Without NOTE, prompts with completion filtered to notes tagged 'trail'."
 
 ;;; *** Roamify
 
-(defun js/roamify-url-at-point (&optional node-id post-cleanup-functions)
-  "Convert a URL at point into an org-roam node and replace the link.
+(defun js/vulpea-note-by-ref (url)
+  "Find a vulpea note whose ROAM_REFS property contains URL.
+`vulpea-db-query-by-property' matches the whole property value exactly,
+so a note with several space-separated ROAM_REFS wouldn't be found by
+matching a single URL against it -- filter after the fact instead."
+  (seq-find
+   (lambda (note)
+     (member url (split-string
+                  (or (cdr (assoc "ROAM_REFS" (vulpea-note-properties note))) "")
+                  " " t)))
+   (vulpea-db-query-by-property-key "ROAM_REFS")))
 
-With C-u prefix, prompt for existing node to add URL as ref to.
-Can optionally pass in your own `NODE-ID' which will get used as the target node.
+(defun js/vulpea-note-add-ref (note url)
+  "Add URL to NOTE's ROAM_REFS property (space-separated, no duplicates)."
+  (let ((file (vulpea-note-path note))
+        (pos (vulpea-note-pos note)))
+    (with-current-buffer (find-file-noselect file)
+      (org-with-wide-buffer
+       (goto-char pos)
+       (let* ((existing (org-entry-get nil "ROAM_REFS"))
+              (refs (if existing (split-string existing " " t) nil)))
+         (unless (member url refs)
+           (org-entry-put nil "ROAM_REFS" (string-join (append refs (list url)) " ")))))
+      (save-buffer))))
 
-`POST-CLEANUP-FUNCTIONS' will be executed upon completion of the finalizer."
+(defun js/roamify-url-at-point (&optional node-id)
+  "Convert a URL at point into a vulpea note and replace the link.
+
+With C-u prefix, prompt for an existing note to add URL as ref to.
+Can optionally pass in your own NODE-ID which will get used as the
+target note."
   (interactive
    (when current-prefix-arg
-     (list (org-roam-node-id (org-roam-node-read nil nil nil 'require-match)))))
+     (list (vulpea-note-id (vulpea-select "Note" :require-match t)))))
   (let* ((context (org-element-context))
          (type (org-element-type context))
          (link-type (org-element-property :type context))
@@ -2836,70 +2860,33 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
          (title-beg (org-element-property :contents-begin context))
          (title-end (org-element-property :contents-end context))
          (working-title (or (buffer-substring-no-properties title-beg title-end)
-			    (js/get-link-title url)))
-         (capture-node nil)
-         (target-id nil)
-         (message-text nil))
+			    (js/get-link-title url))))
     (pcase (list type link-type)
       (`(link "id")
-       (message "Is already roam link.")
-       (return))
+       (message "Is already a vulpea link."))
       (`(link ,_)
        ;; Check if ref already exists first - this takes precedence
-       (if-let ((existing-ref-node (org-roam-node-from-ref url)))
-           ;; Ref already exists - just replace link, no capture
-           (let ((existing-id (org-roam-node-id existing-ref-node))
-                 (existing-title (org-roam-node-title existing-ref-node)))
-	     (delete-region beg end)
-	     (insert (org-roam-link-make-string existing-id working-title))
-	     (message "Using existing node with this ref: %s" existing-title))
-         ;; No existing ref - proceed with capture logic
-         (pcase node-id
-           (`nil
-	    ;; Default behavior: create new node
-	    (setq capture-node (org-roam-node-create :title working-title))
-	    (setq target-id 'from-ref)
-	    (setq message-text (format "Created org-roam node: %s" working-title)))
-           ((and id (guard (org-roam-node-from-id id)))
-	    ;; Add ref to existing node - use the actual existing node object
-	    (let ((existing-node (org-roam-node-from-id id)))
-	      (setq capture-node existing-node)
-	      (setq target-id id)
-	      (setq message-text (format "Added ref to existing node: %s" (org-roam-node-title existing-node)))))
-           (id
-	    ;; Create new node with specified ID
-	    (setq capture-node (org-roam-node-create :title working-title :id id))
-	    (setq target-id 'from-ref)
-	    (setq message-text (format "Created org-roam node: %s" working-title))))))
+       (if-let ((existing-note (js/vulpea-note-by-ref url)))
+           ;; Ref already exists - just replace link, no new note
+           (progn
+             (delete-region beg end)
+             (insert (vulpea-utils-link-make-string existing-note working-title))
+             (message "Using existing note with this ref: %s" (vulpea-note-title existing-note)))
+         ;; No existing ref - add to the given note, or create a new one
+         (let ((final-note
+                (if-let* ((target-note (and node-id (vulpea-db-get-by-id node-id))))
+                    (progn
+                      (js/vulpea-note-add-ref target-note url)
+                      (message "Added ref to existing note: %s" (vulpea-note-title target-note))
+                      (vulpea-db-get-by-id node-id))
+                  (prog1
+                      (vulpea-create working-title nil
+                                     :properties (list (cons "ROAM_REFS" url)))
+                    (message "Created vulpea note: %s" working-title)))))
+           (delete-region beg end)
+           (insert (vulpea-utils-link-make-string final-note working-title)))))
       (_
-       (message "No link found at point.")
-       (return)))
-
-    ;; Single org-roam-capture- call (always runs when we have a capture-node)
-    (when capture-node
-      (defun roamify-finalizer ()
-        "Replace URL with roam link after capture completes."
-        (let ((final-id (cond
-                         ((eq target-id 'from-ref)
-                          (when-let* ((full-node (org-roam-node-from-ref url)))
-			    (org-roam-node-id full-node)))
-                         (target-id
-                          ;; Add ref to existing node
-                          (let ((existing-node (org-roam-node-from-id target-id)))
-			    (with-current-buffer (find-file-noselect (org-roam-node-file existing-node))
-			      (goto-char (org-roam-node-point existing-node))
-			      (org-roam-ref-add url))
-			    target-id)))))
-          (when final-id
-	    (delete-region beg end)
-	    (insert (org-roam-link-make-string final-id working-title))
-	    (message message-text)
-	    )))
-      (org-roam-capture-
-       :keys "d"
-       :node capture-node
-       :info (list :ref url)
-       :props (list :finalize #'roamify-finalizer)))))
+       (message "No link found at point.")))))
 
 ;;; *** Journal watch tracking
 (use-package jrnl-video-watch
