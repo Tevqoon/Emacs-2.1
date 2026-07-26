@@ -3258,21 +3258,40 @@ binding needed here anymore."
   ;; (`ivy--sort-function' falls back to `(ivy-state-caller ivy-last)',
   ;; which defaults to `this-command'), so this hooks js/vulpea-find and
   ;; js/vulpea-insert directly instead.
-  (defun js/vulpea-candidate-mtime (candidate)
-    "Return the mtime of the file behind ivy CANDIDATE's vulpea note, or nil."
-    (when-let* ((id (get-text-property 0 'vulpea-note-id candidate))
-                (note (vulpea-db-get-by-id id))
-                (attrs (file-attributes (vulpea-note-path note))))
-      (file-attribute-modification-time attrs)))
+  ;; The mtime lookup has to be precomputed, not done inside the
+  ;; comparator. Sorting is O(n log n) *comparisons*, so resolving each
+  ;; candidate's note and stat-ing its file per comparison meant tens of
+  ;; thousands of db queries and disk stats per C-c n f -- which is what
+  ;; made the first version of this take seconds to show anything.
+  ;; Instead: one bulk query up front, one stat per *file* (notes sharing
+  ;; a file are common, headings especially), then the comparator is a
+  ;; pair of hash lookups.
+  (defvar js/vulpea--mtime-table (make-hash-table :test #'equal)
+    "Cache of vulpea note id -> file mtime, as a float.
+Rebuilt by `js/vulpea--refresh-mtime-table' when a selection starts.")
+
+  (defun js/vulpea--refresh-mtime-table ()
+    "Rebuild `js/vulpea--mtime-table' for the selection about to run."
+    (clrhash js/vulpea--mtime-table)
+    (let ((by-file (make-hash-table :test #'equal)))
+      (dolist (note (vulpea-db-query))
+        (let* ((path (vulpea-note-path note))
+               (mtime (or (gethash path by-file)
+                          (puthash path
+                                   (if-let* ((attrs (file-attributes path)))
+                                       (float-time
+                                        (file-attribute-modification-time attrs))
+                                     0.0)
+                                   by-file))))
+          (puthash (vulpea-note-id note) mtime js/vulpea--mtime-table)))))
 
   (defun js/vulpea-ivy-mtime-compare (a b)
     "Sort vulpea-find/-insert candidates most-recently-modified file first."
-    (let ((ta (js/vulpea-candidate-mtime a))
-          (tb (js/vulpea-candidate-mtime b)))
-      (cond ((and ta tb) (time-less-p tb ta))
-            (ta t)
-            (tb nil)
-            (t (string< a b)))))
+    (let ((ta (gethash (get-text-property 0 'vulpea-note-id a)
+                       js/vulpea--mtime-table 0.0))
+          (tb (gethash (get-text-property 0 'vulpea-note-id b)
+                       js/vulpea--mtime-table 0.0)))
+      (if (= ta tb) (string< a b) (> ta tb))))
 
   ;; vulpea loads via :after org (early); ivy/counsel load on their own
   ;; :defer 0.1 timer, so ivy-sort-functions-alist doesn't exist yet at
@@ -3431,12 +3450,14 @@ and `js/org-node-not-archived-p')."
     "Find and open a vulpea note, hiding archived by default.
 With C-u prefix, show all notes including archived."
     (interactive "P")
+    (js/vulpea--refresh-mtime-table)
     (vulpea-find :filter-fn (if arg nil #'js/vulpea-note-not-archived-p)))
 
   (defun js/vulpea-insert (&optional arg)
     "Insert a link to a vulpea note, hiding archived by default.
 With C-u prefix, show all notes including archived."
     (interactive "P")
+    (js/vulpea--refresh-mtime-table)
     (vulpea-insert :filter-fn (if arg nil #'js/vulpea-note-not-archived-p)))
 
   (defun js/vulpea-tags-add-at-point ()
@@ -3632,8 +3653,8 @@ org-roam-dailies-map (C-c n d)."
   "n" #'vulpea-journal-today
   "t" #'js/vulpea-journal-tomorrow
   "y" #'js/vulpea-journal-yesterday
-  "b" #'js/vulpea-journal-previous-extant
-  "f" #'js/vulpea-journal-next-extant
+  "b" #'vulpea-journal-previous
+  "f" #'vulpea-journal-next
   "c" #'vulpea-journal-date
   "v" #'vulpea-journal-date)
 
@@ -3663,14 +3684,27 @@ daily notes live in. Matches the :file-name template below.")
     (interactive)
     (dired (expand-file-name js/vulpea-journal-directory org-roam-directory)))
 
-  ;; vulpea-journal-next/-previous track an "active date" that's set by
-  ;; the vulpea-ui sidebar's own prev/next buttons but not by ordinary
-  ;; find-file navigation of a journal buffer, so calling them directly
-  ;; from C-c n d f/b (outside the sidebar) lands on the wrong entry --
-  ;; this is also the likely source of the reported red "missing entry"
-  ;; markings in the sidebar, since that state ends up pointing at a
-  ;; date with no note. Sidestepping all of that: just scan the journal
-  ;; directory's actual files and step to the adjacent one on disk.
+;;; *** Legacy journal files predate the journal tag
+
+  ;; vulpea-journal identifies entries by TAG, not by path:
+  ;;   (defun vulpea-journal-note-p (note)
+  ;;     (and note (member vulpea-journal-tag (vulpea-note-tags note))))
+  ;; and vulpea-journal-all-dates queries vulpea-db-query-by-tags-every
+  ;; on that same tag. New entries get it automatically --
+  ;; vulpea-journal-template-daily defaults to :tags (list
+  ;; vulpea-journal-tag) -- but files inherited from org-roam-dailies
+  ;; never had it. An untagged file still opens fine and still looks
+  ;; like a journal entry, but fails vulpea-journal-note-p, so it gets
+  ;; no calendar/Previous Years/Created Today widgets, is invisible to
+  ;; vulpea-journal-next/-previous (which is why they appeared to jump
+  ;; around: they were skipping to the nearest *tagged* entry), and
+  ;; leaves gaps in the calendar's entry highlighting.
+  ;;
+  ;; So this is a data problem, not a navigation problem -- f/b stay
+  ;; bound to vulpea-journal's own commands, which work correctly once
+  ;; the tag is there (they fall back to the buffer note's own date via
+  ;; vulpea-journal-note-date when no sidebar date is active).
+
   (defun js/vulpea-journal--files ()
     "Return existing journal file paths, sorted chronologically.
 Relies on the default YYYY-MM-DD.org daily file-name template sorting
@@ -3680,29 +3714,33 @@ the same lexicographically as chronologically."
            t "\\`[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\.org\\'")
           #'string<))
 
-  (defun js/vulpea-journal-next-extant ()
-    "Visit the next existing journal file after the current one."
+  (defun js/vulpea-journal-tag-legacy-files ()
+    "Add `vulpea-journal-tag' to journal files missing it, then resync.
+One-off migration for entries created back when org-roam-dailies owned
+this directory. Purely additive -- it only ever adds a filetag, never
+removes or reorders anything -- but it does touch many files at once,
+so it reports what it will change and asks first."
     (interactive)
-    (let* ((files (js/vulpea-journal--files))
-           (current (buffer-file-name))
-           (pos (and current (seq-position files current #'string=))))
+    (let ((untagged
+           (seq-remove
+            (lambda (file)
+              (with-current-buffer (find-file-noselect file)
+                (member vulpea-journal-tag (vulpea-buffer-tags-get))))
+            (js/vulpea-journal--files))))
       (cond
-       ((null files) (message "No journal entries"))
-       ((null pos) (find-file (car (last files))))
-       ((= pos (1- (length files))) (message "No next journal entry"))
-       (t (find-file (nth (1+ pos) files))))))
-
-  (defun js/vulpea-journal-previous-extant ()
-    "Visit the previous existing journal file before the current one."
-    (interactive)
-    (let* ((files (js/vulpea-journal--files))
-           (current (buffer-file-name))
-           (pos (and current (seq-position files current #'string=))))
-      (cond
-       ((null files) (message "No journal entries"))
-       ((null pos) (find-file (car files)))
-       ((= pos 0) (message "No previous journal entry"))
-       (t (find-file (nth (1- pos) files))))))
+       ((null untagged)
+        (message "All journal files already tagged :%s:" vulpea-journal-tag))
+       ((not (y-or-n-p (format "Add :%s: to %d journal file(s)? "
+                               vulpea-journal-tag (length untagged))))
+        (message "Aborted; nothing written."))
+       (t
+        (dolist (file untagged)
+          (with-current-buffer (find-file-noselect file)
+            (vulpea-buffer-tags-add vulpea-journal-tag)
+            (save-buffer)))
+        (vulpea-db-sync-full-scan)
+        (message "Tagged %d journal file(s) :%s: and resynced."
+                 (length untagged) vulpea-journal-tag)))))
 
   ;; Daily journal, replacing org-roam-dailies.
   (setq vulpea-journal-default-template
