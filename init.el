@@ -2531,6 +2531,7 @@ only processes keywords listed in `js/org-keywords-with-links'."
    'append))
 
 ;;; ** Capture and logging
+
 ;;; *** Manual capture setup
 (defvar org-roam-capture-content nil
   "Variable to pass content to capture templates.")
@@ -2739,6 +2740,18 @@ For emacsclient:
 
       ;; Return the URL source for potential chaining
       url-source)))
+
+(defun js/log-page-b64 (url64 &optional title64 targets)
+  "Log a base64-encoded URL64 and TITLE64 to TARGETS.
+Entry point for remote invocation over SSH, where base64 sidesteps
+shell and Elisp string quoting."
+  (let* ((dec (lambda (s) (decode-coding-string (base64-decode-string s) 'utf-8)))
+         (url (funcall dec url64))
+         (title (if (and title64 (not (string-empty-p title64)))
+                    (funcall dec title64)
+                  (js/get-link-title url))))
+    (js/log-page :url (org-link-make-string url title)
+                 :targets (or targets '(Log)))))
 
 ;;; *** Vannevar Trails
 
