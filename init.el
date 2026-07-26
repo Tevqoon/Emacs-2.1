@@ -3437,6 +3437,17 @@ none do (which in practice is most of the time, but not always)."
   ;; vulpea-select-annotate-fn isn't handed the composed candidate length,
   ;; so right-alignment isn't a natural fit here; deliberately accepting
   ;; this cosmetic difference instead of guessing at fragile padding math.
+  ;;
+  ;; Also appends ROAM_REFS (if any) to the candidate string, so refs are
+  ;; searchable straight from vulpea-find/vulpea-insert -- with
+  ;; ivy--regex-ignore-order (see the ivy use-package), typing part of a
+  ;; URL matches it anywhere in the line, same as a tag.
+  (defun js/vulpea-select-annotate (note)
+    "vulpea-select-annotate, plus NOTE's ROAM_REFS appended (searchable)."
+    (let ((base (vulpea-select-annotate note))
+          (refs (cdr (assoc "ROAM_REFS" (vulpea-note-properties note)))))
+      (if refs (concat base " " refs) base)))
+  (setq vulpea-select-annotate-fn #'js/vulpea-select-annotate)
 
 ;;; ** Capture-style note creation
 
