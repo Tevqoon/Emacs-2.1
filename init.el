@@ -1609,9 +1609,17 @@ folds nest: opening the innermost can leave an ancestor still closed."
              (chatlog-dir (expand-file-name org-roam-chatlogs-directory org-roam-directory))
              (file-name (format-time-string "Chat-%Y-%m-%d_%H-%M.org"))
              (full-path (expand-file-name file-name chatlog-dir))
+             ;; The chat transcript is arbitrary existing text, not a template
+             ;; -- don't pass it through vulpea-create's :body, which runs
+             ;; ${var}/%(elisp)/%<format> expansion (a stray "%(...)" in the
+             ;; transcript would get `eval'd). Create empty, then insert raw.
              (body (buffer-substring-no-properties (point-min) (point-max)))
              (old-buffer (current-buffer))
-             (note (vulpea-create title full-path :body body)))
+             (note (vulpea-create title full-path)))
+        (with-current-buffer (find-file-noselect full-path)
+          (goto-char (point-max))
+          (insert body)
+          (save-buffer))
         (set-buffer-modified-p nil)
         (kill-buffer old-buffer)
         (find-file full-path)
@@ -2656,7 +2664,12 @@ matching a single URL against it -- filter after the fact instead."
 
 With C-u prefix, prompt for an existing note to add URL as ref to.
 Can optionally pass in your own NODE-ID which will get used as the
-target note."
+target note.
+
+Brand-new notes go through the same org-capture flow as
+`vulpea-insert' (see `js/vulpea-capture--do'): you get an editable
+buffer instead of an instant blank file, and the link at point is
+only replaced once you finish the capture (C-c C-c)."
   (interactive
    (when current-prefix-arg
      (list (vulpea-note-id (vulpea-select "Note" :require-match t)))))
@@ -2664,8 +2677,8 @@ target note."
          (type (org-element-type context))
          (link-type (org-element-property :type context))
          (url (org-element-property :raw-link context))
-         (end (org-element-property :end context))
-         (beg (org-element-property :begin context))
+         (end (copy-marker (org-element-property :end context)))
+         (beg (copy-marker (org-element-property :begin context)))
          (title-beg (org-element-property :contents-begin context))
          (title-end (org-element-property :contents-end context))
          (working-title (or (buffer-substring-no-properties title-beg title-end)
@@ -2681,21 +2694,111 @@ target note."
              (delete-region beg end)
              (insert (vulpea-utils-link-make-string existing-note working-title))
              (message "Using existing note with this ref: %s" (vulpea-note-title existing-note)))
-         ;; No existing ref - add to the given note, or create a new one
-         (let ((final-note
-                (if-let* ((target-note (and node-id (vulpea-db-get-by-id node-id))))
-                    (progn
-                      (js/vulpea-note-add-ref target-note url)
-                      (message "Added ref to existing note: %s" (vulpea-note-title target-note))
-                      (vulpea-db-get-by-id node-id))
-                  (prog1
-                      (vulpea-create working-title nil
-                                     :properties (list (cons "ROAM_REFS" url)))
-                    (message "Created vulpea note: %s" working-title)))))
-           (delete-region beg end)
-           (insert (vulpea-utils-link-make-string final-note working-title)))))
+         (if-let* ((target-note (and node-id (vulpea-db-get-by-id node-id))))
+             ;; Add ref to an already-existing target note
+             (progn
+               (js/vulpea-note-add-ref target-note url)
+               (delete-region beg end)
+               (insert (vulpea-utils-link-make-string target-note working-title))
+               (message "Added ref to existing note: %s" (vulpea-note-title target-note)))
+           ;; No existing ref, no target note: capture a brand new one
+           (js/vulpea-capture--do
+            working-title
+            (lambda (id)
+              (when (marker-buffer beg)
+                (with-current-buffer (marker-buffer beg)
+                  (save-excursion
+                    (delete-region beg end)
+                    (goto-char beg)
+                    (insert (org-link-make-string (concat "id:" id) working-title)))))
+              (message "Created vulpea note: %s" working-title))
+            (list (cons "ROAM_REFS" url))))))
       (_
        (message "No link found at point.")))))
+
+;;; *** Extract subtree
+
+(defun js/vulpea-extract-subtree (&optional no-link)
+  "Extract the subtree at point into its own top-level vulpea note.
+The heading keeps its :ID:, so existing links to it keep resolving --
+they now point at the new file instead of a heading inside the old
+one. Distinct from just leaving it as a first-class heading: this is
+for promoting something into a real note of its own (its own file,
+title, tags), not merely keeping searchable parent-heading context.
+
+If the heading's own text is itself a non-id link (e.g. a bookmarked
+URL), that link's target becomes the new note's ROAM_REFS and its
+description becomes the title -- same convention `js/roamify-url-at-point'
+uses for fresh captures.
+
+By default, replaces the original heading with a link to the new
+note. With prefix arg NO-LINK, removes it instead."
+  (interactive "P")
+  (org-back-to-heading-or-point-min t)
+  (when (bobp) (user-error "Already a top-level note"))
+  (let* ((heading-text (org-get-heading t t t t))
+         (link-parts (js/extract-org-link heading-text))
+         (url (car link-parts))
+         (is-ref-link (and url (not (string-prefix-p "id:" url))))
+         (title (if (and is-ref-link (cadr link-parts)
+                         (not (string-empty-p (cadr link-parts))))
+                    (cadr link-parts)
+                  heading-text))
+         (tags (org-get-tags nil t)) ; local tags only, not inherited
+         (level (org-current-level))
+         (marker (point-marker))
+         (id (org-id-get-create))
+         (file-name (expand-file-name
+                     (format "%s-%s.org" (format-time-string "%Y%m%d%H%M%S")
+                             (vulpea-title-to-slug title))
+                     org-roam-directory))
+         children)
+    (when is-ref-link
+      (org-edit-headline title))
+    (save-buffer)
+    ;; Grab everything after this heading's own property drawer as plain
+    ;; text, demoted so former level+1 children become level 1 in the new
+    ;; file (a plain string-replace on the leading stars, since these are
+    ;; already-resolved lines, not a template needing org's own promote
+    ;; machinery).
+    (save-excursion
+      (org-back-to-heading t)
+      (forward-line 1)
+      (when (looking-at-p org-property-drawer-re)
+        (re-search-forward "^[ \t]*:END:[ \t]*$" nil t)
+        (forward-line 1))
+      (let* ((children-start (point))
+             (subtree-end (save-excursion (org-end-of-subtree t t)))
+             (raw (buffer-substring-no-properties children-start subtree-end)))
+        (setq children (replace-regexp-in-string (format "^\\*\\{%d\\}" level) "" raw))))
+    ;; vulpea-create's :body goes through ${var}/%(elisp)/%<format> template
+    ;; expansion -- fine for template authors, not safe for arbitrary
+    ;; existing prose (a stray "%(...)" in extracted content would get
+    ;; `eval'd). So: create with no body, then insert the extracted text
+    ;; as a plain, unexpanded string afterward.
+    (let ((note (vulpea-create title file-name
+                                :id id
+                                :tags tags
+                                :properties (when is-ref-link (list (cons "ROAM_REFS" url))))))
+      (unless (string-empty-p (string-trim children))
+        (with-current-buffer (find-file-noselect (vulpea-note-path note))
+          (goto-char (point-max))
+          (unless (bolp) (insert "\n"))
+          (insert (string-trim-right children) "\n")
+          (save-buffer))))
+    ;; Remove the original heading (property drawer, tags, and all) now
+    ;; that its content lives in the new note.
+    (org-back-to-heading t)
+    (org-cut-subtree)
+    (save-buffer)
+    ;; Insert link at original position (unless suppressed)
+    (unless no-link
+      (goto-char marker)
+      (set-marker marker nil)
+      (insert (make-string level ?*) " "
+              (org-link-make-string (concat "id:" id) title)
+              "\n")
+      (forward-line -1))))
 
 ;;; *** Journal watch tracking
 (use-package jrnl-video-watch
@@ -3128,6 +3231,7 @@ binding needed here anymore."
    ("C-c n c" . org-capture-task)
    ("C-c n n s" . vulpea-db-sync-full-scan)
    ("C-c n n r" . js/vulpea-refile-at-point)
+   ("C-c n n t" . js/vulpea-extract-subtree)
    ;; Trails
    ("C-c n y ." . js/trail-activate-at-point)
    ("C-c n y a" . js/trail-activate)
@@ -3333,6 +3437,98 @@ none do (which in practice is most of the time, but not always)."
   ;; vulpea-select-annotate-fn isn't handed the composed candidate length,
   ;; so right-alignment isn't a natural fit here; deliberately accepting
   ;; this cosmetic difference instead of guessing at fragile padding math.
+
+;;; ** Capture-style note creation
+
+  ;; vulpea-create (the default CREATE-FN for both vulpea-find and
+  ;; vulpea-insert) writes the new file instantly with no editing pause --
+  ;; fine for scripted creation, but no good for "I'm several notes deep
+  ;; and want to create-and-write a referenced note, then come back."
+  ;; org-roam's capture buffer used to give you that pause. vulpea's own
+  ;; docs point at exactly this: CREATE-FN "is the hook for 'capture on
+  ;; empty' workflows: set it to a function that routes to org-capture".
+  ;; This wires that up by hand, since vulpea doesn't ship one.
+
+  (defvar js/vulpea-capture--title nil
+    "Title of the note currently being captured via `js/vulpea-capture--do'.")
+  (defvar js/vulpea-capture--id nil
+    "ID of the note currently being captured via `js/vulpea-capture--do'.")
+  (defvar js/vulpea-capture--properties nil
+    "Extra (KEY . VALUE) property-drawer entries for the note currently
+being captured via `js/vulpea-capture--do', alongside :ID:. Written up
+front so callers (e.g. roamify's ROAM_REFS) don't need to query the
+vulpea db for a note that may not be indexed yet.")
+
+  (defun js/vulpea-capture--file ()
+    "Compute the file path for the note currently being captured."
+    (expand-file-name
+     (format "%s-%s.org"
+             (format-time-string "%Y%m%d%H%M%S")
+             (vulpea-title-to-slug js/vulpea-capture--title))
+     org-roam-directory))
+
+  (defun js/vulpea-capture--insert-head ()
+    "Insert the ID/title header for a new capture note, if the file is empty."
+    (when (= (point-min) (point-max))
+      (insert ":PROPERTIES:\n")
+      (insert (format ":ID:       %s\n" js/vulpea-capture--id))
+      (dolist (prop js/vulpea-capture--properties)
+        (insert (format ":%s: %s\n" (car prop) (cdr prop))))
+      (insert ":END:\n")
+      (insert (format "#+title: %s\n#+startup: show2levels\n\n" js/vulpea-capture--title))))
+
+  (defvar js/vulpea-capture-templates
+    '(("v" "vulpea note" plain
+       (file+function js/vulpea-capture--file js/vulpea-capture--insert-head)
+       "%?" :unnarrowed t))
+    "Isolated org-capture-templates used only by `js/vulpea-capture--do'.")
+
+  (defun js/vulpea-capture--do (title on-finish &optional properties)
+    "Capture a new vulpea note titled TITLE via org-capture.
+Calls (ON-FINISH ID) once the capture buffer is finalized with C-c C-c,
+where ID is the new note's org id. ON-FINISH is not called if the
+capture is aborted with C-c C-k. PROPERTIES is an optional alist of
+extra (KEY . VALUE) property-drawer entries to write alongside :ID:."
+    (let ((id (org-id-new)))
+      (setq js/vulpea-capture--title title
+            js/vulpea-capture--id id
+            js/vulpea-capture--properties properties)
+      (letrec ((finish-fn
+                (lambda ()
+                  (remove-hook 'org-capture-after-finalize-hook finish-fn)
+                  (unless org-note-abort
+                    (funcall on-finish id)))))
+        (add-hook 'org-capture-after-finalize-hook finish-fn))
+      (let ((org-capture-templates js/vulpea-capture-templates))
+        (org-capture nil "v"))))
+
+  (defun js/vulpea-find-create-note-via-capture (title &optional _props)
+    "CREATE-FN for `vulpea-find': capture via org-capture instead of an
+instant, no-editing `vulpea-create'. Returns nil -- the capture buffer
+itself is the \"visit\"."
+    (js/vulpea-capture--do title #'ignore)
+    nil)
+
+  (defun js/vulpea-insert-create-note-via-capture (title &optional _props)
+    "CREATE-FN for `vulpea-insert': capture via org-capture, then insert a
+link back at the point vulpea-insert was called from once the capture
+finishes (skipped on abort). Returns nil -- vulpea-insert only inserts
+the link itself when CREATE-FN is nil, so with a CREATE-FN in place
+this function is fully responsible for it."
+    (let ((origin-marker (point-marker)))
+      (js/vulpea-capture--do
+       title
+       (lambda (id)
+         (when-let* ((buf (marker-buffer origin-marker)))
+           (with-current-buffer buf
+             (save-excursion
+               (goto-char origin-marker)
+               (insert (org-link-make-string (concat "id:" id) title)))))
+         (set-marker origin-marker nil))))
+    nil)
+
+  (setq vulpea-find-default-create-fn #'js/vulpea-find-create-note-via-capture)
+  (setq vulpea-insert-default-create-fn #'js/vulpea-insert-create-note-via-capture)
 
   (defvar-local tags/update-tags-enabled nil
     "Buffer-local variable to enable/disable tag updating.")
