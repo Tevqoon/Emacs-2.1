@@ -4174,16 +4174,41 @@ EXTRA-STATES is an optional list of additional states to block on."
 
 ;;; *** Agenda Refiling integration
 
+(defun js/vulpea-refile-subtree-to-note (note)
+  "Refile the subtree at point to become the last child of NOTE.
+NOTE may be file- or heading-level. Copies to the target first (mirrors
+`js/org-unarchive-subtree-from-daily's copy-then-cut ordering, so a
+failed paste doesn't leave the original subtree half-deleted), only
+cutting the original once the paste at the target has succeeded."
+  (org-back-to-heading t)
+  (let ((marker (point-marker)))
+    (org-copy-subtree 1)
+    (let* ((file (vulpea-note-path note))
+           (pos (vulpea-note-pos note))
+           (level (vulpea-note-level note)))
+      (with-current-buffer (find-file-noselect file)
+        (org-with-wide-buffer
+         (goto-char pos)
+         (if (> level 0)
+             (org-end-of-subtree t t)
+           (goto-char (point-max)))
+         (unless (bolp) (insert "\n"))
+         (org-paste-subtree (1+ level)))
+        (save-buffer)))
+    (goto-char marker)
+    (set-marker marker nil)
+    (org-cut-subtree)))
+
 (defun js/agenda-refile-old ()
-  "From org-agenda, refile the subtree into the selected org-roam node."
+  "From org-agenda, refile the subtree into the selected vulpea note."
   (interactive)
-  (let ((dest-node (org-roam-node-read nil nil nil 'require-match)))
+  (let ((dest-note (vulpea-select "Refile into" :require-match t)))
     (org-agenda-with-point-at-orig-entry nil
-                                         (org-node-refile dest-node)))
+                                         (js/vulpea-refile-subtree-to-note dest-note)))
   (next-line))
 
 (defun js/agenda-refile ()
-  "Refile marked entries or the entry at point into the selected org-node.
+  "Refile marked entries or the entry at point into the selected vulpea note.
 
 If there are marked entries, refile all of them. Otherwise, refile
 the current entry at point and move to the next line."
@@ -4191,12 +4216,7 @@ the current entry at point and move to the next line."
   (if (not org-agenda-bulk-marked-entries)
       (save-excursion (org-agenda-bulk-mark)))
 
-  (let* ((input (org-node-read-candidate "Refile into ID-node: " t))
-         (org-mem-entry (or (gethash input org-node--candidate<>entry)
-                            (error "Node not found: %s" input)))
-         (node-id (org-mem-entry-id org-mem-entry))
-         (dest-node (or (org-roam-node-from-id node-id)
-                        (error "No org-roam node found for ID: %s" node-id))))
+  (let ((dest-note (vulpea-select "Refile into" :require-match t)))
     (dolist (marker (reverse org-agenda-bulk-marked-entries))
       (when (and (markerp marker)
                  (marker-buffer marker)
@@ -4204,7 +4224,7 @@ the current entry at point and move to the next line."
                  (marker-position marker))
         (with-current-buffer (marker-buffer marker)
           (goto-char (marker-position marker))
-          (org-roam-refile dest-node)))))
+          (js/vulpea-refile-subtree-to-note dest-note)))))
 
   (org-agenda-bulk-unmark-all)
   (next-line))
