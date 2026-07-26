@@ -792,6 +792,20 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 
 ;;; * Searching and navigation
 
+(use-package recentf
+  :ensure nil
+  ;; :demand -- recentf only records files opened *after* recentf-mode is
+  ;; on, and it's what js/vulpea-find/-insert sort by (see
+  ;; js/vulpea--recency-score), so deferring it would quietly cost
+  ;; history.
+  :demand t
+  :custom
+  ;; Deeper than the default 20: this is the ordering key for note
+  ;; selection, not just a "recent files" menu.
+  (recentf-max-saved-items 500)
+  :config
+  (recentf-mode 1))
+
 (use-package isearch
   :ensure nil
   :custom
@@ -822,8 +836,9 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (setq swiper-use-visual-line-p #'ignore))
 ;; js/ivy-org-node-mtime-compare + its org-node-collection ivy-sort-functions-alist
 ;; entry are gone with org-node. Recency sort is back, vulpea-native, keyed
-;; on the caller instead of the collection -- see js/vulpea-ivy-mtime-compare
-;; in the `vulpea' use-package's :config.
+;; on the caller instead of the collection, and on recently-opened rather
+;; than mtime -- see js/vulpea-ivy-recency-compare in the `vulpea'
+;; use-package's :config.
 
 (use-package ivy-rich
   :after ivy
@@ -3258,47 +3273,78 @@ binding needed here anymore."
   ;; (`ivy--sort-function' falls back to `(ivy-state-caller ivy-last)',
   ;; which defaults to `this-command'), so this hooks js/vulpea-find and
   ;; js/vulpea-insert directly instead.
-  ;; The mtime lookup has to be precomputed, not done inside the
-  ;; comparator. Sorting is O(n log n) *comparisons*, so resolving each
-  ;; candidate's note and stat-ing its file per comparison meant tens of
-  ;; thousands of db queries and disk stats per C-c n f -- which is what
-  ;; made the first version of this take seconds to show anything.
-  ;; Instead: one bulk query up front, one stat per *file* (notes sharing
-  ;; a file are common, headings especially), then the comparator is a
-  ;; pair of hash lookups.
-  (defvar js/vulpea--mtime-table (make-hash-table :test #'equal)
-    "Cache of vulpea note id -> file mtime, as a float.
-Rebuilt by `js/vulpea--refresh-mtime-table' when a selection starts.")
+  ;; Getting the ordering key has to cost nothing at sort time. Two
+  ;; earlier attempts were too slow: resolving each candidate's note
+  ;; inside the comparator (O(n log n) *comparisons*, each a db query
+  ;; plus a stat), then precomputing that into a hash via one bulk
+  ;; vulpea-db-query, which still cost about a second because it
+  ;; re-fetched and re-consed every note that vulpea-select had just
+  ;; fetched itself.
+  ;;
+  ;; So don't do a second pass at all: compute the key in the describe
+  ;; function vulpea-select already calls once per note while building
+  ;; candidates, and stash it on the candidate string as a text
+  ;; property. The comparator then touches no db and no disk.
+  (defvar js/vulpea--recentf-ranks (make-hash-table :test #'equal)
+    "Hash of absolute file path -> its position in `recentf-list'.")
 
-  (defun js/vulpea--refresh-mtime-table ()
-    "Rebuild `js/vulpea--mtime-table' for the selection about to run."
-    (clrhash js/vulpea--mtime-table)
-    (let ((by-file (make-hash-table :test #'equal)))
-      (dolist (note (vulpea-db-query))
-        (let* ((path (vulpea-note-path note))
-               (mtime (or (gethash path by-file)
-                          (puthash path
-                                   (if-let* ((attrs (file-attributes path)))
-                                       (float-time
-                                        (file-attribute-modification-time attrs))
-                                     0.0)
-                                   by-file))))
-          (puthash (vulpea-note-id note) mtime js/vulpea--mtime-table)))))
+  (defvar js/vulpea--mtime-cache (make-hash-table :test #'equal)
+    "Hash of absolute file path -> mtime as a float.
+Keyed by file rather than by note so the many headings sharing one
+file only cost a single stat.")
 
-  (defun js/vulpea-ivy-mtime-compare (a b)
-    "Sort vulpea-find/-insert candidates most-recently-modified file first."
-    (let ((ta (gethash (get-text-property 0 'vulpea-note-id a)
-                       js/vulpea--mtime-table 0.0))
-          (tb (gethash (get-text-property 0 'vulpea-note-id b)
-                       js/vulpea--mtime-table 0.0)))
-      (if (= ta tb) (string< a b) (> ta tb))))
+  (defconst js/vulpea--recentf-base 1.0e12
+    "Score floor for files in `recentf-list'.
+Chosen to sit above any plausible mtime (a unix timestamp) so that
+anything opened recently outranks anything merely edited recently.")
+
+  (defun js/vulpea--refresh-recency ()
+    "Rebuild the recency lookup tables for the selection about to run."
+    (clrhash js/vulpea--recentf-ranks)
+    (clrhash js/vulpea--mtime-cache)
+    (let ((i 0))
+      (dolist (file recentf-list)
+        ;; recentf may store abbreviated names ("~/..."), vulpea-note-path
+        ;; is absolute -- expand both sides so they compare equal.
+        (puthash (expand-file-name file) i js/vulpea--recentf-ranks)
+        (setq i (1+ i)))))
+
+  (defun js/vulpea--recency-score (path)
+    "Return a recency score for PATH. Higher sorts earlier.
+Files in `recentf-list' rank by how recently they were *opened*.
+Anything not in it falls back to mtime, so a short or freshly-started
+recentf history degrades to modification order rather than collapsing
+the whole list to alphabetical."
+    (if-let* ((rank (gethash path js/vulpea--recentf-ranks)))
+        (- js/vulpea--recentf-base rank)
+      (or (gethash path js/vulpea--mtime-cache)
+          (puthash path
+                   (if-let* ((attrs (file-attributes path)))
+                       (float-time (file-attribute-modification-time attrs))
+                     0.0)
+                   js/vulpea--mtime-cache))))
+
+  (defun js/vulpea-select-describe (note)
+    "Describe NOTE for completion, tagging it with its recency score.
+Takes exactly one argument on purpose: `vulpea-select--funcall' passes
+a context argument only to functions whose arity accepts one, and
+`vulpea-select-describe-outline-full' underneath takes just the note."
+    (propertize (vulpea-select-describe-outline-full note)
+                'js/vulpea-recency
+                (js/vulpea--recency-score (vulpea-note-path note))))
+
+  (defun js/vulpea-ivy-recency-compare (a b)
+    "Sort vulpea-find/-insert candidates most-recently-opened first."
+    (let ((ra (or (get-text-property 0 'js/vulpea-recency a) 0.0))
+          (rb (or (get-text-property 0 'js/vulpea-recency b) 0.0)))
+      (if (= ra rb) (string< a b) (> ra rb))))
 
   ;; vulpea loads via :after org (early); ivy/counsel load on their own
   ;; :defer 0.1 timer, so ivy-sort-functions-alist doesn't exist yet at
   ;; this point -- defer registration until ivy itself is loaded.
   (with-eval-after-load 'ivy
     (dolist (cmd '(js/vulpea-find js/vulpea-insert))
-      (add-to-list 'ivy-sort-functions-alist (cons cmd #'js/vulpea-ivy-mtime-compare))))
+      (add-to-list 'ivy-sort-functions-alist (cons cmd #'js/vulpea-ivy-recency-compare))))
 
 ;;; ** Tag management
 
@@ -3450,14 +3496,14 @@ and `js/org-node-not-archived-p')."
     "Find and open a vulpea note, hiding archived by default.
 With C-u prefix, show all notes including archived."
     (interactive "P")
-    (js/vulpea--refresh-mtime-table)
+    (js/vulpea--refresh-recency)
     (vulpea-find :filter-fn (if arg nil #'js/vulpea-note-not-archived-p)))
 
   (defun js/vulpea-insert (&optional arg)
     "Insert a link to a vulpea note, hiding archived by default.
 With C-u prefix, show all notes including archived."
     (interactive "P")
-    (js/vulpea--refresh-mtime-table)
+    (js/vulpea--refresh-recency)
     (vulpea-insert :filter-fn (if arg nil #'js/vulpea-note-not-archived-p)))
 
   (defun js/vulpea-tags-add-at-point ()
@@ -3489,8 +3535,11 @@ file level if none do."
 ;;; ** Selection UI parity (OLP prefix + tags)
 
   ;; Shows "File → Heading → " before the title, like the old OLP+hashtag
-  ;; affixation in `js/org-node-affix-olp-hashtags-aligned'.
-  (setq vulpea-select-describe-fn #'vulpea-select-describe-outline-full)
+  ;; affixation in `js/org-node-affix-olp-hashtags-aligned'. Goes through
+  ;; js/vulpea-select-describe, which is that same
+  ;; vulpea-select-describe-outline-full plus the recency text property
+  ;; the sort above reads.
+  (setq vulpea-select-describe-fn #'js/vulpea-select-describe)
 
   ;; Tag annotation: kept at vulpea's built-in `vulpea-select-annotate'
   ;; (left-flush "#tag1 #tag2", plain concat after the title) rather than
