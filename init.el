@@ -3274,8 +3274,12 @@ binding needed here anymore."
             (tb nil)
             (t (string< a b)))))
 
-  (dolist (cmd '(js/vulpea-find js/vulpea-insert))
-    (add-to-list 'ivy-sort-functions-alist (cons cmd #'js/vulpea-ivy-mtime-compare)))
+  ;; vulpea loads via :after org (early); ivy/counsel load on their own
+  ;; :defer 0.1 timer, so ivy-sort-functions-alist doesn't exist yet at
+  ;; this point -- defer registration until ivy itself is loaded.
+  (with-eval-after-load 'ivy
+    (dolist (cmd '(js/vulpea-find js/vulpea-insert))
+      (add-to-list 'ivy-sort-functions-alist (cons cmd #'js/vulpea-ivy-mtime-compare))))
 
 ;;; ** Tag management
 
