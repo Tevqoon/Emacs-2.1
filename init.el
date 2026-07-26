@@ -4462,23 +4462,14 @@ _S_manual
   (add-to-list 'org-tags-exclude-from-inheritance "note")
   (add-to-list 'org-tags-exclude-from-inheritance "lecture-notes")
 
-  ;; Override to use org-roam query instead of subfolders
+  ;; Override to use a vulpea query instead of subfolders
   (defun org-static-blog-get-post-filenames ()
-    "Get blog posts from org-roam nodes tagged with any tag in `blog-tags'."
-    (delete-dups
-     (mapcar #'car
-             (org-roam-db-query
-              `[:select :distinct [nodes:file] :from nodes
-			:inner-join tags :on (= tags:node-id nodes:id)
-			:where ,(js/tags->or-clause blog-tags)]))))
+    "Get blog posts from vulpea notes tagged with any tag in `blog-tags'."
+    (delete-dups (mapcar #'vulpea-note-path (vulpea-db-query-by-tags-some blog-tags))))
 
   (defun org-static-blog-get-draft-filenames ()
-    "Get static pages from org-roam nodes tagged with any tag in `static-tags'."
-    (mapcar #'car
-            (org-roam-db-query
-             `[:select :distinct [nodes:file] :from nodes
-                       :inner-join tags :on (= tags:node-id nodes:id)
-                       :where ,(js/tags->or-clause static-tags)])))
+    "Get static pages from vulpea notes tagged with any tag in `static-tags'."
+    (delete-dups (mapcar #'vulpea-note-path (vulpea-db-query-by-tags-some static-tags))))
 
   (defun org-static-blog-get-tags (post-filename)
     "Extract tags from POST-FILENAME, excluding management tags."
@@ -4558,11 +4549,6 @@ _S_manual
 
   (defvar static-tags '("blog-static-page" "draft" "lecture-notes")
     "Org-roam tags that mark nodes as static pages, drafts, or lecture notes.")
-
-  (defun js/tags->or-clause (tags)
-    "Build an emacsql :where clause matching tags:tag against any tag in TAGS.
-Returns e.g. (or (= tags:tag \"blog\") (= tags:tag \"note\"))."
-    (cons 'or (mapcar (lambda (tag) `(= tags:tag ,tag)) tags)))
 
   (defun my/org-static-blog-link (link desc info)
     "Transcode ID links to proper blog post URLs.
