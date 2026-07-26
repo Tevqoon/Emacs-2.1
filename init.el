@@ -1830,8 +1830,14 @@ folds nest: opening the innermost can leave an ancestor still closed."
   (org-refile-targets '((nil :maxlevel . 5)))
   (org-outline-path-complete-in-steps nil)
 
+  ;; Plain org variables that used to be tucked into org-roam's :custom
+  ;; (org-roam didn't own them, it just happened to configure them).
+  (org-archive-file-header-format nil)
+  (org-id-link-to-org-use-id nil)
+
   :hook
   (org-mode-hook . js/org-rename-buffer-to-title-enable)
+  (org-mode-hook . js/setup-specific-keyword-link-fontification)
   :bind
   (("C-c l" . org-store-link)
    ("C-c C-l" . ar/org-insert-link-dwim)
@@ -1841,6 +1847,14 @@ folds nest: opening the innermost can leave an ancestor still closed."
    ("C-'" . nil)
    ("C-," . nil))
   :config
+  ;; Color id: links differently (was "org-roam-link"; renamed since
+  ;; org-roam is gone, this now just styles all id: links generally).
+  (defface js/id-link
+    '((t :foreground "orange" :underline t))
+    "Face for id: links."
+    :group 'org-faces)
+  (org-link-set-parameters "id" :face 'js/id-link)
+
   (add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
   ;; Open links in the same window
   (setf (alist-get 'file org-link-frame-setup) #'find-file)
@@ -2297,43 +2311,16 @@ Falls back to #+attr_latex :options for backwards compatibility."
 ;; config is gone. To bring it back: `git log` on this branch for the
 ;; pre-removal use-package block and re-add it.
 ;;
-;; Bindings that were carried by org-roam's :bind (but aren't
-;; org-roam-specific themselves) are salvaged into a plain block below,
-;; since nothing else in this file was loading them.
-
-(defface js/id-link
-  '((t :foreground "orange" :underline t))
-  "Face for id: links."
-  :group 'org-faces)
-(org-link-set-parameters "id" :face 'js/id-link)
-
-(setq org-archive-file-header-format nil)
-(setq org-id-link-to-org-use-id nil)
-
-(add-hook 'org-mode-hook #'js/setup-specific-keyword-link-fontification)
-
-(bind-keys ("C-c n n g" . org-id-get-create)
-	   ("C-c n o" . open-urls-at-point-or-region)
-	   ("C-c n r" . js/roamify-url-at-point)
-	   ("C-c n n s" . vulpea-db-sync-full-scan)
-	   ("C-c n n r" . js/vulpea-refile-at-point)
-	   ;; Trails
-	   ("C-c n y ." . js/trail-activate-at-point)
-	   ("C-c n y a" . js/trail-activate)
-	   ("C-c n y d" . js/trail-deactivate)
-	   ("C-c n y y" . js/trail-add-at-point)
-	   ("C-c n y j" . js/trail-jump)
-	   ("C-c n y u" . js/process-at-point)
-
-	   :map special-mode-map	; For quickly adding references
-	   ("Y" . js/trail-add-at-point)
-	   ("U" . js/process-at-point)
-
-	   :map org-mode-map
-	   ("C-M-i" . completion-at-point)
-	   ("C-c n >" . js/org-goto-last-sibling)
-	   ("C-c n <" . js/org-goto-first-sibling)
-	   ("C-c n s d" . js/org-sort-siblings-by-todo))
+;; Everything org-roam's :bind/:custom/:config carried that wasn't
+;; actually org-roam-specific has been refiled: the plain org
+;; variables and the id: link face went into the main `org'
+;; use-package above; the C-c n * bindings (not org-specific, just
+;; co-located under that prefix, same as org-roam did) went into the
+;; `vulpea' use-package's own :bind below. None of it is left as a
+;; bare top-level form -- a bare `(org-link-set-parameters ...)' call
+;; here previously ran before `ol' was guaranteed loaded and crashed
+;; init entirely partway through the file, taking every use-package
+;; block below it down with it (including vulpea's own bindings).
 
 (defun js/org-sort-siblings-by-todo ()
   "Sort sibling entries by todo state order."
@@ -3135,7 +3122,29 @@ binding needed here anymore."
   (("C-c n f" . js/vulpea-find)
    ("C-c n i" . js/vulpea-insert)
    ("C-c n t" . vulpea-buffer-tags-add)
-   ("C-c n n a" . vulpea-buffer-alias-add))
+   ("C-c n n a" . vulpea-buffer-alias-add)
+   ("C-c n n g" . org-id-get-create)
+   ("C-c n o" . open-urls-at-point-or-region)
+   ("C-c n r" . js/roamify-url-at-point)
+   ("C-c n n s" . vulpea-db-sync-full-scan)
+   ("C-c n n r" . js/vulpea-refile-at-point)
+   ;; Trails
+   ("C-c n y ." . js/trail-activate-at-point)
+   ("C-c n y a" . js/trail-activate)
+   ("C-c n y d" . js/trail-deactivate)
+   ("C-c n y y" . js/trail-add-at-point)
+   ("C-c n y j" . js/trail-jump)
+   ("C-c n y u" . js/process-at-point)
+
+   :map special-mode-map	; For quickly adding references
+   ("Y" . js/trail-add-at-point)
+   ("U" . js/process-at-point)
+
+   :map org-mode-map
+   ("C-M-i" . completion-at-point)
+   ("C-c n >" . js/org-goto-last-sibling)
+   ("C-c n <" . js/org-goto-first-sibling)
+   ("C-c n s d" . js/org-sort-siblings-by-todo))
 
   :config
   ;; The advice on org-roam-extract-subtree (and the extract-subtree
