@@ -17,10 +17,12 @@
 ;;; * Initialization
 ;;; ** Basic initialization
 
-(setq custom-file "~/.emacs.d/custom.el")
-(load "~/.emacs.d/private-config.el")
+(setq private-file "~/.emacs.d/private-config.el")
+(when (file-exists-p private-file)
+ (load private-file))
 (when (facep 'gnus-group-news-low-empty)
      (set-face-attribute 'gnus-group-news-low-empty nil :inherit 'unspecified))
+(setq custom-file "~/.emacs.d/custom.el")
 (when (file-exists-p custom-file)
   (load custom-file))
 
