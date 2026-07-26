@@ -819,24 +819,10 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (ivy-mode 1)
   (counsel-mode)
   (setq ivy-re-builders-alist '((t . ivy--regex-ignore-order)))
-  (setq swiper-use-visual-line-p #'ignore)
-  (add-to-list 'ivy-sort-functions-alist
-               '(org-node-collection . js/ivy-org-node-mtime-compare)))
-
-(defun js/ivy-org-node-mtime-compare (a b)
-  "Compare org-node candidates A and B: by file mtime descending, then by level ascending."
-  (let* ((ea (gethash a org-node--candidate<>entry))
-         (eb (gethash b org-node--candidate<>entry))
-         (fa (and ea (org-mem-file-truename ea)))
-         (fb (and eb (org-mem-file-truename eb))))
-    (if (equal fa fb)
-        (< (if ea (org-mem-entry-level ea) 0)
-           (if eb (org-mem-entry-level eb) 0))
-      (let ((ma (and ea (ignore-errors (org-mem-file-mtime ea))))
-            (mb (and eb (ignore-errors (org-mem-file-mtime eb)))))
-        (cond ((null ma) nil)
-              ((null mb) t)
-              (t (time-less-p mb ma)))))))
+  (setq swiper-use-visual-line-p #'ignore))
+;; js/ivy-org-node-mtime-compare + its org-node-collection ivy-sort-functions-alist
+;; entry are gone with org-node; vulpea-find's default ordering is used instead.
+;; If mtime-sort is wanted back, it'd need a vulpea-native candidate source.
 
 (use-package ivy-rich
   :after ivy
@@ -1314,7 +1300,6 @@ folds nest: opening the innermost can leave an ancestor still closed."
 
 (use-package deadgrep
   :defer t
-  :after org-roam
   :commands deadgrep deadgrep-search-org-roam deadgrep-search-org-roam-dailies
   :hook (deadgrep-finished-hook . my/deadgrep-activate-org-links)
   :bind (("<f5>" . deadgrep)
@@ -1331,15 +1316,15 @@ folds nest: opening the innermost can leave an ancestor still closed."
       (call-interactively #'deadgrep)))
 
   (defun deadgrep-search-org-roam ()
-    "Search all org-roam files."
+    "Search all notes."
     (interactive)
     (deadgrep-search-directory org-roam-directory))
 
   (defun deadgrep-search-org-roam-dailies ()
-    "Search only org-roam daily journal entries."
+    "Search only journal entries."
     (interactive)
     (deadgrep-search-directory
-     (expand-file-name org-roam-dailies-directory org-roam-directory)))
+     (expand-file-name js/vulpea-journal-directory org-roam-directory)))
 
   (defun my/deadgrep-activate-org-links ()
     "Activate Org links in deadgrep results buffer."
@@ -2307,94 +2292,48 @@ Falls back to #+attr_latex :options for backwards compatibility."
 
 ;;; * Org-roam
 
-(use-package org-roam
-  :defer t
-  ;; :after org
-  :ensure t
-  :bind-keymap ("C-c n d" . org-roam-dailies-map)
-  :bind (("C-c n n b " . org-roam-buffer-toggle)
-         ("C-c n f" . js/org-roam-node-find)
-         ("C-c n i" . js/org-roam-node-insert)
-         ("C-c n n r" . org-node-refile)
-         ("C-c n n g" . org-id-get-create)
-         ("C-c n n t" . js/org-roam-extract-subtree)
-         ("C-c n n a" . org-roam-alias-add)
-         ("C-c n c" . org-capture-task)
-         ("C-c n n u" . org-roam-ui-open)
-	 ("C-c n o" . open-urls-at-point-or-region)
-	 ("C-c n r" . js/roamify-url-at-point)
-	 ("C-c n t" . org-roam-tag-add)
-	 ("C-c n n s" . org-roam-db-sync)
-	 ;; Trails
-	 ("C-c n y ." . js/trail-activate-at-point)
-	 ("C-c n y a" . js/trail-activate)
-	 ("C-c n y d" . js/trail-deactivate)
-	 ("C-c n y y" . js/trail-add-at-point)
-	 ("C-c n y j" . js/trail-jump)
-	 ("C-c n y u" . js/process-at-point)
+;; org-roam removed for the vulpea-only test config (2026-07-26). The
+;; package/database files are untouched on disk -- only this init.el
+;; config is gone. To bring it back: `git log` on this branch for the
+;; pre-removal use-package block and re-add it.
+;;
+;; Bindings that were carried by org-roam's :bind (but aren't
+;; org-roam-specific themselves) are salvaged into a plain block below,
+;; since nothing else in this file was loading them.
 
-	 :map special-mode-map		; For quickly adding references
-	 ("Y" . js/trail-add-at-point)
-	 ("U" . js/process-at-point)
+(defface js/id-link
+  '((t :foreground "orange" :underline t))
+  "Face for id: links."
+  :group 'org-faces)
+(org-link-set-parameters "id" :face 'js/id-link)
 
-         :map org-mode-map
-         ("C-M-i" . completion-at-point)
+(setq org-archive-file-header-format nil)
+(setq org-id-link-to-org-use-id nil)
 
-	 ("C-c n >" . js/org-goto-last-sibling)
-	 ("C-c n <" . js/org-goto-first-sibling)
-	 ("C-c n s d" . js/org-sort-siblings-by-todo))
-  :hook (org-roam-mode-hook . visual-line-mode)
+(add-hook 'org-mode-hook #'js/setup-specific-keyword-link-fontification)
 
-  :custom
-  (org-roam-completion-everywhere nil)	; It's actually bothersome
-  (org-roam-dailies-directory "journal/")
-  (org-roam-node-display-template
-   (concat "${title:*} " (propertize "${tags:40}" 'face 'org-tag)))
+(bind-keys ("C-c n n g" . org-id-get-create)
+	   ("C-c n o" . open-urls-at-point-or-region)
+	   ("C-c n r" . js/roamify-url-at-point)
+	   ("C-c n n s" . vulpea-db-sync-full-scan)
+	   ("C-c n n r" . js/vulpea-refile-at-point)
+	   ;; Trails
+	   ("C-c n y ." . js/trail-activate-at-point)
+	   ("C-c n y a" . js/trail-activate)
+	   ("C-c n y d" . js/trail-deactivate)
+	   ("C-c n y y" . js/trail-add-at-point)
+	   ("C-c n y j" . js/trail-jump)
+	   ("C-c n y u" . js/process-at-point)
 
-  (org-archive-file-header-format nil)
+	   :map special-mode-map	; For quickly adding references
+	   ("Y" . js/trail-add-at-point)
+	   ("U" . js/process-at-point)
 
-  (org-id-link-to-org-use-id 'nil)
-  (org-roam-mode-section-functions
-   (list (lambda (node) (org-roam-backlinks-section
-			 node
-			 :show-backlink-p (lambda (backlink) ; Add the negation of all refinements
-					    (and (not (archived-backlink-p backlink))
-						 ))
-			 :section-heading "Backlinks: "))
-         #'org-roam-reflinks-section
-         ;; #'org-roam-unlinked-references-section
-	 (lambda (node) (org-roam-backlinks-section
-			 node
-			 :show-backlink-p #'archived-backlink-p
-			 :section-heading "Archived backlinks: "))))
-  :config
-  (require 'org-roam-dailies)
-
-  ;; Color roam links differently
-  (defface org-roam-link
-    '((t :foreground "orange" :underline t))
-    "Face for Org-roam links."
-    :group 'org-roam-faces)
-  (org-link-set-parameters "id" :face 'org-roam-link)
-
-
-  (add-to-list 'org-roam-file-exclude-regexp ".stversions/" t)
-  (add-hook 'org-mode-hook #'js/setup-specific-keyword-link-fontification)
-
-  ;; Folded backlink buffer
-  (add-to-list 'magit-section-initial-visibility-alist (cons 'org-roam-node-section 'hide))
-  (add-to-list 'display-buffer-alist
-	       '("\\*org-roam\\*"
-		 (display-buffer-in-direction)
-		 (direction . right)
-		 (window-width . 0.33)
-		 (window-height . fit-window-to-buffer)))
-  (org-roam-db-autosync-mode)
-
-  (advice-add 'org-roam-db-update-file :around
-	      (defun +org-roam-db-update-file (fn &rest args)
-		(emacsql-with-transaction (org-roam-db)
-                                          (apply fn args)))))
+	   :map org-mode-map
+	   ("C-M-i" . completion-at-point)
+	   ("C-c n >" . js/org-goto-last-sibling)
+	   ("C-c n <" . js/org-goto-first-sibling)
+	   ("C-c n s d" . js/org-sort-siblings-by-todo))
 
 (defun js/org-sort-siblings-by-todo ()
   "Sort sibling entries by todo state order."
@@ -2407,65 +2346,14 @@ Falls back to #+attr_latex :options for backwards compatibility."
       (org-sort-entries nil ?o))))
 
 ;;; ** Managing headings
-(defun js/org-roam-node-not-archived-p (node)
-  "Return non-nil if NODE should be shown.
-Filters out nodes with ARCHIVE tag."
-  (not (member "ARCHIVE" (org-roam-node-tags node))))
-
-(defun js/org-roam-node-find (&optional arg)
-  "Find and open an Org-roam node, hiding archived by default.
-With C-u prefix, show all nodes including archived."
-  (interactive "P")
-  (let ((filter-fn (if arg nil #'js/org-roam-node-not-archived-p)))
-    (org-roam-node-find nil nil filter-fn)))
-
-(defun js/org-roam-node-insert (&optional arg)
-  "Insert a link to an Org-roam node, hiding archived by default.
-With C-u prefix, show all nodes including archived."
-  (interactive "P")
-  (let ((filter-fn (if arg nil #'js/org-roam-node-not-archived-p)))
-    (org-roam-node-insert filter-fn)))
-
-(defun js/org-roam-extract-subtree (&optional no-link)
-  "Extract subtree to org-roam node.
-If heading contains a non-id link, adds it as ROAM_REFS.
-By default, replaces the heading with a link to the new node.
-With prefix arg NO-LINK, leave nothing behind (original behavior)."
-  (interactive "P")
-  (org-back-to-heading-or-point-min t)
-  (when (bobp) (user-error "Already a top-level node"))
-  (let* ((heading-text (org-get-heading t t t t))
-         (link-parts (js/extract-org-link heading-text))
-         (url (car link-parts))
-         (is-ref-link (and url (not (string-prefix-p "id:" url))))
-         (title (if (and is-ref-link (cadr link-parts)
-                         (not (string-empty-p (cadr link-parts))))
-		    (cadr link-parts)
-                  heading-text))
-         (level (org-current-level))
-         (marker (point-marker))
-         (id (org-id-get-create)))
-    (when is-ref-link
-      (org-edit-headline title))
-    (save-buffer)
-    (org-roam-extract-subtree)
-    ;; Add ref in the new file
-    (when is-ref-link
-      (when-let* ((node (org-roam-node-from-id id))
-                  (file (org-roam-node-file node)))
-        (with-current-buffer (find-file-noselect file)
-          (goto-char (org-roam-node-point node))
-          (org-roam-ref-add url)
-          (save-buffer))))
-    ;; Insert link at original position (unless suppressed)
-    (unless no-link
-      (with-current-buffer (marker-buffer marker)
-        (goto-char marker)
-        (set-marker marker nil)
-        (insert (make-string level ?*) " "
-                (org-link-make-string (concat "id:" id) title)
-                "\n")
-        (forward-line -1)))))
+;; js/org-roam-node-find, js/org-roam-node-insert (superseded by
+;; js/vulpea-find/js/vulpea-insert, see the vulpea use-package below)
+;; and js/org-roam-extract-subtree (needed org-roam-extract-subtree,
+;; which is gone now that org-roam is uninstalled from this config)
+;; were removed with the vulpea-only cutover. Open question for the
+;; person: is the extract-subtree workflow still wanted at all, now
+;; that vulpea headings are directly findable/insertable without
+;; extraction? If so it needs a fresh vulpea-native implementation.
 
 ;;; ** Aesthetics - fontification
 
@@ -2520,91 +2408,26 @@ only processes keywords listed in `js/org-keywords-with-links'."
 ;;; ** Capture and logging
 
 ;;; *** Manual capture setup
-(defvar org-roam-capture-content nil
-  "Variable to pass content to capture templates.")
-
-(setq org-roam-capture-templates
-      '(("d" "default" plain "%?"
-         :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n#+startup: show2levels")
-         :unnarrowed t)))
-
-(setq org-roam-dailies-capture-templates
-      `(("d" "default" plain "* %?"
-	 :target (file+head "%<%Y-%m-%d>.org"
-			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels"))))
+;; The old org-roam-capture-templates/org-roam-dailies-capture-templates/
+;; org-roam-autocapture-templates/org-roam-dailies-autocapture-templates
+;; cluster and js/org-roam-autocapture/org-roam-dailies-autocapture-today
+;; are gone -- their only call sites were rewritten onto vulpea-journal
+;; in the vulpea-port Phase 2 commit, so the templates themselves became
+;; dead weight.
 
 (defun org-capture-task ()
+  "Capture a quick TODO into the fixed task-inbox heading.
+Uses a private, isolated `org-capture-templates' binding (like the old
+org-roam-capture- call did) rather than the shared list above, so its
+\"t\" key doesn't collide with the \"Task\" template already using it."
   (interactive)
-  "A function to automatically capture content into a daily template."
-  (org-roam-capture- :keys "t"
-		     :node (org-roam-node-create)
-		     :templates '(("t" "task" plain "** TODO %?"
-				   :target (node "C6C9881B-7EF4-4DAF-A502-84D396372A68")
-				   :unnarrowed nil))))
-;;; *** Autocapture and logging
-(defvar org-roam-capture--browser nil
-  "Variable to pass current browser to capture templates.")
-
-(defvar org-roam-capture-body nil
-  "Variable to pass body content to capture templates.")
-
-(defvar org-roam-autocapture-templates
-  '(("r" "reference" plain "%?"
-     :if-new (file+head "%<%Y%m%d%H%M%S>-${slug}.org" "#+title: ${title}\n")
-     :unnarrowed t)
-    ("p" "process" plain
-     ""
-     :target (file+olp "20260509100451-process.org"
-                       ("PROCESS %(eval org-roam-capture-content)"))
-     :immediate-finish t))
-  "A list of templates to use for automatic capture.")
-
-(defvar org-roam-dailies-autocapture-templates
-  '(("w" "url capture" plain "%(eval (or org-roam-capture-body \"\"))"
-     :target (file+head+olp "%<%Y-%m-%d>.org"
-			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Web" "%(eval (concat org-roam-capture-content))"))
-     :immediate-finish t)
-    ("e" "elfeed link capture" plain "%(eval (or org-roam-capture-body \"\"))"
-     :target (file+head+olp "%<%Y-%m-%d>.org"
-			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Elfeed" "%(eval (concat org-roam-capture-content))"))
-     :immediate-finish t)
-    ("c" "chatlog capture" plain "%(eval (or org-roam-capture-body \"\"))"
-     :target (file+head+olp "%<%Y-%m-%d>.org"
-			    "#+title: %<%Y-%m-%d>\n#+startup: show2levels" ("Chats" "%(eval (concat org-roam-capture-content))"))
-     :immediate-finish t))
-  "A list of templates to use for automatic daily capture.")
-
-(defun js/org-roam-autocapture (keys &optional contents body)
-  "Automatically capture content into a given roam node."
-  (let ((org-roam-capture-content (or contents org-roam-capture-content))
-        (org-roam-capture-body    (or body org-roam-capture-body)))
-    (org-roam-capture- :keys keys
-                       :node (org-roam-node-create)
-                       :templates org-roam-autocapture-templates
-                       :props (list :override-default-time (current-time)))))
-
-(defun org-roam-dailies-autocapture-today (keys &optional contents body)
-  "A function to automatically capture content into a daily template."
-  (let* ((org-roam-directory (expand-file-name org-roam-dailies-directory org-roam-directory))
-         (org-roam-dailies-directory "./")
-	 (org-roam-capture-content (or contents org-roam-capture-content))
-	 (daily-node nil)
-	 (org-roam-capture-body (or body org-roam-capture-body))
-	 )
-    (org-roam-capture- :keys keys
-		       :node (org-roam-node-create)
-		       :templates org-roam-dailies-autocapture-templates
-		       :props (list :override-default-time (current-time)))))
+  (let ((org-capture-templates
+         '(("t" "task" plain "** TODO %?"
+            :target (id "C6C9881B-7EF4-4DAF-A502-84D396372A68")
+            :unnarrowed nil))))
+    (org-capture nil "t")))
 
 ;;; *** Org browser Integration
-
-(defun org-roam-link-make-string (id &optional description)
-  "Makes an org-roam link string pointing to the given id.
-     Assumes one actually exists."
-  (let* ((node (org-roam-node-from-id id))
-	 (description (or description
-			  (org-roam-node-title node))))
-    (org-link-make-string (concat "id:" id) description)))
 
 (defvar js/browsers
   (pcase system-type
@@ -2642,8 +2465,8 @@ Using the org-mac-link, this comes pre-formatted with the url title."
 
 (defun js/process-at-point ()
   (interactive)
-  (let ((link (if-let* ((node (org-roam-node-at-point))
-                        (id (org-roam-node-id node)))
+  (let ((link (if-let* ((note (js/vulpea-note-at-point))
+                        (id (vulpea-note-id note)))
                   (js/format-link (concat "id:" id))
                 (org-store-link nil nil))))
     (js/url-target-process link)))
@@ -2913,44 +2736,30 @@ target note."
       (substring-no-properties res))))
 
 (defun js/org-current-node-id ()
-  "Return org-roam node ID at point, nil if nonexistent."
-  (when-let* ((node (ignore-errors (org-roam-node-at-point)))
-	      (id (org-roam-node-id node)))
-    id))
+  "Return vulpea note ID at point, nil if nonexistent."
+  (when-let* ((note (js/vulpea-note-at-point)))
+    (vulpea-note-id note)))
 
 ;;; ** Archiving and unarchiving
-(defun archived-backlink-p (backlink)
-  "Checks whether the backlink lives under the Archived today heading."
-  (let* ((properties (org-roam-backlink-properties backlink))
-	 (outline (plist-get properties :outline)))
-    (equal "Archived today" (car outline))))
-
-;; (defun archived-backlink-p (backlink)
-;;   (let ((node (vulpea-db-get-by-id (org-roam-backlink-source-id backlink))))
-;;     (member "ARCHIVE" (vulpea-note-tags node))))
+;; archived-backlink-p (and org-roam-mode-section-functions, the only
+;; thing that used it) is gone along with org-roam's backlink buffer --
+;; vulpea-ui's sidebar doesn't use this show-backlink-p predicate
+;; mechanism.
 
 ;; https://freerangebits.com/posts/2024/01/archiving-in-org-mode/
 (defun js/org-archive-subtree-to-daily (&optional _find-done)
-  "Archive the current subtree to the roam daily file."
+  "Archive the current subtree to today's vulpea journal file."
   (interactive "P")
-  (require 'org-roam)
   (require 'org-archive)
-  (let* ((daily-file (expand-file-name
-		      (format-time-string "%Y-%m-%d.org")
-		      (expand-file-name org-roam-dailies-directory org-roam-directory)))
-         (today (if (string= (buffer-file-name) daily-file)
-		    daily-file
-                  (save-window-excursion
-		    (save-excursion
-		      (org-roam-dailies-goto-today "d")
-		      (buffer-file-name)))))
+  (let* ((today (vulpea-note-path (vulpea-journal-note (current-time))))
          (org-archive-location (concat today "::* Archived today :ARCHIVE:"))
-         (file-id (save-excursion
-		    (goto-char (point-min))
-		    (org-roam-id-at-point)))
+         (file-note (save-excursion
+		      (goto-char (point-min))
+		      (when-let* ((id (org-entry-get nil "ID")))
+			(vulpea-db-get-by-id id))))
          (heading-title (org-get-heading t t t t)))
-    (when file-id
-      (org-set-property "ARCHIVE_NODE" (org-roam-link-make-string file-id)))
+    (when file-note
+      (org-set-property "ARCHIVE_NODE" (vulpea-utils-link-make-string file-note)))
     (org-archive-subtree 0)
     ;; Set TODO state to CANCELLED in the archived entry
     (with-current-buffer (find-file-noselect today)
@@ -2979,8 +2788,6 @@ target note."
 Uses ARCHIVE_NODE and ARCHIVE_OLPATH properties to restore the entry.
 Restores the original TODO state from ARCHIVE_TODO."
   (interactive)
-  (require 'org-roam)
-
   ;; Ensure we're at a heading
   (unless (org-at-heading-p)
     (org-back-to-heading t))
@@ -2998,15 +2805,15 @@ Restores the original TODO state from ARCHIVE_TODO."
     (unless archive-node-link
       (user-error "No ARCHIVE_NODE property found. This doesn't appear to be an archived entry"))
 
-    ;; Extract node ID from the org-roam link
-    (let* ((node-id (when (string-match "\\[\\[id:\\([^]]+\\)\\]" archive-node-link)
+    ;; Extract note ID from the vulpea link
+    (let* ((note-id (when (string-match "\\[\\[id:\\([^]]+\\)\\]" archive-node-link)
 		      (match-string 1 archive-node-link)))
-           (target-node (when node-id (org-roam-node-from-id node-id)))
-           (target-file (or (when target-node (org-roam-node-file target-node))
+           (target-note (when note-id (vulpea-db-get-by-id note-id)))
+           (target-file (or (when target-note (vulpea-note-path target-note))
 			    archive-file)))
 
       (unless target-file
-        (user-error "Could not determine target file from node %s or archive file %s"
+        (user-error "Could not determine target file from note %s or archive file %s"
 		    archive-node-link archive-file))
 
       (unless (file-exists-p target-file)
@@ -3027,20 +2834,20 @@ Restores the original TODO state from ARCHIVE_TODO."
 	      (goto-char (point-min))
 
 	      ;; Navigate to the correct location
-	      (if (and node-id (org-roam-id-find node-id))
+	      (if (and note-id target-note)
                   (progn
-		    (org-id-goto node-id)
+		    (org-id-goto note-id)
 		    (setq paste-level 1)
 
 		    ;; If we have an OLPATH, navigate through it
 		    (when (and archive-olpath (not (string-empty-p archive-olpath)))
 		      (let ((path-components (split-string archive-olpath "/")))
-                        (goto-char (org-roam-capture-find-or-create-olp path-components))
+                        (goto-char (js/org-find-or-create-olp path-components))
                         (setq paste-level (+ 1 (length path-components))))))
-                ;; Fallback: if no node ID, try to use file and OLPATH
+                ;; Fallback: if no note ID, try to use file and OLPATH
                 (when (and archive-olpath (not (string-empty-p archive-olpath)))
                   (let ((path-components (split-string archive-olpath "/")))
-		    (goto-char (org-roam-capture-find-or-create-olp path-components))
+		    (goto-char (js/org-find-or-create-olp path-components))
 		    (setq paste-level (+ 1 (length path-components))))))
 
 	      ;; Move to end of current subtree for insertion
@@ -3078,9 +2885,12 @@ Restores the original TODO state from ARCHIVE_TODO."
                    ""))))))
 
 
-;; Fixes a bug in the capture templates using a heading outline path
+;; Fixes a bug in capture-style templates using a heading outline path.
+;; No longer goes through org-roam-capture--fill-template (OLP here is
+;; already a list of plain, already-resolved heading strings, not a
+;; capture template needing expansion).
 ;; https://github.com/org-roam/org-roam/pull/2336
-(defun org-roam-capture-find-or-create-olp (olp)
+(defun js/org-find-or-create-olp (olp)
   "Return a marker pointing to the entry at OLP in the current buffer.
 If OLP does not exist, create it. If anything goes wrong, throw
 an error, and if you need to do something based on this error,
@@ -3090,12 +2900,11 @@ you can catch it with `condition-case'."
          (lmax 1)
          (start (point-min))
          (end (point-max))
-         headings
+         (headings olp)
          found flevel)
     (unless (derived-mode-p 'org-mode)
       (error "Buffer %s needs to be in Org mode" (current-buffer)))
     (org-with-wide-buffer
-     (setq headings (mapcar #'org-roam-capture--fill-template olp))
      (goto-char start)
      (dolist (heading headings)
        (let ((re (format org-complex-heading-regexp-format
@@ -3150,213 +2959,56 @@ you can catch it with `condition-case'."
 ;;   :after org-transclusion
 ;;   :config (org-transclusion-font-lock-mode +1))
 
-;;; ** Org-roam-ui
+;;; ** Org-roam-ui, org-mem, org-node -- removed
 
-(use-package org-roam-ui
-  :after org-roam
-  :custom
-  (org-roam-ui-sync-theme t)
-  (org_roam-ui-follow nil)
-  (org-roam-ui-update-on-save t)
-  (org-roam-ui-open-on-start nil))
-;;; ** Org-node
+;; org-roam-ui, org-mem, and org-node are uninstalled from this
+;; vulpea-only test config (2026-07-26). org-roam-ui has no vulpea
+;; replacement yet (graph visualization -- open question, see chat);
+;; org-mem/org-node's interactive surface (find/insert/refile/OLP
+;; display) is fully superseded by vulpea-find/vulpea-insert/
+;; js/vulpea-refile-at-point/vulpea-select-describe-outline-full above.
+;; `git log` this branch for the pre-removal blocks if any of this
+;; needs to come back.
 
-(use-package org-mem
-  :defer
-  :custom
-  (org-mem-do-sync-with-org-id t)
-  :config
-  (org-mem-updater-mode))
+;;; ** Vulpea notes via org-protocol
 
-(use-package org-node
-  :if (not (eq system-type 'android))	; For some reason not working well on Android
-  :after org-roam
-  :bind
-  (("C-c n f" . js/org-node-find)
-   ("C-c n i" . js/org-node-insert))
+(require 'org-protocol)
 
-  :custom
-  (org-node-alter-candidates t) ; OLP support
-  (org-node-stay-in-source-buffer t)
+;; Handler: org-protocol://roam-id?id=<UUID> → visit that note
+(defun js/org-protocol-open-roam-id (data)
+  "Open a vulpea note by ID received via org-protocol."
+  (when-let* ((id (plist-get data :id))
+	      (note (vulpea-db-get-by-id id)))
+    (tab-new)
+    (vulpea-visit note))
+  nil)				; return nil: don't kill the emacsclient frame
 
-  (org-node-affixation-fn #'js/org-node-affix-olp-hashtags-aligned)  ; Add tag search support
+(add-to-list 'org-protocol-protocol-alist
+             '("roam-id"
+	       :protocol "roam-id"
+	       :function js/org-protocol-open-roam-id
+	       :kill-client nil))
 
-  ;; Performance tuning
-  (org-node-perf-keep-file-name-handlers nil)  ; Max speed
-
-  ;; Org-roam compatibility
-  (org-node-creation-fn #'org-node-new-via-roam-capture)
-  (org-node-file-slug-fn #'org-node-slugify-like-roam-default)
-  (org-node-file-timestamp-format "%Y%m%d%H%M%S-")
-
-  ;; Directory configuration
-  (org-id-locations-file-relative t)
-  (org-node-extra-id-dirs
-   (list org-roam-directory
-         (expand-file-name org-roam-dailies-directory org-roam-directory)))
-
-  ;; Customs
-  (org-node-display-sort-fn #'org-node-sort-by-file-mtime) ; Seems like this does nothing with ivy
-
-  :config
-  ;; Your custom filtering logic
-  (defun js/org-node-not-archived-p (node)
-    "Return t if NODE should be shown (not archived)."
-    (not (org-mem-property-with-inheritance "ARCHIVE_NODE" node)))
-  (setq org-node-filter-fn #'js/org-node-not-archived-p)
-
-  (defun js/org-node-find (&optional arg)
-    "Find and open an org-node, hiding archived by default.
-With C-u prefix, show all nodes including archived."
-    (interactive "P")
-    (org-node-find))
-
-  (defun js/org-node-insert (&optional arg)
-    "Insert a link to an org-node, hiding archived by default.
-With C-u prefix, insert a transclusion instead."
-    (interactive "P")
-    (if arg
-	(org-node-insert-transclusion)
-      (org-node-insert-link*)))
-
-  (defun js/org-node-affix-olp-hashtags-aligned (node title)
-    "OLP prefix, right-aligned #hashtags suffix."
-    (let* ((width  (- (frame-width)
-                      (fringe-columns 'right)
-                      (fringe-columns 'left)))
-           (olp    nil))
-      (list title
-            (when (org-mem-entry-subtree-p node)
-              (let ((ancestors (org-mem-olpath-with-file-title node)))
-		(setq olp (concat (mapconcat (lambda (anc)
-                                               (propertize anc 'face 'org-node-parent))
-                                             ancestors " > ")
-                                  " > "))))
-            (let ((tags (org-mem-entry-tags node)))
-              (when tags
-		(let* ((tag-str (propertize
-				 (mapconcat (lambda (tag) (concat "#" tag)) tags " ")
-				 'face 'org-node-tag))
-                       (padding (max 2 (- width
-                                          (string-width title)
-                                          (string-width (or olp ""))
-                                          (string-width tag-str)))))
-                  (concat (make-string padding ?\s) tag-str)))))))
-
-  ;; Modified to work outside of org-mode buffers, so i can use it in the minibuffer
-  (defun org-node-insert-link (&optional region-as-initial-input novisit)
-    "Insert a link to one of your ID nodes.
-
-To behave exactly like org-roam\\='s `org-roam-node-insert',
-see `org-node-insert-link*', or pass REGION-AS-INITIAL-INPUT t.
-
-Argument NOVISIT for use by `org-node-insert-link-novisit'."
-    (interactive "@*" org-mode)
-
-    ;; (unless (derived-mode-p 'org-mode)
-    ;;   (user-error "Only works in org-mode buffers"))
-    (org-node-cache-ensure)
-    (let* ((beg nil)
-           (end nil)
-           (region-text (when (region-active-p)
-                          (setq end (region-end))
-                          (goto-char (region-beginning))
-                          (skip-chars-forward "\n[:space:]")
-                          (setq beg (point))
-                          (goto-char end)
-                          (skip-chars-backward "\n[:space:]")
-                          (setq end (point))
-                          (org-link-display-format
-                           (buffer-substring-no-properties beg end))))
-           (initial (if (or region-as-initial-input
-                            (and region-text
-				 (try-completion region-text
-						 org-node--title<>affixations)))
-			region-text
-		      nil))
-           (_ (when (eq t initial)
-		;; Guard against `try-completion' returning t instead of a string
-		;; (who knew?!)
-		(setq initial nil)))
-           (input (if (and novisit initial)
-		      initial
-                    (org-node-read-candidate nil t initial)))
-           (_ (when (string-blank-p input)
-		(setq input (funcall org-node-blank-input-title-generator))))
-           (node (gethash input org-node--candidate<>entry))
-           (id (if node (org-mem-id node) (org-id-new)))
-           (link-desc (or region-text
-                          (and node
-			       org-node-custom-link-format-fn
-			       (funcall org-node-custom-link-format-fn node))
-                          (and (not org-node-alter-candidates) input)
-                          (and node (seq-find (##string-search % input)
-					      (org-mem-entry-roam-aliases node)))
-                          (and node (org-mem-entry-title node))
-                          input)))
-      (atomic-change-group
-	(when region-text
-          (delete-region beg end))
-	;; TODO: When inserting a citation, insert a [cite:] instead of a normal
-	;;       link
-	;; (if (string-prefix-p "@" input))
-	(insert (org-link-make-string (concat "id:" id) link-desc)))
-      (run-hooks 'org-node-insert-link-hook)
-      ;; TODO: Delete the link if a node was not created
-      ;;       See `org-node-insert-transclusion'
-      ;; TODO: Respect `org-node-stay-in-source-buffer'
-      (unless node
-	(org-node-create input id))))
-
-  ;; Initialize the cache
-  (org-node-cache-mode)
-  (org-node-cache-ensure)
-  (org-node-roam-accelerator-mode -1)
-  )
-
-;;; ** Org-roam links via org-protocol
-
-(with-eval-after-load 'org-roam
-  (require 'org-protocol)
-
-  ;; Handler: org-protocol://roam-id?id=<UUID> → visit that node
-  (defun js/org-protocol-open-roam-id (data)
-    "Open org-roam node by ID received via org-protocol."
-    (when-let* ((id (plist-get data :id))
-		(node (org-roam-node-from-id id)))
-      (tab-new)
-      (org-roam-node-visit node nil 'force))
-    nil)			; return nil: don't kill the emacsclient frame
-
-  (add-to-list 'org-protocol-protocol-alist
-               '("roam-id"
-		 :protocol "roam-id"
-		 :function js/org-protocol-open-roam-id
-		 :kill-client nil))
-
-
-  (defun js/org-protocol-open-day (data)
-    "Open the org-roam daily note for :date in DATA, received via org-protocol.
+(defun js/org-protocol-open-day (data)
+  "Open the vulpea journal note for :date in DATA, received via org-protocol.
 If :heading is present, move point to the first headline containing it
 anywhere in its raw text (including link targets)."
-    (when-let* ((date (plist-get data :date)))
-      (tab-new)
-      (org-roam-dailies--capture (org-time-string-to-time (concat date " 12:00")) t)
-      (when-let* ((needle (plist-get data :heading)))
-        (goto-char (point-min))
-        (if (re-search-forward (concat "^\\*+ .*" (regexp-quote needle)) nil t)
-            (progn (org-back-to-heading t)
-                   (org-fold-show-context))
-          (message "js/org-protocol: no heading matching %s" needle)))
-      nil))
+  (when-let* ((date (plist-get data :date)))
+    (tab-new)
+    (vulpea-journal (org-time-string-to-time (concat date " 12:00")))
+    (when-let* ((needle (plist-get data :heading)))
+      (goto-char (point-min))
+      (if (re-search-forward (concat "^\\*+ .*" (regexp-quote needle)) nil t)
+          (progn (org-back-to-heading t)
+                 (org-fold-show-context))
+        (message "js/org-protocol: no heading matching %s" needle)))
+    nil))
 
 (add-to-list 'org-protocol-protocol-alist
              '("journal-day"
                :protocol "journal-day"
                :function js/org-protocol-open-day
                :kill-client nil))
-
-  )
 
 ;;; ** Citations
 
@@ -3486,7 +3138,9 @@ binding needed here anymore."
    ("C-c n n a" . vulpea-buffer-alias-add))
 
   :config
-  (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
+  ;; The advice on org-roam-extract-subtree (and the extract-subtree
+  ;; workflow itself) is gone along with org-roam -- see the note near
+  ;; js/org-roam-extract-subtree's old location for the open question.
 ;;; ** Tag management
 
   (defun org/project-p ()
@@ -3679,16 +3333,7 @@ With C-u prefix, show all notes including archived."
     "Enable tag updating for the current buffer."
     (setq-local tags/update-tags-enabled t)
     (add-hook 'before-save-hook #'tags/maybe-update-tags nil t)
-    (tags/maybe-update-tags))
-
-  ;; Fixes weird tag insertion on extracting heading with `TODO' subheadings
-  (defun tags/extract-subtree-with-tag-pause (orig-fun &rest args)
-    "Pause tag updating during extraction, then update tags after."
-    (let ((tags/tag-pause t))
-      (apply orig-fun args))
-    ;; Now we're in the new buffer, tags/tag-pause is nil again
-    (message (concat "The current value is: " tags/tag-pause))
-    (save-buffer)))
+    (tags/maybe-update-tags)))
 
 (use-package vulpea-ui
   :defer t
@@ -3703,6 +3348,10 @@ With C-u prefix, show all notes including archived."
   (("C-c n m" . js/vulpea-journal-month-today)
    ("C-c n M" . js/vulpea-journal-month-date))
   :config
+  (defvar js/vulpea-journal-directory "journal/"
+    "Relative directory (under `org-roam-directory') that vulpea-journal
+daily notes live in. Matches the :file-name template below.")
+
   ;; Daily journal, replacing org-roam-dailies. The pre-existing monthly
   ;; journal experiment (below) stays separate from this default.
   (setq vulpea-journal-default-template
@@ -4097,7 +3746,6 @@ With prefix argument ALL, push all files tagged :annotations:."
 	     (todo "EXPLORE" ((org-agenda-overriding-header "* Things to explore: ")))
 	     )))))
   :config
-  (require 'org-roam)
   (require 'vulpea)
   ;; Automatically update the agenda files to those roam entries with the `project' tag.
   (advice-add 'org-agenda :before #'roam-agenda-files-update)
@@ -4213,6 +3861,14 @@ cutting the original once the paste at the target has succeeded."
     (set-marker marker nil)
     (org-cut-subtree)))
 
+(defun js/vulpea-refile-at-point ()
+  "Refile the subtree at point into a prompted-for vulpea note.
+Single-entry equivalent of `js/agenda-refile', for direct use in a
+regular org buffer (not agenda) -- replaces the old org-node-refile
+binding on C-c n n r and in the triage hydra."
+  (interactive)
+  (js/vulpea-refile-subtree-to-note (vulpea-select "Refile into" :require-match t)))
+
 (defun js/agenda-refile-old ()
   "From org-agenda, refile the subtree into the selected vulpea note."
   (interactive)
@@ -4300,7 +3956,7 @@ _S_manual
             ("<space>" js/triage-snooze-later)
             ("S" js/triage-manual)
             ("t" org-todo)
-            ("r" org-node-refile)
+            ("r" js/vulpea-refile-at-point)
             ("w" org-refile)
             ("R" js/roamify-url-at-point :exit t)
             ("o" open-urls-at-point-or-region)
@@ -4570,14 +4226,14 @@ Falls back to standard org-html-link for other link types."
     (if (not (string= (org-element-property :type link) "id"))
 	(org-html-link link desc info)
       (let* ((id (org-element-property :path link))
-             (node (org-roam-node-from-id id))
-             (tags (and node (org-roam-node-tags node)))
+             (note (vulpea-db-get-by-id id))
+             (tags (and note (vulpea-note-tags note)))
              (published-p (and tags (seq-intersection tags (append blog-tags static-tags))))
-             (fallback-desc (if node (org-roam-node-title node) id)))
+             (fallback-desc (if note (vulpea-note-title note) id)))
 	(if published-p
             (format "<a href=\"/%s\">%s</a>"
-                    (org-static-blog-get-post-public-path (org-roam-node-file node))
-                    (or desc (org-roam-node-title node)))
+                    (org-static-blog-get-post-public-path (vulpea-note-path note))
+                    (or desc (vulpea-note-title note)))
           (format "<a href=\"broken-link.html\" class=\"broken-link\">%s</a>"
                   (or desc fallback-desc))))))
 
