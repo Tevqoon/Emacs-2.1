@@ -3625,6 +3625,19 @@ With C-u prefix, show all notes including archived."
     (interactive "P")
     (vulpea-insert :filter-fn (if arg nil #'js/vulpea-note-not-archived-p)))
 
+;;; ** Selection UI parity (OLP prefix + tags)
+
+  ;; Shows "File → Heading → " before the title, like the old OLP+hashtag
+  ;; affixation in `js/org-node-affix-olp-hashtags-aligned'.
+  (setq vulpea-select-describe-fn #'vulpea-select-describe-outline-full)
+
+  ;; Tag annotation: kept at vulpea's built-in `vulpea-select-annotate'
+  ;; (left-flush "#tag1 #tag2", plain concat after the title) rather than
+  ;; reproducing the old org-node right-alignment-to-frame-edge behavior.
+  ;; vulpea-select-annotate-fn isn't handed the composed candidate length,
+  ;; so right-alignment isn't a natural fit here; deliberately accepting
+  ;; this cosmetic difference instead of guessing at fragile padding math.
+
   (defvar-local tags/update-tags-enabled nil
     "Buffer-local variable to enable/disable tag updating.")
 
