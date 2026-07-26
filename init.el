@@ -3476,6 +3476,12 @@ Uses cite key at point, then current node's ref, then prompts."
   :hook
   (org-mode-hook . tags/enable-tag-updating)
 
+  :bind
+  (("C-c n f" . js/vulpea-find)
+   ("C-c n i" . js/vulpea-insert)
+   ("C-c n t" . vulpea-buffer-tags-add)
+   ("C-c n n a" . vulpea-buffer-alias-add))
+
   :config
   (advice-add 'org-roam-extract-subtree :around #'tags/extract-subtree-with-tag-pause)
 ;;; ** Tag management
@@ -3613,6 +3619,28 @@ Each function is called with two arguments: the tag and the buffer.")
 			(not (member "ARCHIVE" (vulpea-note-tags note))))
                       notes)))
       (seq-uniq (mapcar #'vulpea-note-path filtered))))
+
+;;; ** Browsing (vulpea-find / vulpea-insert)
+
+  (defun js/vulpea-note-not-archived-p (note)
+    "Return non-nil if NOTE should be shown.
+Filters out notes tagged ARCHIVE or carrying an ARCHIVE_NODE property
+\(mirrors the filtering formerly done by `js/org-roam-node-not-archived-p'
+and `js/org-node-not-archived-p')."
+    (and (not (member "ARCHIVE" (vulpea-note-tags note)))
+         (not (cdr (assoc "ARCHIVE_NODE" (vulpea-note-properties note))))))
+
+  (defun js/vulpea-find (&optional arg)
+    "Find and open a vulpea note, hiding archived by default.
+With C-u prefix, show all notes including archived."
+    (interactive "P")
+    (vulpea-find :filter-fn (if arg nil #'js/vulpea-note-not-archived-p)))
+
+  (defun js/vulpea-insert (&optional arg)
+    "Insert a link to a vulpea note, hiding archived by default.
+With C-u prefix, show all notes including archived."
+    (interactive "P")
+    (vulpea-insert :filter-fn (if arg nil #'js/vulpea-note-not-archived-p)))
 
   (defvar-local tags/update-tags-enabled nil
     "Buffer-local variable to enable/disable tag updating.")
