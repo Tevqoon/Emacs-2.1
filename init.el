@@ -2740,28 +2740,52 @@ shell and Elisp string quoting."
 
 ;;; *** Vannevar Trails
 
+(defun js/vulpea-note-at-point ()
+  "Return the vulpea-note for the ID at or above point, or nil.
+Mirrors org-roam-node-at-point's inheritance: walks up to the
+nearest ancestor heading (or the file itself) carrying an :ID:."
+  (when-let* ((id (org-entry-get nil "ID" t)))
+    (vulpea-db-get-by-id id)))
+
+(defun js/vulpea-note-append-child (note content)
+  "Append CONTENT as a new child heading directly under NOTE.
+Works for both file-level (level 0) and heading-level notes."
+  (let ((file (vulpea-note-path note))
+        (pos (vulpea-note-pos note))
+        (level (vulpea-note-level note)))
+    (with-current-buffer (find-file-noselect file)
+      (org-with-wide-buffer
+       (goto-char pos)
+       (if (> level 0)
+           (org-end-of-subtree t t)
+         (goto-char (point-max)))
+       (unless (bolp) (insert "\n"))
+       (insert (make-string (1+ level) ?*) " " content "\n"))
+      (save-buffer))))
+
 (defvar js/active-trail nil
   "ID of the currently active research trail node, or nil if none.")
 
-(defun js/trail-activate (&optional node)
-  "Set a trail node as active.
-Without NODE, prompts with completion filtered to nodes tagged 'trail'."
+(defun js/trail-activate (&optional note)
+  "Set a trail note as active.
+Without NOTE, prompts with completion filtered to notes tagged 'trail'."
   (interactive)
-  (let* ((node (or node
-                   (org-roam-node-read
-                    nil
-                    (lambda (n) (member "trail" (org-roam-node-tags n))))))
-         (id (org-roam-node-id node)))
+  (let* ((note (or note
+                   (vulpea-select "Trail"
+                                  :filter-fn (lambda (n) (member "trail" (vulpea-note-tags n)))
+                                  :require-match t)))
+         (id (vulpea-note-id note)))
     (setq js/active-trail id)
-    (message "Trail active: %s" (org-roam-node-title node))))
+    (message "Trail active: %s" (vulpea-note-title note))))
 
 (defun js/trail-activate-at-point ()
-  "Set the node at point as the active trail, adding 'trail' tag if absent."
+  "Set the note at point as the active trail, adding 'trail' tag if absent."
   (interactive)
-  (let ((node (org-roam-node-at-point 'assert)))
-    (unless (member "trail" (org-roam-node-tags node))
-      (org-roam-tag-add '("trail")))
-    (js/trail-activate node)))
+  (let ((note (or (js/vulpea-note-at-point) (user-error "No note at point"))))
+    (unless (member "trail" (vulpea-note-tags note))
+      (vulpea-buffer-tags-add "trail")
+      (setq note (vulpea-db-get-by-id (vulpea-note-id note))))
+    (js/trail-activate note)))
 
 (defun js/trail-deactivate ()
   "Clear the active trail."
@@ -2770,28 +2794,23 @@ Without NODE, prompts with completion filtered to nodes tagged 'trail'."
   (message "Trail deactivated."))
 
 (defun js/trail-jump ()
-  "Jump to the active trail node."
+  "Jump to the active trail note."
   (interactive)
   (unless js/active-trail (user-error "No active trail"))
   (org-id-goto js/active-trail))
 
 (defun js/url-target-trail (url-source)
-  "Capture URL-SOURCE as an entry into the active trail node."
+  "Capture URL-SOURCE as an entry into the active trail note."
   (unless js/active-trail (user-error "No active trail"))
-  (let ((org-roam-capture-content url-source))
-    (org-roam-capture- :keys "t"
-                       :node (org-roam-node-create)
-                       :templates `(("t" "trail entry" entry
-                                     "* %(or org-roam-capture-content \"\")"
-                                     :target (node ,js/active-trail)
-                                     :immediate-finish t))))
+  (let ((note (or (vulpea-db-get-by-id js/active-trail)
+                  (error "Active trail note %s not found" js/active-trail))))
+    (js/vulpea-note-append-child note url-source))
   "added to trail")
 
 (defun js/trail-add-at-point ()
   (interactive)
   (unless js/active-trail (user-error "No active trail"))
-  (let ((link (if-let* ((node (org-roam-node-at-point))
-                        (id (org-roam-node-id node)))
+  (let ((link (if-let* ((id (org-id-get)))
                   (js/format-link (concat "id:" id))
                 (org-store-link nil nil))))
     (js/url-target-trail link)))
