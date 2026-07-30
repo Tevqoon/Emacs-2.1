@@ -1862,12 +1862,12 @@ folds nest: opening the innermost can leave an ancestor still closed."
 
   :hook
   (org-mode-hook . js/org-rename-buffer-to-title-enable)
+  :bind*
+  (("C-c C-l" . ar/org-insert-link-dwim))
   :bind
   (("C-c l" . org-store-link)
-   ("C-c C-l" . ar/org-insert-link-dwim)
    :map org-mode-map
    ("M-o" . ace-link-org)
-   ("C-c C-l" . ar/org-insert-link-dwim)
    ("C-'" . nil)
    ("C-," . nil))
   :config
@@ -1939,18 +1939,52 @@ This function is expected to be hooked in org-mode."
 	    (org-element-property :raw-link context)
 	    (org-element-property :description context)))))
 
+(defun js/youtube-url-p (url)
+  "Return non-nil if URL points at a YouTube video."
+  (string-match-p
+   (rx bos "http" (? "s") "://" (? (or "www." "m."))
+       (or (seq "youtube.com/" (or "watch" "shorts/" "live/"))
+           "youtu.be/"))
+   url))
+
+(defun js/get-youtube-oembed (url)
+  "Return the oEmbed alist for the YouTube video at URL, or nil."
+  (let ((endpoint (concat "https://www.youtube.com/oembed?format=json&url="
+                          (url-hexify-string url))))
+    (condition-case nil
+        (when-let* ((buffer (url-retrieve-synchronously endpoint t t 10)))
+          (unwind-protect
+              (with-current-buffer buffer
+                (goto-char url-http-end-of-headers)
+                (json-parse-buffer :object-type 'alist))
+            (kill-buffer buffer)))
+      (error nil))))
+
+(defun js/get-youtube-title (url)
+  "Return \"TITLE - CHANNEL\" for the YouTube video at URL, or nil."
+  (when-let* ((data  (js/get-youtube-oembed url))
+              (title (alist-get 'title data)))
+    (let ((author (alist-get 'author_name data)))
+      (if (and author (not (string-empty-p author)))
+          (format "%s - %s" title author)
+        title))))
+
 (defun js/get-link-title (url)
   "Get the title for a given `url' based on its type."
   (cond
+   ((js/youtube-url-p url)
+    (js/get-youtube-title url))
+
    ((string-prefix-p "http" url t)
     (condition-case nil
-        (let ((buffer (url-retrieve-synchronously url t t 3))) ; Add timeout of 3 seconds
-          (when buffer
-	    (unwind-protect
-                (with-current-buffer buffer
-                  (let ((dom (libxml-parse-html-region (point-min) (point-max))))
-		    (string-trim (dom-text (car (dom-by-tag dom 'title))))))
-	      (kill-buffer buffer))))
+        (when-let* ((buffer (url-retrieve-synchronously url t t 10)))
+          (unwind-protect
+              (with-current-buffer buffer
+                (when-let* ((dom (libxml-parse-html-region (point-min) (point-max)))
+                            (node (car (dom-by-tag dom 'title)))
+                            (title (string-trim (dom-text node))))
+                  (unless (string-empty-p title) title)))
+            (kill-buffer buffer)))
       (error nil)))
 
    ((string-prefix-p "id:" url t)
@@ -1961,14 +1995,14 @@ This function is expected to be hooked in org-mode."
    ((string-prefix-p "elfeed:" url t)
     (let* ((link (string-remove-prefix "elfeed:" url))
            (entry (when (string-match "\\([^#]+\\)#\\(.+\\)" link)
-		    (elfeed-db-get-entry (cons (match-string 1 link)
-					       (match-string 2 link))))))
+                    (elfeed-db-get-entry (cons (match-string 1 link)
+                                               (match-string 2 link))))))
       (when entry
         (let ((title (elfeed-entry-title entry))
-	      (author (get-elfeed-entry-author entry)))
+              (author (get-elfeed-entry-author entry)))
           (if author
-	      (format "%s - %s" title author)
-	    title)))))
+              (format "%s - %s" title author)
+            title)))))
 
    (t nil)))		       ; Return nil for unrecognized URL types
 
@@ -2901,12 +2935,12 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 
 ;;; *** Journal watch tracking
 (use-package jrnl-video-watch
-  :defer t
   :load-path "~/.emacs.d/lisp"
   :bind
   (:map org-mode-map
         ("C-c n w p" . jrnl-video-set-watch-pct)
         ("C-c n w u" . jrnl-video-mark-unwatched)))
+
 ;;; ** Helper functions
 
 (defun js/org--derive-title ()
