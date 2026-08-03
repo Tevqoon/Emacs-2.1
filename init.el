@@ -6858,6 +6858,11 @@ With DRY-RUN non-nil (or a prefix arg interactively), only report what would be 
           (anki-editor-api-call-result 'deleteNotes :notes orphaned)
           (message "Deleted %d orphaned note(s)." (length orphaned)))))))
 
+(defun jcs-insert-em-dash ()
+  "Insert an em-dash at point"
+  (interactive)
+  (insert 8212))
+
 ;;;
 ;;; End of configuration file.
 ;;; init.el ends here
