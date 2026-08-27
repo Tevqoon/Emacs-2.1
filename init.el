@@ -117,6 +117,7 @@
 
   (repeat-mode +1)
 
+  ;; https://www.jamescherti.com/emacs-scrolling-better-performance-usability/
   ;; set reasonable scrolling
   (setq scroll-margin 0)
   (setq scroll-preserve-screen-position 1)
@@ -1230,7 +1231,7 @@ Produces multiple regions so expreg can step through them."
 
 (use-package multiple-cursors
   :defer t
-  :bind (("s-<down>" . mc/mark-next-like-this)
+  :bind* (("s-<down>" . mc/mark-next-like-this)
 	 ("s-<up>" . mc/mark-previous-like-this)
 	 ("s-M-<up>" . mc/unmark-next-like-this)
 	 ("s-M-<down>" . mc/unmark-previous-like-this)
@@ -2941,6 +2942,7 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 ;;; *** Journal watch tracking
 (use-package jrnl-video-watch
   :load-path "~/.emacs.d/lisp"
+  :after org
   :bind
   (:map org-mode-map
         ("C-c n w p" . jrnl-video-set-watch-pct)
@@ -5728,7 +5730,7 @@ If none of the selected entries are downloaded, a message is shown."
 ;;; * Annotation importer
 
 (use-package org-roam-annotation-import
-  :defer t
+  :after org
   :vc (:url "https://github.com/Tevqoon/org-roam-annotation-import" :rev :newest)
   :bind* (("C-c n p r a" . wallabag-synchronise-annotations)
           ("C-c n p z" . js/anki-push-zotero)
@@ -6075,7 +6077,7 @@ Prompts for optional URL and TITLE; falls back to buffer name as title."
 ;;; ** Wallabag edit
 
 (use-package wallabag-clean
-  :defer t
+  :defer nil
   :load-path "~/.emacs.d/lisp"
   :commands (js/wallabag-edit-entry js/wallabag-edit-clean)
   :bind (:map wb-edit-mode-map
