@@ -5658,7 +5658,7 @@ If the file doesn't exist, removes the +downloaded tag and skips it."
          (output-template (concat (file-name-as-directory yt-dlp-folder)
                                   (escape-single-quotes base-filename)
                                   ".%(ext)s"))
-         (yt-dlp-command (format "yt-dlp --no-progress -S 'res:1080' --embed-subs --sub-lang 'en.*' --sponsorblock-mark all --sponsorblock-remove 'sponsor' -o '%s' '%s'"
+         (yt-dlp-command (format "yt-dlp --no-progress -S 'res:1080' --embed-subs --sub-lang 'en.*' --sponsorblock-mark all --sponsorblock-remove 'sponsor' -o '%s' '%s' --cookies-from-browser firefox"
                                  output-template (elfeed-entry-link entry)))
          (process (start-process-shell-command "yt-dlp" "*yt-dlp-output*" yt-dlp-command)))
     (set-process-sentinel process (eval (create-single-entry-sentinel entry base-filename)))
