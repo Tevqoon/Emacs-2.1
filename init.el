@@ -6701,11 +6701,12 @@ When pressed twice, make the sub/superscript roman."
   :bind ("M-s d" . docker))
 
 ;;; * Video Trimmer
+
 (use-package video-trimmer
   :defer t
   :vc (:url "https://github.com/xenodium/video-trimmer")
   :bind (:map dired-mode-map
-	      ("V" . video-trimmer-trim))
+	      ("V" . video-trimmer-trim-file))
   :custom
   (video-trimmer-move-by-increment 1.0)
   (video-trimmer-auto-show-transient-menu t))
