@@ -117,6 +117,11 @@
 
   (repeat-mode +1)
 
+  ;; set reasonable scrolling
+  (setq scroll-margin 0)
+  (setq scroll-preserve-screen-position 1)
+  (setq scroll-conservatively 100000)
+
   ;; utf-8
   (setq locale-coding-system 'utf-8)
   (set-selection-coding-system 'utf-8)
