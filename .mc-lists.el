@@ -118,6 +118,7 @@
         paredit-backward-kill-word
         paredit-delete-char
         paredit-forward-kill-word
+        paredit-kill
         paredit-raise-sexp
         phi-search
         racket-insert-closing

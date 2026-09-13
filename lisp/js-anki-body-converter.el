@@ -28,7 +28,7 @@
 ;;; --- Block type classifications ---
 
 (defconst js/anki-hint-block-types
-  '("definition" "def")
+  '("definition" "def" "axiom")
   "Block types whose body becomes the Hint field (highest priority).")
 
 (defconst js/anki-hint-fallback-block-types
