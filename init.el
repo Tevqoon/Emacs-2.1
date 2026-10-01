@@ -4285,7 +4285,8 @@ _S_manual
      (ocaml . t)
      (octave . t)
      (awk . t)
-     (shell . t)))
+     (shell . t)
+     (gap . t)))
 
   (add-to-list 'org-structure-template-alist '("sh" . "src shell"))
   (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
@@ -6701,6 +6702,24 @@ When pressed twice, make the sub/superscript roman."
   :defer t
   :ensure t
   :bind ("M-s d" . docker))
+
+;;; ** GAP
+
+(use-package gap-mode
+  :custom
+  (gap-executable "/opt/homebrew/bin/gap"))
+
+(use-package ob-gap
+  :vc (:url "https://github.com/cjrl/babel-gap")
+  :config
+  (require 'ansi-color)
+  (defun org-babel-execute:gap (body _params)
+    "Execute GAP BODY in quiet batch mode, stripping ANSI escapes and CRs."
+    (replace-regexp-in-string
+     "\r" ""
+     (ansi-color-filter-apply
+      (org-babel-eval (concat (shell-quote-argument gap-executable) " -q -b -A")
+                      body)))))
 
 ;;; * Video Trimmer
 
