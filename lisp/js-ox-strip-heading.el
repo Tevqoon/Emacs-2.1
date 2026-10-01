@@ -28,7 +28,8 @@
 
 (defcustom js/ox-strip-heading-predicates
   (list #'js/ox-headline-anki-note-p
-        #'js/ox-headline-noheading-tag-p)
+        #'js/ox-headline-noheading-tag-p
+        #'js/ox-headline-default-strip-p)
   "List of predicate functions controlling which headlines are stripped.
 
 Each function receives one argument: the org-element headline node.
@@ -100,6 +101,39 @@ headlines are handled before their parents."
     (dolist (hl targets)
       (js/ox-splice-headline hl)))
   tree)
+
+;;; --- File-level default ---
+
+(defcustom js/ox-strip-heading-default nil
+  "Which headlines are stripped by default, without needing :noheading:.
+
+  nil        — none; only the other predicates apply
+  t          — every headline
+  N          — headlines of level N
+  (N M ...)  — headlines whose level is in the list
+
+A headline tagged :keepheading: is exempt from this default.  It is
+still subject to the other predicates.  Intended to be set per file with
+  #+BIND: js/ox-strip-heading-default 2"
+  :type '(choice (const :tag "None" nil)
+                 (const :tag "All headlines" t)
+                 (integer :tag "Single level")
+                 (repeat :tag "Levels" integer))
+  :group 'js-ox)
+
+(defun js/ox-headline-default-strip-p (headline)
+  "Return non-nil if HEADLINE is stripped by `js/ox-strip-heading-default'."
+  (let ((default js/ox-strip-heading-default)
+        (level   (org-element-property :level headline)))
+    ;; Tolerate a quoted list from #+BIND, e.g. '(1 2).
+    (when (eq (car-safe default) 'quote)
+      (setq default (cadr default)))
+    (and (not (member "keepheading" (org-element-property :tags headline)))
+         (pcase default
+           ('nil nil)
+           ('t   t)
+           ((pred integerp) (= level default))
+           ((pred consp)    (memq level default))))))
 
 ;;; --- Registration ---
 
