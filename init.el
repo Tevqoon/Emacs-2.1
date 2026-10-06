@@ -4310,7 +4310,8 @@ _S_manual
   (add-to-list 'org-structure-template-alist '("cor" . "corollary"))
   (add-to-list 'org-structure-template-alist '("def" . "definition"))
   (add-to-list 'org-structure-template-alist '("rem" . "remark"))
-  (add-to-list 'org-structure-template-alist '("ax" . "axiom")))
+  (add-to-list 'org-structure-template-alist '("ax" . "axiom"))
+  (add-to-list 'org-structure-template-alist '("gap" . "src gap")))
 
 (use-package corg			; Completion for org blocks
   :defer t
@@ -6267,7 +6268,7 @@ When pressed twice, make the sub/superscript roman."
      (?t "\\text" nil t nil nil)
      ( ?l    "\\operatorname"                   "\\textsl" t   nil nil )
      (?o "\\mathring" nil t nil nil)
-     ( ?C    "\\Class"           nil        t   nil nil )
+     ( ?C    "\\Cat"           nil        t   nil nil )
      ( ?B    "\\mathbb"            nil t   nil nil )
      ( ?d   "\\llbracket ? \\rrbracket"  nil        nil nil nil )
      ( ?p   "\\llparenthesis ? \\rrparenthesis"  nil        nil nil nil )
