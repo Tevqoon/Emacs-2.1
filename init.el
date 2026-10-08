@@ -380,7 +380,19 @@ are defining or executing a macro."
   (visual-fill-column-mode-hook . efs/org-mode-visual-fill)
   (text-mode-hook . visual-line-mode)
   (visual-line-mode-hook . visual-wrap-prefix-mode)
-  text-mode-hook)
+  text-mode-hook
+  :config
+  (defun js/visual-wrap-skip-org-headings (orig)
+    "Don't apply visual-wrap prefixes/min-width to Org headlines.
+Org-superstar shrinks the `** ' prefix on display, so Emacs 31's
+min-width padding shows up as a gap (underlined before links)."
+    (unless (and (derived-mode-p 'org-mode)
+                 (looking-at-p org-outline-regexp-bol))
+      (funcall orig)))
+
+  (advice-add 'visual-wrap--apply-to-line :around
+              #'js/visual-wrap-skip-org-headings)
+  )
 
 (defun efs/org-mode-visual-fill ()
   "Sets the width just so that there's a little bit
