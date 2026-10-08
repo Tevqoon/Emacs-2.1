@@ -6386,7 +6386,7 @@ When pressed twice, make the sub/superscript roman."
   ;; 1.6 fucks randy up
   (pcase system-type
     ('gnu/linux (plist-put org-format-latex-options :scale 2.0))
-    ('darwin (plist-put org-format-latex-options :scale 1.6)))
+    ('darwin (plist-put org-format-latex-options :scale 1.2)))
   )
 
 
