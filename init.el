@@ -1576,108 +1576,14 @@ folds nest: opening the innermost can leave an ancestor still closed."
   (Man-switches "-a")
   (Man-notify-method 'pushy))
 
-;;; * AI configuration
-;;; ** GPTel
-
-(use-package gptel
-  :defer t
-  :bind
-  (("C-c g k" . gptel-abort)
-   ("C-c g c" . gptel-add)
-   ("C-c g r" . gptel-rewrite)
-   ("C-c g s" . gptel-send)
-   ("C-c g /" . gptel-menu)
-   ("C-c g g" . gptel)
-   ("C-c g w" . org/save-gptel-chat-as-node)
-   ("C-c g M" . mcp-hub)
-   (:map gptel-mode-map
-	 ("C-c g t o" . gptel-org-set-topic)))
-  :custom
-  (gptel-default-mode 'org-mode)
-
-  :config
-  (setq gptel-model 'claude-haiku-4.5)
-  (setq gptel-backend (gptel-make-gh-copilot "Copilot"))
-
-  (setq-default gptel-include-reasoning nil)
-  (setq-default gptel-include-tool-results 'auto)
-
-  (gptel-make-openai "OpenRouter"
-                     :host "openrouter.ai"
-                     :endpoint "/api/v1/chat/completions"
-                     :stream t
-                     :key 'gptel-api-key-from-auth-source
-                     :models '(openai/gpt-5-mini
-	                       openai/gpt-4o
-	                       openai/o4-mini-deep-research
-	                       anthropic/claude-sonnet-4.6))
-
-  (gptel-make-openai "Cerebras"
-                     :host "api.cerebras.ai"
-                     :endpoint "/v1/chat/completions"
-                     :stream nil
-                     :key 'gptel-api-key-from-auth-source
-                     :models '(gpt-oss-120b
-                               zai-glm-4.7))
-
-  (require 'gptel-integrations)
-  (require 'gptel-org)
-
-
-  (defvar org-roam-chatlogs-directory "chatlogs/"
-    "The directory to save gptel chatlogs in.")
-
-  (defun org/enable-gptel-for-chatlog-buffer ()
-    "Enable gptel-mode if the current buffer has the `chatlog' tag."
-    (when (and (buffer-file-name)
-	       (member "chatlog" (vulpea-buffer-tags-get)))
-      (gptel-mode 1)))
-
-  (defun org/save-gptel-chat-as-node ()
-    "Save the current gptel chat buffer as an org-roam node and link it in today's journal."
-    (interactive)
-    (let* ((existing-id (org-id-get))
-           (title (read-string "Title for chat node: " (format-time-string "Chat %Y-%m-%d %H:%M")))
-           (chatlog-dir (expand-file-name org-roam-chatlogs-directory org-roam-directory))
-           (file-name (format-time-string "Chat-%Y-%m-%d_%H-%M.org"))
-           (full-path (expand-file-name file-name chatlog-dir)))
-
-      (if existing-id
-          (save-buffer)
-
-	(unless (file-directory-p chatlog-dir)
-          (make-directory chatlog-dir t))
-
-	(write-file full-path)
-
-	(goto-char (point-min))
-	(org-id-get-create)
-	(unless (save-excursion (re-search-forward "^#\\+title:" nil t))
-          (goto-char (point-min))
-          (when (re-search-forward "^:END:$" nil t)
-            (forward-line 1)
-            (insert (format "#+title: %s\n" title))))
-
-	(save-buffer)
-	(org-roam-db-sync)
-
-	(let* ((node-id (org-id-get))
-	       (link (org-roam-link-make-string node-id title)))
-          (org-roam-dailies-autocapture-today "c" link)
-          (message "Chat saved as '%s' and linked in today's journal." title)))))
-
-  )
-
-;;; ** Emacs MCP
+;;; * Emacs MCP server
+;;; Exposes Emacs introspection tools to external MCP clients.
 
 (use-package mcp-server-lib
-  :demand t
-  ;; :if (not (eq system-type 'android))
-  )
+  :demand t)
 
 (use-package emacs-mcp-tool-server
   :demand t
-  ;; :if (not (eq system-type 'android)) ; Seems not worth the hassle
   :load-path "~/.emacs.d/lisp/emacs-mcp-tool-server"
   :after mcp-server-lib
   :ensure nil
@@ -1688,77 +1594,6 @@ folds nest: opening the innermost can leave an ancestor still closed."
    ("C-c g t r" . emacs-mcp-tool-restart-server)
    ("C-c g t ?" . emacs-mcp-tool-server-status))
   :config (require 'emacs-mcp-tool-server))
-
-(use-package mcp
-  :demand t
-  ;; :if (not (eq system-type 'android))
-  :after emacs-mcp-tool-server
-  :ensure t
-  :config
-  (setq mcp-hub-servers
-        `(("duckduckgo" . (:command "uvx" :args ("duckduckgo-mcp-server")))
-	  ("emacs-mcp-tool-server" .
-	   (:command ,(expand-file-name "~/.emacs.d/emacs-mcp-stdio.sh")
-		     :args ("--init-function=emacs-mcp-tool-start-server"
-			    "--stop-function=emacs-mcp-tool-stop-server"
-			    "--server-id=default")))))
-  (require 'mcp-hub)
-  (mcp-hub-start-all-server))
-
-;;; ** Xenodium Agent shell
-
-(use-package agent-shell
-  :defer t
-  :ensure t
-  :ensure-system-package
-  ((opencode . "npm install -g opencode-ai")
-   (claude-agent-acp . "npm install -g @zed-industries/claude-code-acp"))
-  :custom
-  ;; default agent for M-x agent-shell
-  (agent-shell-preferred-agent-config 'claude-code)
-  ;; --- opencode ---
-  (agent-shell-opencode-default-model-id "github-copilot/claude-haiku-4.5")
-  ;; --- claude code ---
-  (agent-shell-anthropic-default-model-id nil)
-  (agent-shell-anthropic-authentication
-   (agent-shell-anthropic-make-authentication :login t))
-  ;; --- shared ---
-  (agent-shell-prefer-viewport-interaction t)
-  (agent-shell-session-strategy 'new)
-  (agent-shell-show-usage-at-turn-end t)
-  :bind
-  ("C-c g a" . agent-shell)                              ; default (claude-code)
-  (:map agent-shell-mode-map
-	("M-<tab>" . agent-shell-cycle-session-mode)
-	("C-c C-f" . agent-shell-prompt-compose)))
-
-(use-package agent-shell-manager
-  :defer t
-  ;; :if (not (eq system-type 'android))
-  :vc (:url "https://github.com/jethrokuan/agent-shell-manager"
-	    :rev :newest)
-  :after agent-shell
-  :bind ("C-c g m" . agent-shell-manager-toggle)
-  :custom
-  (agent-shell-manager-side 'bottom))
-
-(use-package agent-shell-attention
-  ;; :if (not (eq system-type 'android))
-  :vc (:url "https://github.com/ultronozm/agent-shell-attention.el"
-	    :rev :newest)
-  :after agent-shell
-  :demand t
-  :bind ("C-c g j" . agent-shell-attention-jump)
-  :custom
-  (agent-shell-attention-render-function #'agent-shell-attention-render-active)
-  (agent-shell-attention-indicator-location 'global-mode-string)
-  (agent-shell-attention-notify-function
-   (lambda (_buffer title body)
-     (alert body :title title :category 'agent-shell)))
-
-  :config
-  (agent-shell-attention-mode 1))
-
 ;;; * Dired
 (use-package dired
   :ensure nil
