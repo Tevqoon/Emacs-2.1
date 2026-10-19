@@ -2342,14 +2342,19 @@ Falls back to #+attr_latex :options for backwards compatibility."
   :defer t
   :hook org-mode-hook)
 
-(use-package org-superstar
-  :defer t
-  :custom
-  (org-superstar-leading-bullet ?\u2002)
+;; (use-package org-superstar
+;;   :defer t
+;;   :custom
+;;   (org-superstar-leading-bullet ?\u2002)
+;;   :hook org-mode-hook)
+
+(use-package org-ibullets
+  :commands org-ibullets-mode
+  :vc (:url "https://github.com/jamescherti/org-ibullets.el")
   :hook org-mode-hook)
 
+
 (use-package org-pretty-table
-  :defer t
   :vc (:url "https://github.com/fuco1/org-pretty-table")
   :hook org-mode-hook)
 
