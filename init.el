@@ -4193,7 +4193,7 @@ _S_manual
   ("C-c n b o" . js/blog-open-in-browser)
 
   :custom
-  (org-static-blog-publish-title "My Blog")
+  (org-static-blog-publish-title "Jure Smolar")
   (org-static-blog-publish-url "https://jure.smolar.si/")
   (org-static-blog-publish-directory "~/Documents/blog/")
   (org-static-blog-posts-directory org-roam-directory)
