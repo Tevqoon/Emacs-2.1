@@ -817,6 +817,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
   (isearch-allow-scroll t)
   (lazy-count-prefix-format nil)
   (lazy-count-suffix-format " [%s/%s]")
+  (isearch-allow-motion t)              ; Allow jumping around the buffer
   :bind
   ("M-s i" . isearch-forward))
 
@@ -1687,6 +1688,7 @@ folds nest: opening the innermost can leave an ancestor still closed."
   (org-insert-heading-respect-content t)
   (org-export-with-broken-links t)
   (org-loop-over-headlines-in-active-region 'start-level)
+  (org-return-follows-link t)           ; Open org links with RET
 
   (org-special-ctrl-a/e t)
   (org-auto-align-tags nil)
@@ -1724,7 +1726,7 @@ folds nest: opening the innermost can leave an ancestor still closed."
    ("C-'" . nil)
    ("C-," . nil))
   :config
-  (add-hook 'org-export-before-processing-hook #'js/org-export-configure-numbering)
+  (add-hook 'org-export-before-processing-functions #'js/org-export-configure-numbering)
   ;; Open links in the same window
   (setf (alist-get 'file org-link-frame-setup) #'find-file)
   (setq org-latex-compiler "pdflatex")
