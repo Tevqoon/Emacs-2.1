@@ -25,24 +25,25 @@
          (timestamp (format-time-string "[%Y-%m-%d %a %H:%M]"))
          (entry (format "- %s uptime=%ds (%s)\n" timestamp uptime-s human))
          (heading (format "* %s" host)))
-    (with-temp-buffer
-      (when (file-exists-p js/uptime-log-file)
-        (insert-file-contents js/uptime-log-file))
-      (goto-char (point-min))
-      ;; Find or create host headline
-      (if (re-search-forward (concat "^" (regexp-quote heading) "$") nil t)
-          ;; Move to end of this headline's content (before next headline or EOF)
-          (progn
-            (forward-line 1)
-            (while (and (not (eobp))
-                        (not (looking-at "^\\* ")))
-              (forward-line 1)))
-        ;; No headline found — create it at end
-        (goto-char (point-max))
-        (unless (bolp) (insert "\n"))
-        (insert heading "\n"))
-      (insert entry)
-      (write-region (point-min) (point-max) js/uptime-log-file nil 'silent))))
+    (when (>= uptime-s 3600)
+     (with-temp-buffer
+       (when (file-exists-p js/uptime-log-file)
+         (insert-file-contents js/uptime-log-file))
+       (goto-char (point-min))
+       ;; Find or create host headline
+       (if (re-search-forward (concat "^" (regexp-quote heading) "$") nil t)
+           ;; Move to end of this headline's content (before next headline or EOF)
+           (progn
+             (forward-line 1)
+             (while (and (not (eobp))
+                         (not (looking-at "^\\* ")))
+               (forward-line 1)))
+         ;; No headline found — create it at end
+         (goto-char (point-max))
+         (unless (bolp) (insert "\n"))
+         (insert heading "\n"))
+       (insert entry)
+       (write-region (point-min) (point-max) js/uptime-log-file nil 'silent)))))
 
 (provide 'js-uptime)
 ;;; js-uptime.el ends here
