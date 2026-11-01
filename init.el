@@ -1786,13 +1786,14 @@ This function is expected to be hooked in org-mode."
 ;;; ** Links
 
 (defun get-org-link-at-point ()
-  "Get URL and description of Org link at point."
-  (interactive)
-  (let* ((context (org-element-context)))
-    (when (equal (car context) 'link)
-      (list (org-element-property :type context)
-	    (org-element-property :raw-link context)
-	    (org-element-property :description context)))))
+  "Return (TYPE URL DESCRIPTION) of the Org link at point, or nil."
+  (let ((ctx (org-element-context)))
+    (when (eq (org-element-type ctx) 'link)
+      (list (org-element-property :type ctx)
+            (org-element-property :raw-link ctx)
+            (when-let ((beg (org-element-property :contents-begin ctx)))
+              (buffer-substring-no-properties
+               beg (org-element-property :contents-end ctx)))))))
 
 (defun js/youtube-url-p (url)
   "Return non-nil if URL points at a YouTube video."
@@ -1872,19 +1873,24 @@ This function is expected to be hooked in org-mode."
 (defun ar/org-insert-link-dwim ()
   "Like `org-insert-link' but with personal dwim preferences."
   (interactive)
-  (let* ((point-in-link (org-in-regexp org-link-any-re 1))
+  (let* ((bounds (org-in-regexp org-link-any-re 1)) ; (BEG . END) or nil
+         (link (and bounds (get-org-link-at-point)))
          (clipboard-url (when (string-match-p "^http" (current-kill 0))
                           (current-kill 0)))
-         (region-content (when (region-active-p)
-                           (buffer-substring-no-properties (region-beginning)
-                                                           (region-end)))))
-    (cond ((and region-content clipboard-url (not point-in-link))
-           (delete-region (region-beginning) (region-end))
-           (insert (org-link-make-string clipboard-url region-content)))
-	  ;; New URLs default to title
-          ((and clipboard-url (not point-in-link))
-           (insert (js/format-link clipboard-url)))
-          (t (call-interactively 'org-insert-link)))))
+         ;; Titled replacement for an http(s) link without a description
+         (title (pcase link
+                  (`(,(or "http" "https") ,url nil) (js/get-link-title url)))))
+    (cond
+     (title
+      (delete-region (car bounds) (cdr bounds))
+      (insert (org-link-make-string (cadr link) title)))
+     ((and (region-active-p) clipboard-url (not bounds))
+      (let ((text (buffer-substring-no-properties (region-beginning) (region-end))))
+        (delete-region (region-beginning) (region-end))
+        (insert (org-link-make-string clipboard-url text))))
+     ((and clipboard-url (not bounds))
+      (insert (js/format-link clipboard-url)))
+     (t (call-interactively 'org-insert-link)))))
 
 (defun js/youtube-channel-rss (url)
   "Extract the RSS feed URL from a YouTube channel URL."
@@ -4188,7 +4194,6 @@ _S_manual
   (org-html-htmlize-output-type 'css))
 
 (use-package org-static-blog
-  :commands js/makovec-rss
   :bind
   ("C-c n b b" . org-static-blog-publish)
   ("C-c n b p" . js/sync-blog)
@@ -4551,12 +4556,6 @@ With C-u C-u: pull static/ from remote."
                     ((= (prefix-numeric-value arg) 16) "pull-static")
                     (t "sync-static"))))
       (compile (format "make %s" target))))
-
-  (defun js/makovec-rss ()
-    "Scrape makovec and add to blog"
-    (interactive)
-    (let* ((default-directory (expand-file-name "~/Documents/blog/")))
-      (compile "make makovec")))
 
   (defun js/blog-open-in-browser ()
     "Open the current org-roam file as its published blog URL."
@@ -6043,12 +6042,12 @@ When pressed twice, make the sub/superscript roman."
      (?a    "\\norm"          nil        t   nil nil )
      (?h    "\\ch"          nil        t   nil nil )
      (?t "\\text" nil t nil nil)
-     ( ?l    "\\operatorname"                   "\\textsl" t   nil nil )
+     (?l    "\\operatorname"                   "\\textsl" t   nil nil )
      (?o "\\mathring" nil t nil nil)
-     ( ?C    "\\Cat"           nil        t   nil nil )
-     ( ?B    "\\mathbb"            nil t   nil nil )
-     ( ?d   "\\llbracket ? \\rrbracket"  nil        nil nil nil )
-     ( ?p   "\\llparenthesis ? \\rrparenthesis"  nil        nil nil nil )
+     (?C    "\\Cat"           nil        t   nil nil )
+     (?B    "\\mathbb"            nil t   nil nil )
+     (?d   "\\llbracket ? \\rrbracket"  nil        nil nil nil )
+     (?p   "\\llparenthesis ? \\rrparenthesis"  nil        nil nil nil )
      ))
 
   (cdlatex-math-symbol-alist
@@ -6068,6 +6067,7 @@ When pressed twice, make the sub/superscript roman."
      (?. ("\\cdot" ".\\,"))
      (?, ("\\,"))
      (?b ("\\beta" "\\bind"))
+     (?1 ("^{-1}"))
      ))
 
   :hook
