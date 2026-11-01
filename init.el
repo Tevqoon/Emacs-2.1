@@ -1679,7 +1679,7 @@ folds nest: opening the innermost can leave an ancestor still closed."
   "Buffer-local variable to enable/disable tag updating.")
 
 (use-package org
-  :ensure nil
+  :vc (:url "https://git.savannah.gnu.org/git/emacs/org-mode.git")
   :custom
   (org-hide-emphasis-markers t)
   (org-image-actual-width nil)
@@ -1749,7 +1749,6 @@ folds nest: opening the innermost can leave an ancestor still closed."
 	   ("\\subsection{%s}" . "\\subsection*{%s}")
 	   ("\\subsubsection{%s}" . "\\subsubsection*{%s}"))))
   (setq org-export-with-section-numbers nil)
-
   )
 
 (use-package org-num
@@ -6095,65 +6094,38 @@ When pressed twice, make the sub/superscript roman."
   (:map org-mode-map
 	("$" . math-delimiters-insert)))
 
-;;; ** Xenops/fragtog/org latex
+;;; ** org-latex-preview
 
-(use-package xenops
-  :after org
-  :bind
-  (:map org-mode-map
-	("C-c n !" . xenops-mode))
-  :config
-  (setq xenops-reveal-on-entry t)
-  (pcase system-type
-    ('gnu/linux (setq xenops-math-image-scale-factor 2.0))
-    ('darwin (setq xenops-math-image-scale-factor 1.6)))
-  (setq xenops-math-latex-process 'imagemagick)
-  (defun xenops-src-parse-at-point ()
-    "Parse 'src element at point."
-    (-if-let* ((element (xenops-parse-element-at-point 'src))
-	       (org-babel-info
-		(xenops-src-do-in-org-mode
-		 (org-babel-get-src-block-info 'light (org-element-context)))))
-	      (xenops-util-plist-update
-	       element
-	       :type 'src
-	       :language (nth 0 org-babel-info)
-	       :org-babel-info org-babel-info))))
+;; [[https://abode.karthinks.com/org-latex-preview/#orge0949a8][=org-latex-preview=: Set up and troubleshooting]]
+;; (package-vc-install
+;;  '(org :url "https://git.savannah.gnu.org/git/emacs/org-mode.git"
+;;        :lisp-dir "lisp"
+;;        :make '("autoloads" "info")
+;;        :doc "doc/org.texi"))
 
-(use-package org-fragtog
-  ;; :disabled ;; Seems like xenops is working again
-  ;; Not disabled but unhooked - I set some C-c C-x C-l stuff here
-  :after org
+(use-package org-latex-preview
+  :ensure nil
+  :hook org-mode-hook
   :custom
-  (org-latex-create-formula-image-program 'imagemagick-lualatex)
   (org-latex-packages-alist
    (pcase system-type
      ('gnu/linux '(("" "/home/jure/.emacs.d/defaults/js" t)))
      ('darwin '(("" "/Users/jure/.emacs.d/defaults/js" t)))))
-  (org-export-in-background nil)
-
   :config
-  (add-to-list
-   'org-preview-latex-process-alist
-   '(imagemagick-lualatex
-     :programs ("lualatex" "convert") :description "pdf > png"
-     :message
-     "you need to install the programs: latex and imagemagick."
-     :image-input-type "pdf" :image-output-type "png"
-     :image-size-adjust (1.0 . 1.0)
-     :latex-compiler
-     ("lualatex -interaction nonstopmode -output-directory %o %f")
-     :image-converter
-     ("convert -verbose -density %D -background none -trim -antialias %f -quality 100 %O")
-     ))
+  (plist-put org-latex-preview-appearance-options
+             :page-width 0.8)
+  (setq org-latex-preview-process-default 'dvisvgm)
 
-  ;; In some rare cases, the argument that gets passed to the density makes convert unable to trim.
-  ;; 1.6 fucks randy up
-  (pcase system-type
-    ('gnu/linux (plist-put org-format-latex-options :scale 2.0))
-    ('darwin (plist-put org-format-latex-options :scale 1.2)))
-  )
+  ;; ;; Block C-n, C-p etc from opening up previews when using `org-latex-preview-mode'
+  ;; (setq org-latex-preview-mode-ignored-commands
+  ;;       '(next-line previous-line mwheel-scroll
+  ;;         scroll-up-command scroll-down-command))
 
+  ;; Bonus: Turn on live previews.  This shows you a live preview of a LaTeX
+  ;; fragment and updates the preview in real-time as you edit it.
+  ;; To preview only environments, set it to '(block edit-special) instead
+  (setq org-latex-preview-mode-display-live t)
+  (setq org-latex-preview-mode-update-delay 0.25))
 
 ;;; * Programming
 ;;; ** Magit and VC
