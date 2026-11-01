@@ -516,6 +516,7 @@ the old view instead of scrolling to it."
    ;; Macos Registers ;;
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(file-name-concat org-directory "tasks.org")))
+   (set-register ?@ `(file . ,(concat org-directory "/20261013235900-anti_ai.org")))
    (set-register ?j `(file . ,(file-name-concat org-directory "journal/Journelly.org")))
    (defun js/open-journelly ()
      "Jump to the Journelly.org file stored in register ?j."
@@ -599,6 +600,7 @@ by a factor of 10, as the default pty size is a pitiful 1024 bytes."
 
    (set-register ?r '(file . "~/.emacs.d/init.el"))
    (set-register ?t `(file . ,(concat org-directory "/tasks.org")))
+   (set-register ?@ `(file . ,(concat org-directory "/20261013235900-anti_ai.org")))
    (set-register ?p `(file . ,(concat org-directory "/journal/Journelly.org")))
    (set-register ?l '(file . "~/.stumpwm.d/init.lisp")) ;; StumpWM config
    (set-register ?n '(file . "/etc/nixos/configuration.nix")) ;; StumpWM config
@@ -4421,7 +4423,7 @@ tikz-cd, bussproofs, forest and the \\N/\\Z macros are all available.")
 
   ;; tikz-cd needs a real PDF (it does not survive the dvi route), and dvisvgm
   ;; would need Ghostscript to read PDFs, so go through pdf2svg instead.
-  (add-to-list 'org-preview-latex-process-alist
+  (add-to-list 'org-latex-preview-process-alist
                `(js-blog-svg
                  :programs ("lualatex" "pdf2svg")
                  :description "pdf > svg"
