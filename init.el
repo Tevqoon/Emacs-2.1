@@ -6126,7 +6126,7 @@ When pressed twice, make the sub/superscript roman."
   ;; Bonus: Turn on live previews.  This shows you a live preview of a LaTeX
   ;; fragment and updates the preview in real-time as you edit it.
   ;; To preview only environments, set it to '(block edit-special) instead
-  (setq org-latex-preview-mode-display-live t)
+  (setq org-latex-preview-mode-display-live nil)
   (setq org-latex-preview-mode-update-delay 0.25))
 
 ;;; * Programming
@@ -6207,6 +6207,10 @@ When pressed twice, make the sub/superscript roman."
   ;; 	      ("M-l" . flymake-show-buffer-diagnostics)
   ;; 	      )
   )
+
+(use-package kanata-kbd-mode
+  :vc (:url "https://github.com/chmouel/kanata-kbd-mode/" :rev :newest)
+  :mode ("\\.kbd\\'" . kanata-kbd-mode))
 
 ;;; ** LSP Eglot
 
