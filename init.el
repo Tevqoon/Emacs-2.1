@@ -4187,9 +4187,11 @@ _S_manual
      (octave . t)
      (awk . t)
      (shell . t)
-     (gap . t)))
+     (gap . t)
+     (nix . t)))
 
   (add-to-list 'org-structure-template-alist '("sh" . "src shell"))
+  (add-to-list 'org-structure-template-alist '("nix" . "src nix"))
   (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
   (add-to-list 'org-structure-template-alist '("hl" . "src haskell"))
   (add-to-list 'org-structure-template-alist '("py" . "src python :results output"))
@@ -6516,6 +6518,11 @@ When pressed twice, make the sub/superscript roman."
      (ansi-color-filter-apply
       (org-babel-eval (concat (shell-quote-argument gap-executable) " -q -b -A")
                       body)))))
+
+;;; ** Nix
+
+(use-package ob-nix
+  :vc (:url "https://github.com/emacsmirror/ob-nix"))
 
 ;;; * Video Trimmer
 
