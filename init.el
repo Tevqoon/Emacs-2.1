@@ -2842,45 +2842,85 @@ Can optionally pass in your own `NODE-ID' which will get used as the target node
 ;;   (let ((node (vulpea-db-get-by-id (org-roam-backlink-source-id backlink))))
 ;;     (member "ARCHIVE" (vulpea-note-tags node))))
 
-;; https://freerangebits.com/posts/2024/01/archiving-in-org-mode/
+(defun js/org-archive-daily-finalize ()
+  "Finalize the entry just archived to the daily file.
+Meant for `org-archive-finalize-hook'; point is on the archived heading.
+Open TODO states become CANCELLED; done states and keyword-less
+entries are left alone.  Also removes the extra blank line that
+`org-archive-subtree' inserts before the new entry."
+  (let ((state (org-get-todo-state)))
+    (when (and state (not (member state org-done-keywords)))
+      (org-todo "CANCELLED")))
+  (let ((beg (point)))
+    (when (< (skip-chars-backward "\n") -1)
+      (forward-char 1)
+      (delete-region (point) beg))))
+
 (defun js/org-archive-subtree-to-daily (&optional _find-done)
   "Archive the current subtree to the roam daily file."
   (interactive "P")
   (require 'org-roam)
   (require 'org-archive)
   (let* ((daily-file (expand-file-name
-		      (format-time-string "%Y-%m-%d.org")
-		      (expand-file-name org-roam-dailies-directory org-roam-directory)))
+                      (format-time-string "%Y-%m-%d.org")
+                      (expand-file-name org-roam-dailies-directory org-roam-directory)))
          (today (if (string= (buffer-file-name) daily-file)
-		    daily-file
+                    daily-file
                   (save-window-excursion
-		    (save-excursion
-		      (org-roam-dailies-goto-today "d")
-		      (buffer-file-name)))))
+                    (save-excursion
+                      (org-roam-dailies-goto-today "d")
+                      (buffer-file-name)))))
          (org-archive-location (concat today "::* Archived today :ARCHIVE:"))
+         (org-archive-finalize-hook (list #'js/org-archive-daily-finalize))
          (file-id (save-excursion
-		    (goto-char (point-min))
-		    (org-roam-id-at-point)))
-         (heading-title (org-get-heading t t t t)))
+                    (goto-char (point-min))
+                    (org-roam-id-at-point))))
     (when file-id
       (org-set-property "ARCHIVE_NODE" (org-roam-link-make-string file-id)))
     (org-archive-subtree 0)
-    ;; Set TODO state to CANCELLED in the archived entry
     (with-current-buffer (find-file-noselect today)
-      (save-excursion
-        (goto-char (point-min))
-        ;; Find the "Archived today" heading
-        (when (re-search-forward "^\\* Archived today" nil t)
-          (let ((archive-end (save-excursion (org-end-of-subtree t t))))
-	    ;; Search for our heading within this subtree
-	    (when (re-search-forward
-                   (format "^\\*\\* .*%s" (regexp-quote heading-title))
-                   archive-end t)
-	      (org-back-to-heading t)
-	      (when (org-get-todo-state)
-                (org-todo "CANCELLED"))))))
       (save-buffer))
     (save-buffer)))
+
+;; https://freerangebits.com/posts/2024/01/archiving-in-org-mode/
+;; (defun js/org-archive-subtree-to-daily (&optional _find-done)
+;;   "Archive the current subtree to the roam daily file."
+;;   (interactive "P")
+;;   (require 'org-roam)
+;;   (require 'org-archive)
+;;   (let* ((daily-file (expand-file-name
+;; 		      (format-time-string "%Y-%m-%d.org")
+;; 		      (expand-file-name org-roam-dailies-directory org-roam-directory)))
+;;          (today (if (string= (buffer-file-name) daily-file)
+;; 		    daily-file
+;;                   (save-window-excursion
+;; 		    (save-excursion
+;; 		      (org-roam-dailies-goto-today "d")
+;; 		      (buffer-file-name)))))
+;;          (org-archive-location (concat today "::* Archived today :ARCHIVE:"))
+;;          (file-id (save-excursion
+;; 		    (goto-char (point-min))
+;; 		    (org-roam-id-at-point)))
+;;          (heading-title (org-get-heading t t t t)))
+;;     (when file-id
+;;       (org-set-property "ARCHIVE_NODE" (org-roam-link-make-string file-id)))
+;;     (org-archive-subtree 0)
+;;     ;; Set TODO state to CANCELLED in the archived entry
+;;     (with-current-buffer (find-file-noselect today)
+;;       (save-excursion
+;;         (goto-char (point-min))
+;;         ;; Find the "Archived today" heading
+;;         (when (re-search-forward "^\\* Archived today" nil t)
+;;           (let ((archive-end (save-excursion (org-end-of-subtree t t))))
+;; 	    ;; Search for our heading within this subtree
+;; 	    (when (re-search-forward
+;;                    (format "^\\*\\* .*%s" (regexp-quote heading-title))
+;;                    archive-end t)
+;; 	      (org-back-to-heading t)
+;; 	      (when (org-get-todo-state)
+;;                 (org-todo "CANCELLED"))))))
+;;       (save-buffer))
+;;     (save-buffer)))
 
 (custom-set-variables
  '(org-archive-default-command #'js/org-archive-subtree-to-daily))
