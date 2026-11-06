@@ -485,7 +485,7 @@ the old view instead of scrolling to it."
   :vc (:url "https://github.com/xenodium/winpulse"
 	    :rev :newest)
   :config
-  (winpulse-mode +1))
+  (winpulse-mode -1))
 
 ;;; * OS specific configuration
 ;;; TODO: OS specific config is its own can of worms
