@@ -4465,7 +4465,7 @@ tikz-cd, bussproofs, forest and the \\N/\\Z macros are all available.")
 
   ;; tikz-cd needs a real PDF (it does not survive the dvi route), and dvisvgm
   ;; would need Ghostscript to read PDFs, so go through pdf2svg instead.
-  (add-to-list 'org-latex-preview-process-alist
+  (add-to-list 'org-preview-latex-process-alist
                `(js-blog-svg
                  :programs ("lualatex" "pdf2svg")
                  :description "pdf > svg"
