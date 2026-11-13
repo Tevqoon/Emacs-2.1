@@ -6040,7 +6040,7 @@ When pressed twice, make the sub/superscript roman."
      ("or" "text or in math" "\\text{ or }" nil nil nil t)
      ("and" "text and in math" "\\text{ and }" nil nil nil t)
 
-
+     ("cd" "comma dots" ",\\dots, " nil nil nil t)
      ("capd" "Inserts cap dots" "\\cap \\cdots \\cap " nil nil nil t)
      ("cupd" "Inserts cup dots" "\\cup \\cdots \\cup " nil nil nil t)
      ("plusd" "Inserts plus dots" "+ \\cdots + " nil nil nil t)
