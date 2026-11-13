@@ -2170,8 +2170,9 @@ Falls back to #+attr_latex :options for backwards compatibility."
 ;;; ** Org-download
 
 (use-package org-download
-  :defer t
-  :after org)
+  :after org
+  :custom
+  (org-download-image-dir (file-name-concat org-directory "download")))
 
 ;;; ** Org-mac-link
 
