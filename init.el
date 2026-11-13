@@ -6511,6 +6511,10 @@ When pressed twice, make the sub/superscript roman."
   :vc (:url "https://github.com/cjrl/babel-gap")
   :config
   (require 'ansi-color)
+  (setq org-babel-default-header-args:gap
+        '((:results . "output replace")
+          (:wrap . "example gap")))
+
   (defun org-babel-execute:gap (body _params)
     "Execute GAP BODY in quiet batch mode, stripping ANSI escapes and CRs."
     (replace-regexp-in-string
