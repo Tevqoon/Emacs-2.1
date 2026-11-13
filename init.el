@@ -4590,15 +4590,15 @@ stays a real table for screen readers."
   (defun js/sync-blog (arg)
     "Sync blog to muffalo server via Makefile targets.
 
-No prefix: sync without static/.
-With C-u: sync including static/ (push).
-With C-u C-u: pull static/ from remote."
+No prefix: sync the current state (make sure to git pull for up to date static).
+With C-u: Sync local files upstream
+With C-u C-u: pull files/ from remote (additively)."
     (interactive "P")
     (let* ((default-directory (expand-file-name "~/Documents/blog/"))
            (target (cond
                     ((null arg) "sync")
-                    ((= (prefix-numeric-value arg) 16) "pull-static")
-                    (t "sync-static"))))
+                    ((= (prefix-numeric-value arg) 16) "pull-files")
+                    (t "sync-files"))))
       (compile (format "make %s" target))))
 
   (defun js/blog-open-in-browser ()
@@ -6501,6 +6501,13 @@ When pressed twice, make the sub/superscript roman."
   :defer t
   :ensure t
   :bind ("M-s d" . docker))
+
+;;; ** Caddyfile
+
+(use-package caddyfile-mode
+  :ensure t
+  :mode (("Caddyfile\\'" . caddyfile-mode)
+         ("caddy\\.conf\\'" . caddyfile-mode)))
 
 ;;; ** GAP
 
