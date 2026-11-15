@@ -6241,6 +6241,8 @@ When pressed twice, make the sub/superscript roman."
   (prog-mode-hook . flymake-mode)
   (prog-mode-hook . subword-mode)
   (lisp-interaction-mode . (lambda () (flymake-mode -1)))
+  :custom
+  (flymake-show-diagnostics-at-end-of-line 'short)
   :config
   (setq flymake-diagnostic-format-alist
         '((t . (origin code message))))
@@ -6262,11 +6264,12 @@ When pressed twice, make the sub/superscript roman."
   :pin gnu
   :bind (:map eglot-mode-map
               ("C-c e a" . eglot-code-actions))
-  :hook ((python-mode-hook        . eglot-ensure)
-         (c-mode-hook             . eglot-ensure)
-         (c++-mode-hook           . eglot-ensure)
-         (rust-mode-hook          . eglot-ensure)
-         (eglot-managed-mode-hook . eglot-semantic-tokens-mode))
+  :hook ((python-mode-hook                 . eglot-ensure)
+         (c-mode-hook                      . eglot-ensure)
+         (c++-mode-hook                    . eglot-ensure)
+         (rust-mode-hook                   . eglot-ensure)
+         ((nix-mode-hook nix-ts-mode-hook) . eglot-ensure)
+         (eglot-managed-mode-hook          . eglot-semantic-tokens-mode))
   :custom
   (eglot-autoshutdown t)
   (eglot-sync-connect nil)
@@ -6375,6 +6378,9 @@ When pressed twice, make the sub/superscript roman."
 (use-package nix-mode
   :defer t
   :mode "\\.nix\\'")
+
+(use-package ob-nix
+  :vc (:url "https://github.com/emacsmirror/ob-nix"))
 
 ;;; ** OCaml
 (use-package neocaml
@@ -6530,11 +6536,6 @@ When pressed twice, make the sub/superscript roman."
      (ansi-color-filter-apply
       (org-babel-eval (concat (shell-quote-argument gap-executable) " -q -b -A")
                       body)))))
-
-;;; ** Nix
-
-(use-package ob-nix
-  :vc (:url "https://github.com/emacsmirror/ob-nix"))
 
 ;;; * Video Trimmer
 
